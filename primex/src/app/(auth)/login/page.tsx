@@ -1,0 +1,189 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Shield, ChevronRight } from "lucide-react";
+import { Button, TextInput, LiveDot, Label } from "@/components/ui";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    router.push("/dashboard");
+    router.refresh();
+  }
+
+  return (
+    <div className="min-h-screen bg-bg flex items-center justify-center px-4">
+      <div className="w-full max-w-[1000px] grid grid-cols-2 rounded-2xl overflow-hidden shadow-xl border border-border">
+        {/* Left — form panel */}
+        <div className="bg-surface flex flex-col justify-center px-12 py-14">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
+              <Shield size={18} className="text-white" strokeWidth={2} />
+            </div>
+            <span className="font-serif text-lg font-semibold text-ink leading-tight">
+              Primex Security System
+            </span>
+          </div>
+
+          {/* Heading */}
+          <Label className="mb-3">Sign in</Label>
+          <h1 className="font-serif text-4xl font-semibold text-ink leading-tight mb-2">
+            Welcome back.
+          </h1>
+          <p className="text-ink-3 text-sm font-sans mb-8">
+            Your dashboard adapts to your role — from live dispatch to executive
+            reporting.
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-ink-2 font-sans">
+                Email address
+              </label>
+              <TextInput
+                type="email"
+                value={email}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-ink-2 font-sans">
+                Password
+              </label>
+              <TextInput
+                type="password"
+                value={password}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-p-red font-sans">{error}</p>
+            )}
+
+            {/* Remember + Forgot */}
+            <div className="flex items-center justify-between mt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  defaultChecked
+                  className="w-4 h-4 rounded border-border accent-p-blue cursor-pointer"
+                />
+                <span className="text-sm text-ink-2 font-sans">
+                  Keep me signed in
+                </span>
+              </label>
+              <button
+                type="button"
+                className="text-sm text-p-blue hover:underline font-sans"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              full
+              icon={ChevronRight}
+              type="submit"
+              disabled={loading}
+              className="mt-2"
+            >
+              {loading ? "Signing in..." : "Continue"}
+            </Button>
+          </form>
+
+          {/* Footer */}
+          <p className="text-sm text-ink-3 font-sans mt-6 text-center">
+            Don&apos;t have an account?{" "}
+            <span className="text-p-blue hover:underline cursor-pointer font-medium">
+              Request access
+            </span>
+          </p>
+        </div>
+
+        {/* Right — navy testimonial panel */}
+        <div className="relative bg-navy flex flex-col justify-between px-12 py-14 overflow-hidden">
+          {/* SVG grid pattern */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ opacity: 0.06 }}
+          >
+            <defs>
+              <pattern
+                id="grid"
+                width="40"
+                height="40"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M 40 0 L 0 0 0 40"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1"
+                />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
+
+          {/* Top — live badge */}
+          <div className="relative z-10 flex items-center gap-2">
+            <LiveDot color="green" />
+            <span className="text-sm font-sans font-medium text-white/80">
+              Live &middot; 32 companies
+            </span>
+          </div>
+
+          {/* Bottom — testimonial */}
+          <div className="relative z-10">
+            <blockquote className="font-serif text-xl italic text-white/90 leading-relaxed mb-6">
+              &ldquo;Primex took our dispatch from spreadsheets to real-time
+              control overnight. We caught two incidents in the first week that
+              we would have missed entirely.&rdquo;
+            </blockquote>
+            <div>
+              <p className="text-white font-semibold font-sans text-sm">
+                Marcus Reyes
+              </p>
+              <p className="text-white/50 font-sans text-xs mt-0.5">
+                Director of Operations &middot; Northgate Security Co.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
