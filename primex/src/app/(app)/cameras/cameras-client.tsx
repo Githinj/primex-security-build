@@ -6,14 +6,15 @@ import { useRouter } from "next/navigation";
 import { PageTitle, StatCard, ActionMenu } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
-import type { Camera, Site } from "@/lib/types";
+import type { Camera, Site, Company } from "@/lib/types";
 
 interface CamerasClientProps {
   cameras: Camera[];
   sites: Site[];
+  companies: Company[];
 }
 
-export function CamerasClient({ cameras, sites }: CamerasClientProps) {
+export function CamerasClient({ cameras, sites, companies }: CamerasClientProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -106,7 +107,7 @@ export function CamerasClient({ cameras, sites }: CamerasClientProps) {
         </div>
       </div>
 
-      <AddCameraModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddCameraModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} sites={sites} />
     </>
   );
 }

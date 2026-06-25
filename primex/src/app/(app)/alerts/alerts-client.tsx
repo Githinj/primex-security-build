@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { CreateAlertModal } from "@/components/alerts/create-alert-modal";
 import { severityTone } from "@/lib/utils";
-import type { Alert, Site } from "@/lib/types";
+import type { Alert, Site, Company, Camera } from "@/lib/types";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString("en-AU", {
@@ -30,9 +30,11 @@ function formatTime(iso: string): string {
 interface AlertsClientProps {
   alerts: Alert[];
   sites: Site[];
+  companies: Company[];
+  cameras: Camera[];
 }
 
-export function AlertsClient({ alerts, sites }: AlertsClientProps) {
+export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClientProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -139,6 +141,9 @@ export function AlertsClient({ alerts, sites }: AlertsClientProps) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         mode="admin"
+        companies={companies}
+        sites={sites}
+        cameras={cameras}
       />
     </>
   );

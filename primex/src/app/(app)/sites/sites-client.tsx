@@ -134,7 +134,7 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
         </Card>
       </div>
 
-      <AddSiteModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddSiteModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} />
     </>
   );
 }
