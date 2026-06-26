@@ -13,9 +13,6 @@ import {
   Plus,
   ArrowUpRight,
   ArrowRight,
-  Wifi,
-  WifiOff,
-  Wrench,
 } from "lucide-react";
 
 import {
@@ -68,16 +65,6 @@ export function DashboardClient({
   guards,
   companies,
 }: DashboardClientProps) {
-  // Camera status counts per company
-  const companyCameraStats = companies.map((company) => {
-    return {
-      company,
-      // NOTE: We don't have per-company camera counts from the server yet,
-      // so we show company-level info only. Stats come from the dashboard stats.
-      status: company.status,
-    };
-  });
-
   // Incident table rows (first 4 incidents)
   const incidentRows = incidents.slice(0, 4).map((incident) => {
     const site = sites.find((s) => s.id === incident.site_id);
@@ -223,7 +210,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Main content grid ── */}
-      <div className="grid grid-cols-[1fr_340px] gap-5">
+      <div className="grid grid-cols-[1.6fr_1fr] gap-5">
 
         {/* Left: Recent active incidents */}
         <Card padding="p-0">
@@ -250,57 +237,53 @@ export function DashboardClient({
         {/* Right: Critical alerts feed */}
         <Card padding="p-0">
           {/* Card header */}
-          <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-border">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h2 className="font-serif text-xl font-semibold text-ink">
-                  Critical alerts
-                </h2>
+          <div className="px-[22px] py-4 border-b border-border">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="inline-flex items-center gap-2.5 font-serif text-[20px] font-bold text-ink">
                 <LiveDot color="red" />
-              </div>
-              <p className="text-ink-3 text-xs font-sans">Need review now</p>
+                Critical alerts
+              </h2>
+              <p className="text-[12.5px] text-ink-3 font-sans">Need review now</p>
             </div>
           </div>
 
           {/* Alert feed */}
-          <div className="flex flex-col divide-y divide-border">
-            {stats.recentAlerts.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-ink-3 font-sans">No critical alerts.</p>
+          <div className="flex flex-col">
+            {stats.criticalAlerts.length === 0 ? (
+              <p className="px-[22px] py-6 text-sm text-ink-3 font-sans">No critical alerts.</p>
             ) : (
-              stats.recentAlerts
-                .filter((a) => a.severity === "Critical" && a.status !== "Closed")
-                .map((alert) => {
-                  const site = sites.find((s) => s.id === alert.site_id);
-                  return (
-                    <div key={alert.id} className="flex items-stretch gap-0">
-                      {/* Left red accent bar */}
-                      <div className="w-1 bg-p-red flex-shrink-0 rounded-l-sm" />
-                      {/* Content */}
-                      <div className="flex flex-col gap-2 px-4 py-3.5 flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-ink font-sans leading-snug">
-                          {alert.title}
-                        </p>
-                        <p className="text-[11px] text-ink-3 font-sans">
-                          {site?.name ?? "Unknown site"} · {formatRelative(alert.created_at)}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Pill tone={severityTone(alert.severity)} dot size="sm">
-                            {alert.severity}
-                          </Pill>
-                          <Pill tone="gray" dot size="sm">
-                            {alert.status}
-                          </Pill>
-                        </div>
+              stats.criticalAlerts.map((alert) => {
+                const site = sites.find((s) => s.id === alert.site_id);
+                return (
+                  <div key={alert.id} className="flex gap-3 px-[16px] py-[16px] border-b border-border">
+                    {/* Left red accent bar */}
+                    <div className="w-[3px] self-stretch bg-p-red rounded flex-shrink-0" />
+                    {/* Content */}
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <p className="text-[13.5px] font-medium text-ink font-sans leading-snug">
+                        {alert.title}
+                      </p>
+                      <p className="text-[12px] text-ink-3 font-sans mt-1">
+                        {site?.name ?? "Unknown site"} · {formatRelative(alert.created_at)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2.5">
+                        <Pill tone={severityTone(alert.severity)} dot size="sm">
+                          {alert.severity}
+                        </Pill>
+                        <Pill tone="gray" dot size="sm">
+                          {alert.status}
+                        </Pill>
                       </div>
                     </div>
-                  );
-                })
+                  </div>
+                );
+              })
             )}
           </div>
 
           {/* Footer link */}
-          <div className="px-5 py-3.5 border-t border-border">
-            <Button variant="link" size="sm" icon={ArrowUpRight}>
+          <div className="px-[22px] py-[14px]">
+            <Button variant="link" size="sm" icon={ArrowRight}>
               Open dispatcher console
             </Button>
           </div>
@@ -308,78 +291,67 @@ export function DashboardClient({
       </div>
 
       {/* ── Camera status by company ── */}
-      <Card padding="p-0" className="mt-5">
+      <Card padding="p-0">
         {/* Card header */}
-        <div className="px-5 py-4 border-b border-border flex flex-col gap-1">
+        <div className="px-[22px] py-4 border-b border-border flex flex-col gap-1">
           <div className="flex items-center gap-2.5">
-            <h2 className="font-serif text-xl font-semibold text-ink">
+            <h2 className="font-serif text-[20px] font-bold text-ink">
               Camera status by company
             </h2>
             <PhaseTag>Live streaming · Phase 2</PhaseTag>
           </div>
-          <p className="text-ink-3 text-xs font-sans">
-            Phase 1 — status monitoring only
+          <p className="text-[12.5px] text-ink-3 font-sans">
+            Phase 1 — status monitoring only (Online · Offline · Maintenance · Unknown)
           </p>
         </div>
 
         {/* Company columns */}
-        <div className="grid grid-cols-4 divide-x divide-border">
-          {companyCameraStats.map(({ company, status }) => {
+        <div className="grid grid-cols-4">
+          {stats.camerasByCompany.map(({ company, online, offline, maintenance }, idx) => {
             const statusTone =
-              status === "Active"
+              company.status === "Active"
                 ? "green"
-                : status === "Pending"
+                : company.status === "Pending"
                 ? "amber"
                 : "red";
 
             return (
-              <div key={company.id} className="flex flex-col gap-4 px-5 py-5">
-                {/* Company name + meta */}
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-[13px] font-semibold text-ink font-sans leading-snug">
+              <div
+                key={company.id}
+                className={`flex flex-col px-[22px] py-[22px] ${
+                  idx < stats.camerasByCompany.length - 1 ? "border-r border-border" : ""
+                }`}
+              >
+                {/* Company name + status pill */}
+                <div className="flex items-center gap-2">
+                  <p className="text-[13.5px] font-semibold text-ink font-sans leading-snug">
                     {company.name}
                   </p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-ink-3 font-sans">{company.type}</span>
-                    <Pill tone={statusTone as "green" | "amber" | "red"} dot size="sm">
-                      {status}
-                    </Pill>
-                  </div>
+                  <Pill tone={statusTone as "green" | "amber" | "red"} dot size="sm">
+                    {company.status}
+                  </Pill>
                 </div>
+                <p className="text-[11.5px] text-ink-3 font-sans mt-1">{company.type}</p>
 
-                {/* Camera counts - overall stats */}
-                <div className="flex flex-col gap-2.5">
-                  {/* Online */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-[11px] text-ink-3 font-sans">
-                      <Wifi size={12} className="text-p-green" strokeWidth={2} />
-                      Online
-                    </div>
-                    <span className="font-serif text-xl font-semibold text-p-green leading-none">
-                      {stats.camerasOnline}
+                {/* Camera mini stats */}
+                <div className="flex items-end gap-5 mt-[18px]">
+                  <div className="flex flex-col items-start">
+                    <span className="font-serif text-[28px] font-bold text-p-green leading-none">
+                      {online}
                     </span>
+                    <span className="text-[11px] text-ink-3 font-sans mt-1">Online</span>
                   </div>
-
-                  {/* Offline */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-[11px] text-ink-3 font-sans">
-                      <WifiOff size={12} className="text-p-red" strokeWidth={2} />
-                      Offline
-                    </div>
-                    <span className="font-serif text-xl font-semibold text-p-red leading-none">
-                      {stats.camerasOffline}
+                  <div className="flex flex-col items-start">
+                    <span className="font-serif text-[28px] font-bold text-p-red leading-none">
+                      {offline}
                     </span>
+                    <span className="text-[11px] text-ink-3 font-sans mt-1">Offline</span>
                   </div>
-
-                  {/* Maintenance */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-[11px] text-ink-3 font-sans">
-                      <Wrench size={12} className="text-p-amber" strokeWidth={2} />
-                      Maintenance
-                    </div>
-                    <span className="font-serif text-xl font-semibold text-p-amber leading-none">
-                      0
+                  <div className="flex flex-col items-start">
+                    <span className="font-serif text-[28px] font-bold text-p-amber leading-none">
+                      {maintenance}
                     </span>
+                    <span className="text-[11px] text-ink-3 font-sans mt-1">Maint.</span>
                   </div>
                 </div>
               </div>

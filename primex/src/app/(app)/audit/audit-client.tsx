@@ -135,7 +135,7 @@ export function AuditClient({ activity }: AuditClientProps) {
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-3.5">
         <StatCard
           label="Events today"
           value={247}
@@ -162,24 +162,24 @@ export function AuditClient({ activity }: AuditClientProps) {
       {/* Activity log card */}
       <Card padding="p-0">
         {/* Card header */}
-        <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between gap-4 p-3.5 border-b border-border">
           <div className="w-72">
             <SearchInput
-              placeholder="Search events, actors, targets..."
+              placeholder="Search by actor, action, or target…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1.5">
             {TIME_FILTERS.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setTimeFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-100 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-full text-[11.5px] font-medium cursor-pointer transition-colors duration-100 ${
                   timeFilter === f
-                    ? "bg-navy text-white"
-                    : "text-ink-3 hover:bg-surface-subtle hover:text-ink"
+                    ? "bg-navy text-white border border-navy"
+                    : "bg-surface text-ink-2 border border-border"
                 }`}
               >
                 {f}

@@ -8,3 +8,10 @@ export async function createCamera(data: { site_id: string; name: string; locati
   if (error) throw error
   revalidatePath('/cameras')
 }
+
+export async function deleteCamera(id: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('cameras').delete().eq('id', id)
+  if (error) throw error
+  revalidatePath('/cameras')
+}

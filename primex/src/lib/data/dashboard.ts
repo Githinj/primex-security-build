@@ -1,5 +1,12 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Alert, ActivityItem } from '@/lib/types'
+import type { Alert, ActivityItem, Company } from '@/lib/types'
+
+export interface CamerasByCompany {
+  company: Company
+  online: number
+  offline: number
+  maintenance: number
+}
 
 export interface DashboardStats {
   totalCompanies: number
@@ -12,6 +19,8 @@ export interface DashboardStats {
   guardsOnDuty: number
   recentAlerts: Alert[]
   recentActivity: ActivityItem[]
+  criticalAlerts: Alert[]
+  camerasByCompany: CamerasByCompany[]
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -28,6 +37,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { count: guardsOnDuty },
     { data: recentAlerts },
     { data: activityData },
+    { data: criticalAlertsData },
+    { data: camerasRaw },
+    { data: companiesRaw },
   ] = await Promise.all([
     supabase.from('companies').select('*', { count: 'exact', head: true }),
     supabase.from('sites').select('*', { count: 'exact', head: true }),
@@ -39,7 +51,29 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'guard').in('guard_status', ['Available', 'On Incident']),
     supabase.from('alerts').select('*').in('status', ['New', 'Reviewing', 'Escalated']).order('created_at', { ascending: false }).limit(5),
     supabase.from('activity_log').select('*, profiles:actor_id(full_name)').order('created_at', { ascending: false }).limit(10),
+    supabase.from('alerts').select('*').eq('severity', 'Critical').neq('status', 'Closed').order('created_at', { ascending: false }).limit(5),
+    supabase.from('cameras').select('id, status, site:sites!inner(company_id)'),
+    supabase.from('companies').select('*'),
   ])
+
+  // Build camera counts by company
+  const camerasData = ((camerasRaw ?? []) as unknown) as Array<{ id: string; status: string; site: { company_id: string } }>
+  const companiesData = (companiesRaw ?? []) as Company[]
+  const countsByCompany: Record<string, { online: number; offline: number; maintenance: number }> = {}
+  for (const cam of camerasData) {
+    const companyId = cam.site?.company_id
+    if (!companyId) continue
+    if (!countsByCompany[companyId]) countsByCompany[companyId] = { online: 0, offline: 0, maintenance: 0 }
+    if (cam.status === 'Online') countsByCompany[companyId].online++
+    else if (cam.status === 'Offline') countsByCompany[companyId].offline++
+    else if (cam.status === 'Maintenance') countsByCompany[companyId].maintenance++
+  }
+  const camerasByCompany: CamerasByCompany[] = companiesData.map((c) => ({
+    company: c,
+    online: countsByCompany[c.id]?.online ?? 0,
+    offline: countsByCompany[c.id]?.offline ?? 0,
+    maintenance: countsByCompany[c.id]?.maintenance ?? 0,
+  }))
 
   return {
     totalCompanies: totalCompanies ?? 0,
@@ -60,5 +94,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       icon: a.icon,
       tone: a.tone,
     })),
+    criticalAlerts: (criticalAlertsData ?? []) as Alert[],
+    camerasByCompany,
   }
 }

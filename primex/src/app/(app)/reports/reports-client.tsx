@@ -18,28 +18,28 @@ import {
   DataTable,
   Button,
 } from "@/components/ui";
+import { SimpleBarChart } from "@/components/charts/bar-chart";
+import { HorizontalBarList } from "@/components/charts/horizontal-bars";
 
 import type { Report } from "@/lib/types";
 
 // --- chart data (hardcoded) --------------------------------------------------
 
 const monthlyData = [
-  { month: "Dec", value: 8 },
-  { month: "Jan", value: 11 },
-  { month: "Feb", value: 13 },
-  { month: "Mar", value: 9 },
-  { month: "Apr", value: 12 },
-  { month: "May", value: 9 },
+  { label: "Dec", value: 8 },
+  { label: "Jan", value: 11 },
+  { label: "Feb", value: 13 },
+  { label: "Mar", value: 9 },
+  { label: "Apr", value: 12 },
+  { label: "May", value: 9 },
 ];
 
-const maxMonthly = Math.max(...monthlyData.map((d) => d.value));
-
 const incidentTypes = [
-  { label: "Suspicious activity", count: 14, pct: 78 },
-  { label: "Door / access", count: 9, pct: 50 },
-  { label: "Camera offline", count: 8, pct: 44 },
-  { label: "After-hours motion", count: 6, pct: 33 },
-  { label: "Other", count: 3, pct: 17 },
+  { name: "Suspicious activity", count: 14, pct: 78 },
+  { name: "Door / access", count: 9, pct: 50 },
+  { name: "Camera offline", count: 8, pct: 44 },
+  { name: "After-hours motion", count: 6, pct: 33 },
+  { name: "Other", count: 3, pct: 17 },
 ];
 
 // --- helpers -----------------------------------------------------------------
@@ -170,77 +170,33 @@ export function ReportsClient({ reports }: ReportsClientProps) {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-[1fr_360px] gap-5">
+      <div className="grid grid-cols-[1.4fr_1fr] gap-5">
 
         {/* Left: Incidents over time */}
-        <Card>
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="font-serif text-xl font-semibold text-ink">
-                  Incidents over time
-                </h2>
-                <p className="text-ink-3 text-xs font-sans">Dec 2024 - May 2025 - all companies</p>
-              </div>
-            </div>
-
-            {/* Bar chart */}
-            <div className="flex items-end gap-3 h-36 pt-2">
-              {monthlyData.map((d, i) => {
-                const heightPct = Math.round((d.value / maxMonthly) * 100);
-                const isLast = i === monthlyData.length - 1;
-                return (
-                  <div key={d.month} className="flex flex-col items-center gap-2 flex-1">
-                    <span className="text-[11px] font-semibold text-ink-3 font-sans">
-                      {d.value}
-                    </span>
-                    <div className="w-full flex items-end" style={{ height: "88px" }}>
-                      <div
-                        className={`w-full rounded-t-md transition-all duration-300 ${
-                          isLast ? "bg-p-blue" : "bg-p-blue-soft"
-                        }`}
-                        style={{ height: `${heightPct}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-ink-4 font-sans">{d.month}</span>
-                  </div>
-                );
-              })}
-            </div>
+        <Card padding="p-0">
+          <div className="flex flex-col gap-0.5 px-6 pt-5 pb-0">
+            <h2 className="font-serif text-[20px] font-bold text-ink">
+              Incidents over time
+            </h2>
+            <p className="text-[12.5px] text-ink-3">
+              Last 6 months &middot; all companies
+            </p>
+          </div>
+          <div className="px-6 py-6">
+            <SimpleBarChart data={monthlyData} />
           </div>
         </Card>
 
         {/* Right: Top incident types */}
-        <Card>
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="font-serif text-xl font-semibold text-ink">
-                Top incident types
-              </h2>
-              <p className="text-ink-3 text-xs font-sans">Last 6 months - all companies</p>
-            </div>
-
-            {/* Horizontal bars */}
-            <div className="flex flex-col gap-4">
-              {incidentTypes.map((item) => (
-                <div key={item.label} className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-ink font-sans font-medium leading-tight">
-                      {item.label}
-                    </span>
-                    <span className="text-[12px] text-ink-3 font-sans flex-shrink-0">
-                      {item.count} - {item.pct}%
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-surface-subtle rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-p-blue rounded-full transition-all duration-300"
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+        <Card padding="p-0">
+          <div className="flex flex-col gap-0.5 px-6 pt-5 pb-0">
+            <h2 className="font-serif text-[20px] font-bold text-ink">
+              Top incident types
+            </h2>
+            <p className="text-[12.5px] text-ink-3">Apr 2026</p>
+          </div>
+          <div className="px-[22px] py-[22px]">
+            <HorizontalBarList data={incidentTypes} />
           </div>
         </Card>
       </div>

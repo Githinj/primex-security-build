@@ -22,3 +22,27 @@ export async function assignGuard(incidentId: string, guardId: string) {
   if (error) throw error
   revalidatePath('/incidents')
 }
+
+export async function updateIncidentStatus(id: string, status: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('incidents').update({ status }).eq('id', id)
+  if (error) throw error
+
+  // When resolved, set the guard back to Available
+  if (status === 'Resolved') {
+    const { data: incident } = await supabase
+      .from('incidents')
+      .select('guard_id')
+      .eq('id', id)
+      .single()
+    if (incident?.guard_id) {
+      await supabase
+        .from('profiles')
+        .update({ guard_status: 'Available' })
+        .eq('id', incident.guard_id)
+    }
+  }
+
+  revalidatePath('/guard')
+  revalidatePath('/incidents')
+}

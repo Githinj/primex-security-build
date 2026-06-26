@@ -8,3 +8,17 @@ export async function createSite(data: { company_id: string; name: string; type:
   if (error) throw error
   revalidatePath('/sites')
 }
+
+export async function toggleSiteStatus(id: string, newStatus: 'Active' | 'Inactive') {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('sites').update({ status: newStatus }).eq('id', id)
+  if (error) throw error
+  revalidatePath('/sites')
+}
+
+export async function deleteSite(id: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('sites').delete().eq('id', id)
+  if (error) throw error
+  revalidatePath('/sites')
+}

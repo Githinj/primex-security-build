@@ -15,3 +15,10 @@ export async function toggleProfileStatus(id: string, active: boolean) {
   if (error) throw error
   revalidatePath('/team')
 }
+
+export async function deleteProfile(id: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('profiles').update({ status: 'Removed' }).eq('id', id)
+  if (error) throw error
+  revalidatePath('/team')
+}

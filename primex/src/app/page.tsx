@@ -233,7 +233,7 @@ const SOLUTIONS_TABS = [
   {
     id: "security",
     label: "Security Firms",
-    icon: Briefcase,
+    icon: Shield,
     tagline: "Dispatch smarter. Bill more. Scale faster.",
     blurb:
       "Primex gives your control room the tools to handle more sites with fewer operators — without sacrificing response quality.",
@@ -253,7 +253,7 @@ const SOLUTIONS_TABS = [
   {
     id: "multisite",
     label: "Multi-site Operators",
-    icon: MapPin,
+    icon: Building,
     tagline: "One view across every location.",
     blurb:
       "Whether you manage 5 sites or 500, Primex gives you a single pane of glass for real-time security awareness across your entire portfolio.",
@@ -273,7 +273,7 @@ const SOLUTIONS_TABS = [
   {
     id: "warehouses",
     label: "Warehouses & Logistics",
-    icon: Building,
+    icon: ClipboardList,
     tagline: "Protect the perimeter. Protect the payload.",
     blurb:
       "Large footprints, high-value cargo, and complex access points. Primex AI watches the zones humans can't — around the clock.",
@@ -297,24 +297,27 @@ function SolutionsSection() {
   const tab = SOLUTIONS_TABS[activeTab];
 
   return (
-    <section className="px-6 pb-24 max-w-7xl mx-auto" id="solutions">
+    <section className="px-6 pb-24 max-w-7xl mx-auto scroll-mt-24" id="solutions">
       <div className="text-center mb-10">
-        <Label className="mb-3 block">Solutions</Label>
+        <Label className="mb-3 block">SOLUTIONS</Label>
         <h2 className="font-serif text-4xl font-bold text-ink">
-          Built for every security use case
+          Built for the way you <em>actually</em> operate.
         </h2>
+        <p className="text-sm text-ink-3 mt-3 max-w-lg mx-auto">
+          Each vertical has unique challenges. Primex adapts to yours out of the box.
+        </p>
       </div>
 
       {/* Tab bar */}
-      <div className="flex flex-wrap gap-2 justify-center mb-10">
+      <div className="flex flex-wrap justify-center border-b border-border mb-10">
         {SOLUTIONS_TABS.map((t, i) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(i)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium font-sans transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-5 py-3 text-sm font-sans transition-colors cursor-pointer border-b-2 -mb-px ${
               activeTab === i
-                ? "bg-navy text-white"
-                : "bg-surface border border-border text-ink-2 hover:bg-surface-subtle"
+                ? "border-p-blue text-ink font-semibold"
+                : "border-transparent text-ink-3 hover:text-ink-2"
             }`}
           >
             <t.icon size={14} strokeWidth={2} />
@@ -324,16 +327,22 @@ function SolutionsSection() {
       </div>
 
       {/* Tab content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-[1.05fr_1fr] lg:grid-cols-2 gap-8 items-start">
         {/* Left: text */}
         <div className="flex flex-col gap-5">
+          <div className="inline-flex items-center gap-2 self-start">
+            <Pill tone="blue" size="sm">
+              <tab.icon size={12} strokeWidth={2} />
+              {tab.label}
+            </Pill>
+          </div>
           <p className="font-serif text-xl italic text-ink-2">{tab.tagline}</p>
           <p className="text-sm text-ink-3 leading-relaxed">{tab.blurb}</p>
           <ul className="flex flex-col gap-3">
             {tab.bullets.map((b) => (
               <li key={b} className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-p-green-soft flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check size={11} strokeWidth={3} className="text-p-green" />
+                <div className="w-5 h-5 rounded-full bg-p-blue-soft flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check size={11} strokeWidth={3} className="text-p-blue" />
                 </div>
                 <span className="text-sm text-ink-2">{b}</span>
               </li>
@@ -349,30 +358,35 @@ function SolutionsSection() {
         </div>
 
         {/* Right: stat card */}
-        <div className="bg-navy rounded-2xl p-8 flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <div className="font-serif text-5xl font-bold text-white">
-              {tab.stat.value}
+        <div className="relative bg-navy rounded-2xl p-8 flex flex-col gap-6 overflow-hidden">
+          <GridPattern className="opacity-5" />
+          <div className="relative z-10 flex flex-col gap-6">
+            <div className="text-xs text-white/40 uppercase tracking-wider font-sans">
+              Operator view
             </div>
-            <div className="text-sm text-white/60">{tab.stat.label}</div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <LiveDot color="green" />
-            <span className="text-xs text-white/50">Live — updated now</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-white/10">
-            {tab.mini.map((m) => (
-              <div key={m.label} className="flex flex-col gap-1">
-                <div className="font-serif text-xl font-semibold text-white">
-                  {m.value}
-                </div>
-                <div className="text-[11px] text-white/40 uppercase tracking-wider font-sans">
-                  {m.label}
-                </div>
+            <div className="flex items-center gap-2">
+              <LiveDot color="green" />
+              <span className="text-xs text-white/50">Live — updated now</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="font-serif text-5xl font-bold text-white">
+                {tab.stat.value}
               </div>
-            ))}
+              <div className="text-sm text-white/60">{tab.stat.label}</div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/10">
+              {tab.mini.map((m) => (
+                <div key={m.label} className="flex flex-col gap-1">
+                  <div className="font-serif text-xl font-semibold text-white">
+                    {m.value}
+                  </div>
+                  <div className="text-[11px] text-white/40 uppercase tracking-wider font-sans">
+                    {m.label}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -416,21 +430,24 @@ const TESTIMONIALS = [
 
 function CustomersSection() {
   return (
-    <section className="px-6 pb-24 max-w-7xl mx-auto" id="customers">
+    <section className="px-6 pb-24 max-w-7xl mx-auto scroll-mt-24" id="customers">
       <div className="text-center mb-12">
-        <Label className="mb-3 block">Customers</Label>
+        <Label className="mb-3 block">CUSTOMERS</Label>
         <h2 className="font-serif text-4xl font-bold text-ink">
-          Operators trust Primex to be there at 2 AM.
+          Operators trust Primex to be there <em>at 2 AM.</em>
         </h2>
+        <p className="text-sm text-ink-3 mt-3 max-w-lg mx-auto">
+          From single-site retailers to national security firms, Primex keeps teams connected and incidents contained.
+        </p>
       </div>
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-border rounded-xl overflow-hidden mb-12">
         {[
-          { value: "32+", label: "Active sites" },
-          { value: "240+", label: "Guards dispatched this month" },
+          { value: "32+", label: "Companies" },
+          { value: "240+", label: "Sites" },
           { value: "1.2k+", label: "Incidents resolved" },
-          { value: "99.4%", label: "Platform uptime" },
+          { value: "99.4%", label: "Uptime" },
         ].map((s, i) => (
           <div
             key={s.label}
@@ -447,7 +464,7 @@ function CustomersSection() {
       </div>
 
       {/* Logo strip */}
-      <div className="flex flex-wrap justify-center gap-8 mb-14 opacity-40">
+      <div className="flex flex-wrap justify-center gap-8 mb-14 opacity-70">
         {LOGOS.map((l) => (
           <div key={l.name} className="flex items-center gap-2">
             <l.icon size={18} strokeWidth={1.5} className="text-ink-2" />
@@ -462,15 +479,25 @@ function CustomersSection() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {TESTIMONIALS.map((t) => (
           <Card key={t.name} className="flex flex-col justify-between gap-6">
-            <p className="text-sm text-ink-2 leading-relaxed italic">
-              &ldquo;{t.quote}&rdquo;
-            </p>
             <div>
-              <div className="text-sm font-semibold text-ink font-sans">
-                {t.name}
+              <span className="font-serif text-5xl leading-none text-p-blue select-none">&ldquo;</span>
+              <p className="font-serif text-sm text-ink-2 leading-relaxed italic mt-1">
+                {t.quote}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-p-blue-soft flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-p-blue">
+                  {t.name.split(" ").map((n) => n[0]).join("")}
+                </span>
               </div>
-              <div className="text-xs text-ink-3 mt-0.5">
-                {t.title} &mdash; {t.company}
+              <div>
+                <div className="text-sm font-semibold text-ink font-sans">
+                  {t.name}
+                </div>
+                <div className="text-xs text-ink-3 mt-0.5">
+                  {t.title} &mdash; {t.company}
+                </div>
               </div>
             </div>
           </Card>
@@ -505,7 +532,7 @@ const PLANS = [
     period: "/mo",
     featured: true,
     badge: "Most popular",
-    cta: "Get Professional",
+    cta: "Start free trial",
     features: [
       "Up to 15 active sites",
       "Unlimited camera streams",
@@ -523,7 +550,7 @@ const PLANS = [
     price: "Custom",
     period: "",
     featured: false,
-    cta: "Contact sales",
+    cta: "Talk to sales",
     features: [
       "Unlimited sites",
       "Dedicated account manager",
@@ -538,14 +565,14 @@ const PLANS = [
 
 function PricingSection() {
   return (
-    <section className="px-6 pb-24 max-w-7xl mx-auto" id="pricing">
+    <section className="px-6 pb-24 max-w-7xl mx-auto scroll-mt-24" id="pricing">
       <div className="text-center mb-12">
-        <Label className="mb-3 block">Pricing</Label>
+        <Label className="mb-3 block">PRICING</Label>
         <h2 className="font-serif text-4xl font-bold text-ink">
-          Simple, transparent pricing
+          Simple pricing. <em>No surprises.</em>
         </h2>
         <p className="text-sm text-ink-3 mt-3 max-w-md mx-auto">
-          No hidden fees. Cancel anytime. All plans include a 14-day free trial.
+          Start with a 14-day free trial. Upgrade, downgrade, or cancel anytime.
         </p>
       </div>
 
@@ -555,7 +582,7 @@ function PricingSection() {
             key={plan.name}
             className={`rounded-2xl p-7 flex flex-col gap-6 ${
               plan.featured
-                ? "bg-navy text-white shadow-2xl shadow-navy/30 scale-105 origin-top"
+                ? "bg-navy text-white shadow-2xl shadow-navy/30 -translate-y-3"
                 : "bg-surface border border-border"
             }`}
           >
@@ -563,7 +590,7 @@ function PricingSection() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span
-                  className={`font-serif text-xl font-semibold ${
+                  className={`font-serif text-2xl font-semibold ${
                     plan.featured ? "text-white" : "text-ink"
                   }`}
                 >
@@ -604,17 +631,6 @@ function PricingSection() {
               )}
             </div>
 
-            {/* CTA */}
-            <Link href="/login" className="block">
-              <Button
-                variant={plan.featured ? "primary" : "secondary"}
-                size="md"
-                full
-              >
-                {plan.cta}
-              </Button>
-            </Link>
-
             {/* Features */}
             <ul className="flex flex-col gap-2.5">
               {plan.features.map((f) => (
@@ -636,9 +652,24 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
+
+            {/* CTA */}
+            <Link href="/login" className="block mt-auto">
+              <Button
+                variant={plan.featured ? "primary" : "secondary"}
+                size="md"
+                full
+              >
+                {plan.cta}
+              </Button>
+            </Link>
           </div>
         ))}
       </div>
+
+      <p className="text-center text-xs text-ink-3 mt-8">
+        All plans include a 14-day free trial &middot; No credit card required &middot; Cancel anytime
+      </p>
     </section>
   );
 }

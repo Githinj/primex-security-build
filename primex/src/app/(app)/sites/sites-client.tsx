@@ -12,6 +12,8 @@ import {
   ActionMenu,
 } from "@/components/ui";
 import { AddSiteModal } from "@/components/sites/add-site-modal";
+import { SiteToggleModal } from "@/components/sites/site-toggle-modal";
+import { DeleteSiteModal } from "@/components/sites/delete-site-modal";
 import type { Site, Company, SiteRisk, SiteStatus } from "@/lib/types";
 
 function riskTone(risk: SiteRisk): "red" | "amber" | "green" {
@@ -37,6 +39,8 @@ interface SitesClientProps {
 export function SitesClient({ sites, companies }: SitesClientProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [toggleModal, setToggleModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
 
   const rows = sites.map((site) => {
     const company = companies.find((c) => c.id === site.company_id);
@@ -91,13 +95,13 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
           {
             label: site.status === "Active" ? "Deactivate site" : "Activate site",
             icon: Power,
-            onClick: () => {},
+            onClick: () => setToggleModal({ open: true, site }),
           },
           {
             label: "Delete site",
             icon: Trash2,
             tone: "danger",
-            onClick: () => {},
+            onClick: () => setDeleteModal({ open: true, site }),
           },
         ]}
       />,
@@ -135,6 +139,16 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
       </div>
 
       <AddSiteModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} />
+      <SiteToggleModal
+        open={toggleModal.open}
+        onClose={() => setToggleModal({ open: false, site: null })}
+        site={toggleModal.site}
+      />
+      <DeleteSiteModal
+        open={deleteModal.open}
+        onClose={() => setDeleteModal({ open: false, site: null })}
+        site={deleteModal.site}
+      />
     </>
   );
 }

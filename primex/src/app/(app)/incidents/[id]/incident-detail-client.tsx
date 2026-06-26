@@ -42,7 +42,6 @@ export function IncidentDetailClient({
       ),
       label: "Alert created",
       by: alert?.source ?? "System",
-      isFirst: true,
     },
     {
       time: new Date(incident.started_at).toLocaleString("en-AU", {

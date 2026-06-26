@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
 import {
   Shield,
   LayoutDashboard,
@@ -17,9 +18,11 @@ import {
   Users,
   AlertTriangle,
   BarChart3,
+  Building,
 } from "lucide-react";
 import { LiveDot } from "@/components/ui";
 import { useProfile } from "@/components/providers/profile-provider";
+import { useScope } from "@/components/providers/scope-provider";
 
 interface NavItem {
   label: string;
@@ -56,6 +59,7 @@ function roleLabel(role: string) {
 export function Sidebar() {
   const pathname = usePathname();
   const profile = useProfile();
+  const { scope, scopeCompanyId, setScope, companies } = useScope();
   const userRole = profile?.role ?? "client";
   const userName = profile?.full_name ?? "User";
   const userInitials = userName
@@ -65,6 +69,27 @@ export function Sidebar() {
     .toUpperCase()
     .slice(0, 2);
   const isSuperAdmin = userRole === "super_admin";
+
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const scopeRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (scopeRef.current && !scopeRef.current.contains(e.target as Node)) {
+        setScopeOpen(false);
+      }
+    }
+    if (scopeOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [scopeOpen]);
+
+  // Resolve company name for non-super-admin users
+  const orgName = profile?.company_id
+    ? companies.find((c) => c.id === profile.company_id)?.name ?? "My Organization"
+    : "My Organization";
 
   return (
     <aside className="w-60 flex-shrink-0 bg-surface border-r border-border flex flex-col justify-between h-full">
@@ -87,25 +112,72 @@ export function Sidebar() {
 
         {/* Scope selector */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] font-semibold tracking-widest uppercase text-ink-4 font-sans">
-            {isSuperAdmin ? "Client Scope" : "Organization"}
+          <span className="text-[10px] font-semibold uppercase text-ink-4 font-sans" style={{ letterSpacing: "1.3px" }}>
+            {isSuperAdmin ? "CLIENT SCOPE" : "ORGANIZATION"}
           </span>
           {isSuperAdmin ? (
-            <button
-              type="button"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface hover:bg-surface-subtle transition-colors duration-150 text-left w-full"
-            >
-              <Building2 size={14} className="text-ink-3 flex-shrink-0" strokeWidth={2} />
-              <span className="flex-1 text-sm font-sans font-medium text-ink truncate">
-                All Companies
-              </span>
-              <ChevronDown size={13} className="text-ink-4 flex-shrink-0" strokeWidth={2} />
-            </button>
+            <div className="relative" ref={scopeRef}>
+              <button
+                type="button"
+                onClick={() => setScopeOpen((prev) => !prev)}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-border bg-bg text-xs font-medium text-left w-full"
+              >
+                <Building size={14} className="text-ink-3 flex-shrink-0" strokeWidth={2} />
+                <span className="flex-1 font-sans text-ink truncate">
+                  {scope}
+                </span>
+                <ChevronDown
+                  size={13}
+                  className="text-ink-4 flex-shrink-0 transition-transform duration-150"
+                  strokeWidth={2}
+                  style={{ transform: scopeOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                />
+              </button>
+              {scopeOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScope(null, "All Companies");
+                      setScopeOpen(false);
+                    }}
+                    className={[
+                      "flex items-center gap-2 px-2.5 py-2 rounded-md text-xs font-sans w-full text-left",
+                      scopeCompanyId === null
+                        ? "bg-p-blue-soft text-p-blue font-semibold"
+                        : "text-ink hover:bg-bg font-medium",
+                    ].join(" ")}
+                  >
+                    <Building size={11} className="flex-shrink-0" strokeWidth={2} />
+                    All Companies
+                  </button>
+                  {companies.map((company) => (
+                    <button
+                      key={company.id}
+                      type="button"
+                      onClick={() => {
+                        setScope(company.id, company.name);
+                        setScopeOpen(false);
+                      }}
+                      className={[
+                        "flex items-center gap-2 px-2.5 py-2 rounded-md text-xs font-sans w-full text-left",
+                        scopeCompanyId === company.id
+                          ? "bg-p-blue-soft text-p-blue font-semibold"
+                          : "text-ink hover:bg-bg font-medium",
+                      ].join(" ")}
+                    >
+                      <Building size={11} className="flex-shrink-0" strokeWidth={2} />
+                      {company.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Building2 size={14} className="text-ink-3 flex-shrink-0" strokeWidth={2} />
-              <span className="text-sm font-sans font-medium text-ink truncate">
-                Apex Retail Group
+            <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-surface-subtle text-xs font-semibold">
+              <Building size={14} className="text-ink-3 flex-shrink-0" strokeWidth={2} />
+              <span className="font-sans text-ink truncate">
+                {orgName}
               </span>
             </div>
           )}

@@ -247,7 +247,7 @@ const NOTIF_ROWS: NotifRow[] = [
     event: "SMS notifications",
     channels: ["SMS"],
     on: false,
-    phase: "SMS - Phase 2",
+    phase: "Phase 2",
   },
 ];
 
@@ -258,35 +258,45 @@ function NotificationsTab() {
 
   return (
     <Card>
-      <div className="flex flex-col divide-y divide-border">
-        {NOTIF_ROWS.map((row, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
-          >
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-ink">{row.event}</span>
-                {row.phase && <PhaseTag>{row.phase}</PhaseTag>}
+      <div className="flex flex-col gap-[18px]">
+        <div>
+          <p className="font-serif text-[19px] font-bold text-ink">Notifications</p>
+          <p className="text-[13px] text-ink-3 mt-0.5">
+            Choose which events trigger notifications and how you receive them.
+          </p>
+        </div>
+
+        <div className="flex flex-col">
+          {NOTIF_ROWS.map((row, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-4 border-b border-border last:border-b-0"
+              style={{ padding: "14px 0" }}
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13.5px] font-medium text-ink">{row.event}</span>
+                  {row.phase && <PhaseTag>{row.phase}</PhaseTag>}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {row.channels.map((ch) => (
+                    <Pill key={ch} tone="gray" size="sm">
+                      {ch}
+                    </Pill>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {row.channels.map((ch) => (
-                  <Pill key={ch} tone="gray" size="sm">
-                    {ch}
-                  </Pill>
-                ))}
-              </div>
+              <Toggle
+                on={states[i]}
+                onChange={(val) => {
+                  const next = [...states];
+                  next[i] = val;
+                  setStates(next);
+                }}
+              />
             </div>
-            <Toggle
-              on={states[i]}
-              onChange={(val) => {
-                const next = [...states];
-                next[i] = val;
-                setStates(next);
-              }}
-            />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </Card>
   );
@@ -348,44 +358,60 @@ const INTEGRATIONS: Integration[] = [
 
 function IntegrationsTab() {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {INTEGRATIONS.map((intg) => {
-        const Icon = intg.icon;
-        return (
-          <Card key={intg.name}>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-3">
-                <span className="w-10 h-10 rounded-xl bg-p-blue-soft flex items-center justify-center flex-shrink-0">
-                  <Icon size={18} className="text-p-blue" strokeWidth={2} />
-                </span>
-                {intg.connected ? (
-                  <Pill tone="green" dot>
-                    Connected
-                  </Pill>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={!!intg.phase}
-                  >
-                    Connect
-                  </Button>
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-ink">
-                    {intg.name}
-                  </span>
-                  {intg.phase && <PhaseTag>{intg.phase}</PhaseTag>}
+    <Card>
+      <div className="flex flex-col gap-[18px]">
+        <div>
+          <p className="font-serif text-[19px] font-bold text-ink">Integrations</p>
+          <p className="text-[13px] text-ink-3 mt-0.5">
+            Connect third-party services to extend platform capabilities.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {INTEGRATIONS.map((intg) => {
+            const Icon = intg.icon;
+            return (
+              <div
+                key={intg.name}
+                className="p-4 border border-border rounded-lg"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-lg bg-p-blue-soft flex items-center justify-center flex-shrink-0">
+                      <Icon size={18} className="text-p-blue" strokeWidth={2} />
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[13.5px] font-semibold text-ink">
+                          {intg.name}
+                        </span>
+                        {intg.phase && <PhaseTag>{intg.phase}</PhaseTag>}
+                      </div>
+                      <p className="text-[11.5px] text-ink-3">{intg.description}</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-ink-3">{intg.description}</p>
+                <div className="mt-3">
+                  {intg.connected ? (
+                    <Pill tone="green" dot>
+                      Connected
+                    </Pill>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={!!intg.phase}
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -396,44 +422,50 @@ function IntegrationsTab() {
 function BillingTab() {
   return (
     <Card>
-      <div className="flex flex-col gap-5">
-        {/* Plan header */}
-        <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-[18px]">
+        <div>
+          <p className="font-serif text-[19px] font-bold text-ink">Billing &amp; plans</p>
+          <p className="text-[13px] text-ink-3 mt-0.5">
+            Manage your subscription, payment method, and invoices.
+          </p>
+        </div>
+
+        {/* Plan banner */}
+        <div className="p-[18px] bg-bg rounded-lg flex items-start justify-between gap-4 mb-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <p className="font-serif text-xl font-semibold text-ink">
-                Professional plan
+              <p className="font-serif text-[22px] font-bold text-ink">
+                Professional
               </p>
-              <PhaseTag>Stripe billing - Phase 2</PhaseTag>
+              <PhaseTag>Stripe billing &middot; Phase 2</PhaseTag>
             </div>
-            <p className="text-sm text-ink-3">
-              23 active sites - 86 cameras - unlimited users
+            <p className="text-[12.5px] text-ink-3">
+              23 active sites &middot; 86 cameras &middot; unlimited users
             </p>
           </div>
-          <Button variant="secondary" size="sm" disabled>
-            Upgrade plan
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-baseline gap-1">
+              <span className="font-serif text-[26px] font-bold text-ink">
+                $1,840
+              </span>
+              <span className="text-[13px] text-ink-3">/mo</span>
+            </div>
+            <Button variant="secondary" size="sm">
+              Upgrade plan
+            </Button>
+          </div>
         </div>
-
-        {/* Price */}
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-serif text-4xl font-semibold text-ink">
-            $1,840
-          </span>
-          <span className="text-sm text-ink-3">/mo</span>
-        </div>
-
-        <hr className="border-border" />
 
         {/* KV rows */}
         <div className="flex flex-col gap-4">
-          <KV k="Next invoice" v="1 July 2026" />
+          <hr className="border-border" />
+          <KV k="Next invoice" v="June 1, 2026" />
           <hr className="border-border" />
           <KV
             k="Payment method"
             v={
               <span className="flex items-center gap-2">
-                <span>Visa .... 4242</span>
+                <span>Visa &bull;&bull;&bull;&bull; 4242</span>
                 <Button variant="link" size="sm">
                   Update
                 </Button>
@@ -443,7 +475,7 @@ function BillingTab() {
           <hr className="border-border" />
           <KV k="Billing email" v="billing@primexsecurity.com.au" />
           <hr className="border-border" />
-          <KV k="Tax ID" v="ABN 12 345 678 901" />
+          <KV k="Tax ID" v="—" />
         </div>
       </div>
     </Card>

@@ -1,7 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ProfileProvider } from '@/components/providers/profile-provider'
+import { ScopeProvider } from '@/components/providers/scope-provider'
 import { AppShell } from './app-shell'
+import { getCompanies } from '@/lib/data/companies'
 import type { Profile } from '@/lib/types'
+import type { Company } from '@/lib/types'
 
 export default async function AppLayout({
   children,
@@ -21,9 +24,21 @@ export default async function AppLayout({
     profile = data
   }
 
+  // Fetch companies for scope dropdown (used by super_admin)
+  let companies: Company[] = []
+  if (profile?.role === 'super_admin') {
+    try {
+      companies = await getCompanies()
+    } catch {
+      companies = []
+    }
+  }
+
   return (
     <ProfileProvider profile={profile}>
-      <AppShell>{children}</AppShell>
+      <ScopeProvider companies={companies}>
+        <AppShell>{children}</AppShell>
+      </ScopeProvider>
     </ProfileProvider>
   )
 }

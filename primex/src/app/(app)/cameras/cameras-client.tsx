@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { PageTitle, StatCard, ActionMenu } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
+import { RemoveCameraModal } from "@/components/cameras/remove-camera-modal";
 import type { Camera, Site, Company } from "@/lib/types";
 
 interface CamerasClientProps {
@@ -17,6 +18,7 @@ interface CamerasClientProps {
 export function CamerasClient({ cameras, sites, companies }: CamerasClientProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [removeModal, setRemoveModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
 
   const online = cameras.filter((c) => c.status === "Online").length;
   const offline = cameras.filter((c) => c.status === "Offline").length;
@@ -96,7 +98,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
                         label: "Remove camera",
                         icon: Trash2,
                         tone: "danger",
-                        onClick: () => {},
+                        onClick: () => setRemoveModal({ open: true, camera }),
                       },
                     ]}
                   />
@@ -108,6 +110,11 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
       </div>
 
       <AddCameraModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} sites={sites} />
+      <RemoveCameraModal
+        open={removeModal.open}
+        onClose={() => setRemoveModal({ open: false, camera: null })}
+        camera={removeModal.camera}
+      />
     </>
   );
 }

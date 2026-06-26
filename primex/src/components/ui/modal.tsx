@@ -110,7 +110,7 @@ export function ModalFooter({ children }: ModalFooterProps) {
 
 interface SuccessStateProps {
   title: string;
-  sub?: string;
+  sub?: React.ReactNode;
   onDone?: () => void;
 }
 

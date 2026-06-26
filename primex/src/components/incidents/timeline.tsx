@@ -4,7 +4,6 @@ interface TimelineEvent {
   time: string;
   label: string;
   by?: string;
-  isFirst?: boolean;
 }
 
 interface TimelineProps {
@@ -22,7 +21,7 @@ export function Timeline({ events }: TimelineProps) {
             <div className="flex flex-col items-center flex-shrink-0 w-4">
               <span
                 className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5 ${
-                  event.isFirst ? "bg-p-red" : "bg-ink-4"
+                  i === 0 ? "bg-p-red" : "bg-ink-4"
                 }`}
               />
               {!isLast && (
