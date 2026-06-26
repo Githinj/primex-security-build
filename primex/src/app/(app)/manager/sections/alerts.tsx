@@ -55,7 +55,7 @@ export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlerts
       </Pill>,
       <span key="source" className="inline-flex items-center gap-1.5 text-ink-2">
         {alert.source}
-        {isAI && <PhaseTag>AI</PhaseTag>}
+        {isAI && <Pill tone="blue" size="sm">AI</Pill>}
       </span>,
       <span
         key="time"

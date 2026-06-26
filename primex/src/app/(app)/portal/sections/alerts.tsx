@@ -74,7 +74,12 @@ export function ClientAlerts({ alerts }: ClientAlertsProps) {
             </p>
             <p className="text-[11px] text-ink-3 font-sans">
               {formatTimestamp(alert.created_at)}
-              {alert.source && <span> &middot; Source: {alert.source}</span>}
+              {alert.source && (
+                <span className="inline-flex items-center gap-1.5">
+                  {' '}&middot; Source: {alert.source}
+                  {alert.source.includes('AI') && <Pill tone="blue" size="sm">AI</Pill>}
+                </span>
+              )}
             </p>
           </Card>
         ))}
