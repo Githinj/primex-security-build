@@ -68,7 +68,7 @@ export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClient
       // Source
       <span key="source" className="inline-flex items-center gap-1.5 text-ink-2">
         {alert.source}
-        {isAI && <PhaseTag>AI</PhaseTag>}
+        {isAI && <Pill tone="blue" size="sm">AI</Pill>}
       </span>,
 
       // Time

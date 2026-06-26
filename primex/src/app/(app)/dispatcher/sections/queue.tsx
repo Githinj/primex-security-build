@@ -16,6 +16,7 @@ import { Timeline } from '@/components/incidents/timeline'
 import { AssignGuardModal } from '@/components/dispatch/assign-guard-modal'
 import { cn, severityTone } from '@/lib/utils'
 import { updateAlertStatus } from '@/lib/data/actions/alerts'
+import { useRealtimeAlerts } from '@/lib/hooks/use-realtime-alerts'
 import type { Alert, AlertSeverity, Profile, Site, Camera as CameraType } from '@/lib/types'
 
 type FilterSeverity = 'All' | AlertSeverity
@@ -59,6 +60,8 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
   const [selectedId, setSelectedId] = useState<string | null>(alerts[0]?.id ?? null)
   const [modalOpen, setModalOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  useRealtimeAlerts()
 
   const filtered = filter === 'All' ? alerts : alerts.filter((a) => a.severity === filter)
   const selected = alerts.find((a) => a.id === selectedId) ?? null
@@ -145,6 +148,7 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
                         {alert.title}
                       </span>
                       {isCriticalNew && <LiveDot color="red" />}
+                      {alert.source.includes('AI') && <Pill tone="blue" size="sm">AI</Pill>}
                     </div>
                     {site && (
                       <span className="text-[12px] text-ink-3 truncate">
