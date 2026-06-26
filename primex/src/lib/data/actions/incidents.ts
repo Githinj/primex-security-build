@@ -28,7 +28,7 @@ export async function assignGuard(incidentId: string, guardId: string) {
 }
 
 export async function updateIncidentStatus(id: string, status: string) {
-  await requireRole('super_admin', 'dispatcher', 'guard')
+  await requireRole('super_admin', 'dispatcher', 'guard', 'company_manager')
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('incidents').update({ status }).eq('id', id)
   if (error) throw error

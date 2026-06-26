@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, ExternalLink, XCircle } from "lucide-react";
 import {
   PageTitle,
@@ -12,6 +13,7 @@ import {
   ActionMenu,
 } from "@/components/ui";
 import { CreateAlertModal } from "@/components/alerts/create-alert-modal";
+import { updateAlertStatus } from "@/lib/data/actions/alerts";
 import { severityTone } from "@/lib/utils";
 import type { Company, Alert, Site, Camera } from "@/lib/types";
 
@@ -34,7 +36,9 @@ interface CompanyAlertsProps {
 }
 
 export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlertsProps) {
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const rows = alerts.map((alert) => {
     const site = sites.find((s) => s.id === alert.site_id);
@@ -69,19 +73,26 @@ export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlerts
           {
             label: "View alert",
             icon: Bell,
-            onClick: () => {},
+            onClick: () => router.push(`/alerts/${alert.id}`),
           },
           {
             label: "Open incident",
             icon: ExternalLink,
-            onClick: () => {},
+            onClick: () => router.push(`/incidents`),
           },
           { divider: true, label: "" },
           {
             label: "Close alert",
             icon: XCircle,
             tone: "danger",
-            onClick: () => {},
+            onClick: () => startTransition(async () => {
+              try {
+                await updateAlertStatus(alert.id, 'Closed');
+                router.refresh();
+              } catch (err) {
+                console.error(err);
+              }
+            }),
           },
         ]}
       />,

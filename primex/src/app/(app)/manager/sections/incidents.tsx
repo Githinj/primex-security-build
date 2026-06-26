@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Filter, Eye, Pencil, X } from "lucide-react";
 import {
   PageTitle,
@@ -9,6 +11,7 @@ import {
   Pill,
   ActionMenu,
 } from "@/components/ui";
+import { updateIncidentStatus } from "@/lib/data/actions/incidents";
 import { severityTone, incidentTone } from "@/lib/utils";
 import type { Incident, Site, Profile } from "@/lib/types";
 
@@ -23,6 +26,8 @@ export function CompanyIncidents({
   sites,
   teamMembers,
 }: CompanyIncidentsProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const guards = teamMembers.filter((m) => m.role === "guard");
 
   const rows = incidents.map((incident) => {
@@ -68,10 +73,22 @@ export function CompanyIncidents({
       <ActionMenu
         key="actions"
         actions={[
-          { label: "View", icon: Eye, onClick: () => {} },
-          { label: "Edit", icon: Pencil, onClick: () => {} },
+          { label: "View", icon: Eye, onClick: () => router.push(`/incidents/${incident.id}`) },
+          { label: "Edit", icon: Pencil, onClick: () => router.push(`/incidents/${incident.id}`) },
           { divider: true, label: "" },
-          { label: "Close", icon: X, tone: "danger", onClick: () => {} },
+          {
+            label: "Close",
+            icon: X,
+            tone: "danger",
+            onClick: () => startTransition(async () => {
+              try {
+                await updateIncidentStatus(incident.id, 'Closed');
+                router.refresh();
+              } catch (err) {
+                console.error(err);
+              }
+            }),
+          },
         ]}
       />,
     ];
