@@ -1,8 +1,10 @@
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireRole } from '@/lib/auth/require-role'
 
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
+  await requireRole('super_admin', 'company_manager', 'dispatcher')
   const supabase = await createServerSupabaseClient()
   const { data: alertData, error: alertError } = await supabase
     .from('alerts')
@@ -28,6 +30,7 @@ export async function createAlert(data: { site_id: string; camera_id?: string | 
 }
 
 export async function updateAlertStatus(id: string, status: string) {
+  await requireRole('super_admin', 'dispatcher')
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('alerts').update({ status }).eq('id', id)
   if (error) throw error

@@ -10,6 +10,7 @@ import {
   Field,
   TextInput,
   Select,
+  InfoBox,
   Button,
 } from "@/components/ui";
 import type { Profile } from "@/lib/types";
@@ -18,7 +19,6 @@ import { updateProfile } from "@/lib/data/actions/profiles";
 const ROLE_OPTIONS = [
   { value: "company_manager", label: "Company Manager" },
   { value: "dispatcher", label: "Dispatcher" },
-  { value: "site_manager", label: "Site Manager" },
   { value: "guard", label: "Guard/Responder" },
 ];
 
@@ -31,6 +31,7 @@ interface EditTeamMemberModalProps {
 export function EditTeamMemberModal({ open, onClose, member }: EditTeamMemberModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -63,7 +64,7 @@ export function EditTeamMemberModal({ open, onClose, member }: EditTeamMemberMod
       });
       setSubmitted(true);
     } catch {
-      // TODO: surface error to user
+      setError("Something went wrong. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -71,11 +72,13 @@ export function EditTeamMemberModal({ open, onClose, member }: EditTeamMemberMod
 
   function handleDone() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
   function handleClose() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
@@ -129,6 +132,9 @@ export function EditTeamMemberModal({ open, onClose, member }: EditTeamMemberMod
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
               </Field>
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
             </div>
           </ModalBody>
           <ModalFooter>

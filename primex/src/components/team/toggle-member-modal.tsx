@@ -23,6 +23,7 @@ interface ToggleMemberModalProps {
 export function ToggleMemberModal({ open, onClose, member }: ToggleMemberModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!member) return null;
 
@@ -36,7 +37,7 @@ export function ToggleMemberModal({ open, onClose, member }: ToggleMemberModalPr
       await toggleProfileStatus(member.id, !isActive);
       setSubmitted(true);
     } catch {
-      // TODO: surface error to user
+      setError("Something went wrong. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -44,11 +45,13 @@ export function ToggleMemberModal({ open, onClose, member }: ToggleMemberModalPr
 
   function handleDone() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
   function handleClose() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
@@ -72,6 +75,9 @@ export function ToggleMemberModal({ open, onClose, member }: ToggleMemberModalPr
             onClose={handleClose}
           />
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             <InfoBox tone={isActive ? "amber" : "green"}>
               {isActive
                 ? "They keep their account and history, but can't sign in. Reactivate anytime."

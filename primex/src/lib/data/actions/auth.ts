@@ -3,6 +3,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { UserRole } from '@/lib/types'
+import { requireRole } from '@/lib/auth/require-role'
 
 interface InviteUserParams {
   email: string
@@ -14,6 +15,7 @@ interface InviteUserParams {
 }
 
 export async function inviteUser(params: InviteUserParams) {
+  await requireRole('super_admin', 'company_manager')
   const admin = createAdminSupabaseClient()
 
   const password = params.temp_password || generateTempPassword()

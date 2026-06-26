@@ -38,6 +38,7 @@ export function CreateAlertModal({
 }: CreateAlertModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState(lockedCompany?.id ?? "");
   const [siteId, setSiteId] = useState("");
   const [cameraId, setCameraId] = useState("");
@@ -68,14 +69,15 @@ export function CreateAlertModal({
           source: "Manual",
         });
         setSubmitted(true);
-      } catch (err) {
-        console.error("Failed to create alert:", err);
+      } catch {
+        setError("Something went wrong. Please try again.");
       }
     });
   }
 
   function handleDone() {
     setSubmitted(false);
+    setError(null);
     setCompanyId(lockedCompany?.id ?? "");
     setSiteId("");
     setCameraId("");
@@ -191,6 +193,9 @@ export function CreateAlertModal({
                 />
               </Field>
 
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
               <InfoBox tone="amber">
                 Creating this alert will automatically open a linked incident for
                 dispatcher review and guard dispatch.

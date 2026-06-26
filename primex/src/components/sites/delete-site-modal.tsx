@@ -23,6 +23,7 @@ interface DeleteSiteModalProps {
 export function DeleteSiteModal({ open, onClose, site }: DeleteSiteModalProps) {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!site) return null;
 
@@ -32,8 +33,8 @@ export function DeleteSiteModal({ open, onClose, site }: DeleteSiteModalProps) {
     try {
       await deleteSite(site.id);
       setDone(true);
-    } catch (err) {
-      console.error("Failed to delete site:", err);
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -41,6 +42,7 @@ export function DeleteSiteModal({ open, onClose, site }: DeleteSiteModalProps) {
 
   function handleClose() {
     setDone(false);
+    setError(null);
     onClose();
   }
 
@@ -61,6 +63,9 @@ export function DeleteSiteModal({ open, onClose, site }: DeleteSiteModalProps) {
           />
 
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             <InfoBox tone="amber">
               This will remove the site, all of its cameras, and disable Business Client access. Past alerts and incidents stay in your records for audit.
             </InfoBox>

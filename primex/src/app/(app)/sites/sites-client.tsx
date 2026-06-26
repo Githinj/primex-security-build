@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, Plus, Eye, Pencil, Power, Trash2 } from "lucide-react";
+import { Filter, Plus, Eye, Power, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   PageTitle,
@@ -85,11 +85,6 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
             label: "View site",
             icon: Eye,
             onClick: () => router.push(`/sites/${site.id}`),
-          },
-          {
-            label: "Edit site",
-            icon: Pencil,
-            onClick: () => {},
           },
           { divider: true, label: "" },
           {

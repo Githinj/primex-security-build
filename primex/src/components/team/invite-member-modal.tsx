@@ -20,7 +20,6 @@ import { useProfile } from "@/components/providers/profile-provider";
 const ROLE_OPTIONS = [
   { value: "company_manager", label: "Company Manager" },
   { value: "dispatcher", label: "Dispatcher" },
-  { value: "site_manager", label: "Site Manager" },
   { value: "guard", label: "Guard/Responder" },
 ];
 
@@ -34,6 +33,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
   const [submitted, setSubmitted] = useState(false);
   const [tempPassword, setTempPassword] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -53,8 +53,8 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
         });
         setTempPassword(result.tempPassword);
         setSubmitted(true);
-      } catch (err) {
-        console.error("Failed to invite user:", err);
+      } catch {
+        setError("Something went wrong. Please try again.");
       }
     });
   }
@@ -62,6 +62,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
   function handleDone() {
     setSubmitted(false);
     setTempPassword("");
+    setError(null);
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
   }
@@ -69,6 +70,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
   function handleClose() {
     setSubmitted(false);
     setTempPassword("");
+    setError(null);
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
   }
@@ -131,6 +133,9 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
               </Field>
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
               <InfoBox tone="blue">
                 The invitation link expires in 7 days. You can resend or revoke
                 from the team list.

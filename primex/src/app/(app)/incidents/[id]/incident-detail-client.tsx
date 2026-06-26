@@ -1,5 +1,7 @@
 "use client";
 
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
 
 import {
@@ -12,6 +14,7 @@ import {
 } from "@/components/ui";
 import { Timeline } from "@/components/incidents/timeline";
 import { severityTone, incidentTone } from "@/lib/utils";
+import { updateIncidentStatus } from "@/lib/data/actions/incidents";
 import type { Incident, Site, Profile, Alert } from "@/lib/types";
 
 interface IncidentDetailClientProps {
@@ -27,6 +30,19 @@ export function IncidentDetailClient({
   guard,
   alert,
 }: IncidentDetailClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleCloseIncident = () =>
+    startTransition(async () => {
+      try {
+        await updateIncidentStatus(incident.id, 'Closed');
+        router.refresh();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
   // Build timeline events from available data
   const timelineEvents = [
     {
@@ -154,14 +170,13 @@ export function IncidentDetailClient({
           <div className="flex flex-col gap-2">
             <Label>Actions</Label>
             <div className="flex flex-col gap-2 mt-1">
-              <Button variant="primary" full>
-                Update Status
-              </Button>
-              <Button variant="secondary" full>
-                Assign Guard
-              </Button>
-              <Button variant="secondary" full>
-                Close Incident
+              <Button
+                variant="primary"
+                full
+                onClick={handleCloseIncident}
+                disabled={isPending || incident.status === 'Closed'}
+              >
+                {isPending ? 'Closing…' : incident.status === 'Closed' ? 'Already Closed' : 'Close Incident'}
               </Button>
             </div>
           </div>

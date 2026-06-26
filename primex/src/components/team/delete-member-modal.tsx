@@ -23,6 +23,7 @@ interface DeleteMemberModalProps {
 export function DeleteMemberModal({ open, onClose, member }: DeleteMemberModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!member) return null;
 
@@ -35,7 +36,7 @@ export function DeleteMemberModal({ open, onClose, member }: DeleteMemberModalPr
       await deleteProfile(member.id);
       setSubmitted(true);
     } catch {
-      // TODO: surface error to user
+      setError("Something went wrong. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -43,11 +44,13 @@ export function DeleteMemberModal({ open, onClose, member }: DeleteMemberModalPr
 
   function handleDone() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
   function handleClose() {
     setSubmitted(false);
+    setError(null);
     onClose();
   }
 
@@ -67,6 +70,9 @@ export function DeleteMemberModal({ open, onClose, member }: DeleteMemberModalPr
             onClose={handleClose}
           />
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             <InfoBox tone="amber">
               Soft delete — the user is hidden from your team list and can&apos;t
               sign in. Their actions stay in the audit log. Admins can restore

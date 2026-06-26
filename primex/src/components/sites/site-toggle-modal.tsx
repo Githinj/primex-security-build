@@ -23,6 +23,7 @@ interface SiteToggleModalProps {
 export function SiteToggleModal({ open, onClose, site }: SiteToggleModalProps) {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!site) return null;
 
@@ -34,8 +35,8 @@ export function SiteToggleModal({ open, onClose, site }: SiteToggleModalProps) {
     try {
       await toggleSiteStatus(site.id, isActive ? "Inactive" : "Active");
       setDone(true);
-    } catch (err) {
-      console.error("Failed to toggle site status:", err);
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -43,6 +44,7 @@ export function SiteToggleModal({ open, onClose, site }: SiteToggleModalProps) {
 
   function handleClose() {
     setDone(false);
+    setError(null);
     onClose();
   }
 
@@ -67,6 +69,9 @@ export function SiteToggleModal({ open, onClose, site }: SiteToggleModalProps) {
           />
 
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             {isActive ? (
               <InfoBox tone="amber">
                 Cameras at this site stop generating alerts. Existing incidents stay open. You can reactivate anytime.

@@ -13,6 +13,7 @@ import {
   Field,
   TextInput,
   Select,
+  InfoBox,
   KV,
   Pill,
 } from "@/components/ui";
@@ -62,6 +63,7 @@ export function CompanyDetailsModal({
   const [editMode, setEditMode] = useState(mode === "edit");
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -92,6 +94,7 @@ export function CompanyDetailsModal({
   function handleClose() {
     setSuccess(false);
     setEditMode(false);
+    setError(null);
     onClose();
   }
 
@@ -105,7 +108,7 @@ export function CompanyDetailsModal({
       });
       setSuccess(true);
     } catch {
-      // silently handle for now
+      setError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -172,6 +175,9 @@ export function CompanyDetailsModal({
                   options={PLAN_OPTIONS}
                 />
               </Field>
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
             </div>
           </ModalBody>
           <ModalFooter>

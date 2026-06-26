@@ -29,6 +29,7 @@ export function SuspendCompanyModal({
 }: SuspendCompanyModalProps) {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!company) return null;
 
@@ -36,6 +37,7 @@ export function SuspendCompanyModal({
 
   function handleClose() {
     setSuccess(false);
+    setError(null);
     onClose();
   }
 
@@ -48,7 +50,7 @@ export function SuspendCompanyModal({
       });
       setSuccess(true);
     } catch {
-      // silently handle for now
+      setError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -78,6 +80,9 @@ export function SuspendCompanyModal({
             onClose={handleClose}
           />
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             <InfoBox tone={isSuspended ? "green" : "amber"}>
               {isSuspended
                 ? "Users will regain access immediately. Cameras and alerts will resume normal operation."

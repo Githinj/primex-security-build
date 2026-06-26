@@ -1,6 +1,8 @@
 "use client";
 
-import { Plus, User, Pencil, UserX } from "lucide-react";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, UserX } from "lucide-react";
 import {
   PageTitle,
   Card,
@@ -9,6 +11,7 @@ import {
   ActionMenu,
   Button,
 } from "@/components/ui";
+import { toggleProfileStatus } from "@/lib/data/actions/profiles";
 import type { Profile, GuardStatus } from "@/lib/types";
 
 interface GuardsClientProps {
@@ -36,6 +39,9 @@ function getInitials(name: string): string {
 }
 
 export function GuardsClient({ guards }: GuardsClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const rows = guards.map((guard) => [
     /* Guard - avatar + name */
     <span key="guard" className="inline-flex items-center gap-3">
@@ -72,21 +78,17 @@ export function GuardsClient({ guards }: GuardsClientProps) {
       key="actions"
       actions={[
         {
-          label: "View profile",
-          icon: User,
-          onClick: () => {},
-        },
-        {
-          label: "Edit",
-          icon: Pencil,
-          onClick: () => {},
-        },
-        { divider: true, label: "" },
-        {
           label: "Deactivate",
           icon: UserX,
           tone: "danger",
-          onClick: () => {},
+          onClick: () => startTransition(async () => {
+            try {
+              await toggleProfileStatus(guard.id, false);
+              router.refresh();
+            } catch (err) {
+              console.error(err);
+            }
+          }),
         },
       ]}
     />,
@@ -98,7 +100,7 @@ export function GuardsClient({ guards }: GuardsClientProps) {
         title="Guards"
         sub="Field responders across all zones. Status updates from the mobile app in real-time."
         actions={
-          <Button variant="primary" icon={Plus} onClick={() => {}}>
+          <Button variant="primary" icon={Plus} onClick={() => router.push('/team')}>
             Add guard
           </Button>
         }

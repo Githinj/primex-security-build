@@ -28,6 +28,7 @@ interface AddSiteModalProps {
 export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSiteModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     company_id: lockedCompany?.id ?? "",
@@ -54,14 +55,15 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
           risk: form.risk || undefined,
         });
         setSubmitted(true);
-      } catch (err) {
-        console.error("Failed to create site:", err);
+      } catch {
+        setError("Something went wrong. Please try again.");
       }
     });
   }
 
   function handleDone() {
     setSubmitted(false);
+    setError(null);
     setForm({
       company_id: lockedCompany?.id ?? "",
       name: "",
@@ -204,6 +206,9 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
                   </Field>
                 </div>
 
+                {error && (
+                  <InfoBox tone="amber">{error}</InfoBox>
+                )}
                 <InfoBox tone="blue">
                   A portal invite link will be emailed to the client when the site
                   is created. They can activate their account at any time.

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Filter, Bell, ExternalLink, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { updateAlertStatus } from "@/lib/data/actions/alerts";
 import {
   PageTitle,
   Card,
@@ -37,6 +38,7 @@ interface AlertsClientProps {
 export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClientProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const rows = alerts.map((alert) => {
     const site = sites.find((s) => s.id === alert.site_id);
@@ -89,14 +91,21 @@ export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClient
           {
             label: "Open incident",
             icon: ExternalLink,
-            onClick: () => {},
+            onClick: () => router.push(`/incidents`),
           },
           { divider: true, label: "" },
           {
             label: "Close alert",
             icon: XCircle,
             tone: "danger",
-            onClick: () => {},
+            onClick: () => startTransition(async () => {
+              try {
+                await updateAlertStatus(alert.id, 'Closed');
+                router.refresh();
+              } catch (err) {
+                console.error(err);
+              }
+            }),
           },
         ]}
       />,

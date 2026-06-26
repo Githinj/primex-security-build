@@ -1,8 +1,10 @@
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireRole } from '@/lib/auth/require-role'
 
 export async function dispatchGuard(alertId: string, guardId: string) {
+  await requireRole('super_admin', 'dispatcher')
   const supabase = await createServerSupabaseClient()
 
   // 1. Get the alert

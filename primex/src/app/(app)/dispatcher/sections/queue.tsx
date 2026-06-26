@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Bell,
   AlertTriangle,
@@ -14,6 +15,7 @@ import { Button, Pill, Label, Card, LiveDot, KV } from '@/components/ui'
 import { Timeline } from '@/components/incidents/timeline'
 import { AssignGuardModal } from '@/components/dispatch/assign-guard-modal'
 import { cn, severityTone } from '@/lib/utils'
+import { updateAlertStatus } from '@/lib/data/actions/alerts'
 import type { Alert, AlertSeverity, Profile, Site, Camera as CameraType } from '@/lib/types'
 
 type FilterSeverity = 'All' | AlertSeverity
@@ -52,9 +54,11 @@ function formatTime(dateStr: string) {
 }
 
 export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQueueProps) {
+  const router = useRouter()
   const [filter, setFilter] = useState<FilterSeverity>('All')
   const [selectedId, setSelectedId] = useState<string | null>(alerts[0]?.id ?? null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
   const filtered = filter === 'All' ? alerts : alerts.filter((a) => a.severity === filter)
   const selected = alerts.find((a) => a.id === selectedId) ?? null
@@ -245,10 +249,34 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
                     >
                       Convert to incident
                     </Button>
-                    <Button variant="secondary" icon={ArrowUpRight}>
+                    <Button
+                      variant="secondary"
+                      icon={ArrowUpRight}
+                      disabled={isPending}
+                      onClick={() => startTransition(async () => {
+                        try {
+                          await updateAlertStatus(selected.id, 'Escalated')
+                          router.refresh()
+                        } catch (err) {
+                          console.error(err)
+                        }
+                      })}
+                    >
                       Escalate
                     </Button>
-                    <Button variant="secondary" icon={Check}>
+                    <Button
+                      variant="secondary"
+                      icon={Check}
+                      disabled={isPending}
+                      onClick={() => startTransition(async () => {
+                        try {
+                          await updateAlertStatus(selected.id, 'Closed')
+                          router.refresh()
+                        } catch (err) {
+                          console.error(err)
+                        }
+                      })}
+                    >
                       Close alert
                     </Button>
                   </div>

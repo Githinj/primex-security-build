@@ -43,6 +43,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
@@ -77,8 +78,8 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
           status: form.status || undefined,
         });
         setSuccess(true);
-      } catch (err) {
-        console.error("Failed to create camera:", err);
+      } catch {
+        setError("Something went wrong. Please try again.");
       }
     });
   }
@@ -86,6 +87,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
   function handleClose() {
     setForm(INITIAL_FORM);
     setSuccess(false);
+    setError(null);
     onClose();
   }
 
@@ -159,6 +161,11 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
                   placeholder="Select status"
                 />
               </Field>
+
+              {/* Error display */}
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
 
               {/* Phase 2 info box */}
               <InfoBox tone="blue">

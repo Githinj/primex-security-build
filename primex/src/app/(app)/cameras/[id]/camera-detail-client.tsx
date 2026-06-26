@@ -1,15 +1,16 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Eye,
-  Pencil,
   Trash2,
 } from "lucide-react";
 import { Card, KV, Button, Label, Pill } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { cameraTone } from "@/lib/utils";
+import { deleteCamera } from "@/lib/data/actions/cameras";
 import type { Camera, Site } from "@/lib/types";
 
 interface CameraDetailClientProps {
@@ -30,6 +31,7 @@ function formatTime(iso: string): string {
 
 export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const tone = cameraTone(camera.status);
 
@@ -95,20 +97,20 @@ export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
               View live (Phase 2)
             </Button>
             <Button
-              variant="secondary"
-              icon={Pencil}
-              full
-              onClick={() => {}}
-            >
-              Edit camera
-            </Button>
-            <Button
               variant="danger"
               icon={Trash2}
               full
-              onClick={() => {}}
+              disabled={isPending}
+              onClick={() => startTransition(async () => {
+                try {
+                  await deleteCamera(camera.id);
+                  router.push('/cameras');
+                } catch (err) {
+                  console.error(err);
+                }
+              })}
             >
-              Remove camera
+              {isPending ? 'Removing…' : 'Remove camera'}
             </Button>
           </div>
         </Card>

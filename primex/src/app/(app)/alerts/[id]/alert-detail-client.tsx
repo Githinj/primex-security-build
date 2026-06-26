@@ -1,9 +1,11 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Camera, ArrowLeft, AlertTriangle, FileText, X } from "lucide-react";
+import { MapPin, Camera, ArrowLeft, AlertTriangle, X } from "lucide-react";
 import { Card, Pill, Button, KV } from "@/components/ui";
 import { severityTone } from "@/lib/utils";
+import { updateAlertStatus } from "@/lib/data/actions/alerts";
 import type { Alert, Site, Camera as CameraType } from "@/lib/types";
 
 function formatTime(iso: string): string {
@@ -31,6 +33,27 @@ interface AlertDetailClientProps {
 
 export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleEscalate = () =>
+    startTransition(async () => {
+      try {
+        await updateAlertStatus(alert.id, 'Escalated');
+        router.refresh();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+  const handleClose = () =>
+    startTransition(async () => {
+      try {
+        await updateAlertStatus(alert.id, 'Closed');
+        router.refresh();
+      } catch (err) {
+        console.error(err);
+      }
+    });
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-5xl">
@@ -153,26 +176,20 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
               Actions
             </p>
             <Button
-              variant="primary"
-              icon={FileText}
-              full
-              onClick={() => {}}
-            >
-              Convert to incident
-            </Button>
-            <Button
               variant="secondary"
               icon={AlertTriangle}
               full
-              onClick={() => {}}
+              onClick={handleEscalate}
+              disabled={isPending}
             >
-              Escalate
+              {isPending ? 'Updating…' : 'Escalate'}
             </Button>
             <Button
               variant="danger"
               icon={X}
               full
-              onClick={() => {}}
+              onClick={handleClose}
+              disabled={isPending}
             >
               Close alert
             </Button>

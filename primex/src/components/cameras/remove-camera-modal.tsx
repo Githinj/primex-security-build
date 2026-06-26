@@ -22,16 +22,22 @@ interface RemoveCameraModalProps {
 
 export function RemoveCameraModal({ open, onClose, camera }: RemoveCameraModalProps) {
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!camera) return null;
 
   async function handleRemove() {
-    await deleteCamera(camera!.id);
-    setDone(true);
+    try {
+      await deleteCamera(camera!.id);
+      setDone(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   }
 
   function handleClose() {
     setDone(false);
+    setError(null);
     onClose();
   }
 
@@ -52,6 +58,9 @@ export function RemoveCameraModal({ open, onClose, camera }: RemoveCameraModalPr
           />
 
           <ModalBody>
+            {error && (
+              <InfoBox tone="amber">{error}</InfoBox>
+            )}
             <InfoBox tone="amber">
               The camera is unregistered from Primex. Status checks stop and past alerts linked to it stay in records.
             </InfoBox>

@@ -52,10 +52,12 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [tempPassword, setTempPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function handleClose() {
     setSuccess(false);
     setTempPassword("");
+    setError(null);
     setForm(INITIAL_FORM);
     onClose();
   }
@@ -72,8 +74,8 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
       });
       setTempPassword(result.tempPassword);
       setSuccess(true);
-    } catch (err) {
-      console.error("Failed to invite company:", err);
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -147,6 +149,9 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
                   options={PLAN_OPTIONS}
                 />
               </Field>
+              {error && (
+                <InfoBox tone="amber">{error}</InfoBox>
+              )}
               <InfoBox tone="blue">
                 The contact will receive an email with a secure link to set
                 their password, configure 2FA, and create their first site.
