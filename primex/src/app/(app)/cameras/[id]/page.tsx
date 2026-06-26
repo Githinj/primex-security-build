@@ -1,5 +1,6 @@
 import { getCameraById } from "@/lib/data/cameras";
 import { getSiteById } from "@/lib/data/sites";
+import { getCameraAiConfig } from "@/lib/data/camera-ai-config";
 import { notFound } from "next/navigation";
 import { CameraDetailClient } from "./camera-detail-client";
 
@@ -16,5 +17,7 @@ export default async function CameraDetailPage({ params }: PageProps) {
   const site = await getSiteById(camera.site_id);
   if (!site) notFound();
 
-  return <CameraDetailClient camera={camera} site={site} />;
+  const aiConfig = await getCameraAiConfig(camera.id);
+
+  return <CameraDetailClient camera={camera} site={site} aiConfig={aiConfig} />;
 }

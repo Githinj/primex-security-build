@@ -11,11 +11,13 @@ import { Card, KV, Button, Label, Pill } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { cameraTone } from "@/lib/utils";
 import { deleteCamera } from "@/lib/data/actions/cameras";
-import type { Camera, Site } from "@/lib/types";
+import { toggleCameraAi } from "@/lib/data/actions/camera-ai-config";
+import type { Camera, Site, CameraAiConfig } from "@/lib/types";
 
 interface CameraDetailClientProps {
   camera: Camera;
   site: Site;
+  aiConfig: CameraAiConfig | null;
 }
 
 function formatTime(iso: string): string {
@@ -29,7 +31,7 @@ function formatTime(iso: string): string {
   });
 }
 
-export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
+export function CameraDetailClient({ camera, site, aiConfig }: CameraDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -80,6 +82,52 @@ export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
                 )
               }
             />
+          </div>
+        </Card>
+
+        {/* AI Detection config */}
+        <Card className="flex flex-col gap-5">
+          <Label>AI Detection</Label>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-ink font-sans">Status</span>
+              <button
+                type="button"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                  aiConfig?.enabled ? 'bg-p-blue' : 'bg-p-gray/30'
+                }`}
+                onClick={() => startTransition(async () => {
+                  try {
+                    await toggleCameraAi(camera.id, !(aiConfig?.enabled ?? false));
+                    router.refresh();
+                  } catch (err) {
+                    console.error(err);
+                  }
+                })}
+                disabled={isPending}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                    aiConfig?.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <KV k="Zones configured" v={String(aiConfig?.zones?.length ?? 0)} />
+            {aiConfig?.zones && aiConfig.zones.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {aiConfig.zones.map((z) => (
+                  <Pill key={z.name} tone="blue" size="sm">
+                    {z.name} ({z.type})
+                  </Pill>
+                ))}
+              </div>
+            )}
+            {!aiConfig && (
+              <p className="text-xs text-ink-4 font-sans">
+                No AI config. Detection will be enabled when the camera is assigned a stream.
+              </p>
+            )}
           </div>
         </Card>
 
