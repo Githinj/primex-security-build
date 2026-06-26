@@ -7,6 +7,7 @@ import { PageTitle, StatCard, ActionMenu } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
 import { RemoveCameraModal } from "@/components/cameras/remove-camera-modal";
+import { EditCameraModal } from "@/components/cameras/edit-camera-modal";
 import type { Camera, Site, Company } from "@/lib/types";
 
 interface CamerasClientProps {
@@ -19,6 +20,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [removeModal, setRemoveModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
+  const [editModal, setEditModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
 
   const online = cameras.filter((c) => c.status === "Online").length;
   const offline = cameras.filter((c) => c.status === "Offline").length;
@@ -30,8 +32,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
       <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
         <PageTitle
           title="Cameras & devices"
-          phaseTag="RTSP streaming · Phase 2"
-          sub="Phase 1 shows status only. Super Admin can add or remove cameras from any company site."
+          sub="Manage cameras across all company sites. Click a camera to view live stream."
           actions={
             <button
               type="button"
@@ -91,7 +92,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
                       {
                         label: "Edit camera",
                         icon: Pencil,
-                        onClick: () => {},
+                        onClick: () => setEditModal({ open: true, camera }),
                       },
                       { divider: true, label: "" },
                       {
@@ -110,6 +111,11 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
       </div>
 
       <AddCameraModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} sites={sites} />
+      <EditCameraModal
+        open={editModal.open}
+        onClose={() => setEditModal({ open: false, camera: null })}
+        camera={editModal.camera}
+      />
       <RemoveCameraModal
         open={removeModal.open}
         onClose={() => setRemoveModal({ open: false, camera: null })}
