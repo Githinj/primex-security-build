@@ -7,6 +7,7 @@ export type AlertStatus = 'New' | 'Reviewing' | 'Escalated' | 'Closed'
 export type IncidentStatus = 'Open' | 'In Progress' | 'Dispatched' | 'Resolved' | 'Closed'
 export type GuardStatus = 'Available' | 'On Incident' | 'Off-duty'
 export type UserRole = 'super_admin' | 'company_manager' | 'dispatcher' | 'guard' | 'client'
+export type DetectionEventType = 'motion_afterhours' | 'person_lingering' | 'concealment_behavior' | 'door_event' | 'vehicle_detection'
 
 export interface Company {
   id: string
@@ -36,6 +37,69 @@ export interface Camera {
   status: CameraStatus
   last_checked: string
   warning: string | null
+  stream_id: string | null
+  stream_url: string | null
+  recording_enabled: boolean
+  last_frame_at: string | null
+}
+
+export interface AiZone {
+  name: string
+  type: 'door' | 'restricted' | 'entry'
+  coords: { x1: number; y1: number; x2: number; y2: number }
+}
+
+export interface CameraAiConfig {
+  id: string
+  camera_id: string
+  enabled: boolean
+  zones: AiZone[]
+}
+
+export interface SiteBusinessHours {
+  id: string
+  site_id: string
+  timezone: string
+  hours: Record<string, { open: string; close: string }>
+}
+
+export interface AiWorkerConfig {
+  id: number
+  confidence_threshold: number
+  snapshot_interval_s: number
+  cooldown_s: number
+  dwell_threshold_s: number
+  door_open_threshold_s: number
+  updated_at: string
+}
+
+export interface Recording {
+  id: string
+  camera_id: string
+  stream_id: string
+  file_url: string
+  file_size: number | null
+  duration_s: number | null
+  started_at: string
+  ended_at: string | null
+  status: 'recording' | 'complete' | 'failed'
+  created_at: string
+}
+
+export interface StreamToken {
+  token: string
+  streamId: string
+  webrtcUrl: string
+  hlsUrl: string
+  expiresAt: number
+}
+
+export interface StreamEvent {
+  id: string
+  camera_id: string
+  event_type: 'stream_started' | 'stream_stopped' | 'recording_saved'
+  payload: Record<string, unknown>
+  created_at: string
 }
 
 export interface Profile {
@@ -62,6 +126,10 @@ export interface Alert {
   created_at: string
   description: string
   source: string
+  frame_url: string | null
+  confidence: number | null
+  event_type: DetectionEventType | null
+  ai_metadata: Record<string, unknown> | null
 }
 
 export interface Incident {
