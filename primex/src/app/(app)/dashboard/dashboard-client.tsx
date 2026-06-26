@@ -183,10 +183,10 @@ export function DashboardClient({
         />
         <StatCard
           label="Avg response"
-          value="9m"
+          value={stats.avgResponseMinutes > 0 ? `${stats.avgResponseMinutes}m` : '—'}
           icon={Clock}
           supporting={
-            <Pill tone="green" dot size="sm">↓ 2m vs avg</Pill>
+            <Pill tone="blue" dot size="sm">from {stats.resolvedIncidentCount} incidents</Pill>
           }
         />
         <StatCard

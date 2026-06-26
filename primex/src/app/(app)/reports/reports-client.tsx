@@ -23,24 +23,25 @@ import { HorizontalBarList } from "@/components/charts/horizontal-bars";
 
 import type { Report } from "@/lib/types";
 
-// --- chart data (hardcoded) --------------------------------------------------
+// --- types -------------------------------------------------------------------
 
-const monthlyData = [
-  { label: "Dec", value: 8 },
-  { label: "Jan", value: 11 },
-  { label: "Feb", value: 13 },
-  { label: "Mar", value: 9 },
-  { label: "Apr", value: 12 },
-  { label: "May", value: 9 },
-];
+export interface ReportStats {
+  totalReports: number;
+  avgIncidentsPerMonth: number;
+  avgResponseMinutes: number;
+  resolutionRate: number;
+}
 
-const incidentTypes = [
-  { name: "Suspicious activity", count: 14, pct: 78 },
-  { name: "Door / access", count: 9, pct: 50 },
-  { name: "Camera offline", count: 8, pct: 44 },
-  { name: "After-hours motion", count: 6, pct: 33 },
-  { name: "Other", count: 3, pct: 17 },
-];
+export interface MonthlyDataPoint {
+  label: string;
+  value: number;
+}
+
+export interface IncidentTypeEntry {
+  name: string;
+  count: number;
+  pct: number;
+}
 
 // --- helpers -----------------------------------------------------------------
 
@@ -69,9 +70,12 @@ function formatDate(iso: string): string {
 
 interface ReportsClientProps {
   reports: Report[];
+  reportStats: ReportStats;
+  monthlyData: MonthlyDataPoint[];
+  incidentTypes: IncidentTypeEntry[];
 }
 
-export function ReportsClient({ reports }: ReportsClientProps) {
+export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes }: ReportsClientProps) {
   const [_dateRange, setDateRange] = useState("Last 6 months");
 
   const reportRows = reports.map((report) => [
@@ -137,34 +141,34 @@ export function ReportsClient({ reports }: ReportsClientProps) {
       <div className="grid grid-cols-4 gap-3.5">
         <StatCard
           label="Reports generated"
-          value="47"
+          value={String(reportStats.totalReports)}
           icon={FileText}
           supporting={
-            <Pill tone="blue" size="sm">12 this month</Pill>
+            <Pill tone="blue" size="sm">{reportStats.totalReports} total</Pill>
           }
         />
         <StatCard
           label="Avg incidents / month"
-          value="11.4"
+          value={String(reportStats.avgIncidentsPerMonth)}
           icon={AlertTriangle}
           supporting={
-            <Pill tone="green" size="sm">&#8595; 8% vs Q4</Pill>
+            <Pill tone="blue" size="sm">across all months</Pill>
           }
         />
         <StatCard
           label="Avg response time"
-          value="9m"
+          value={reportStats.avgResponseMinutes > 0 ? `${reportStats.avgResponseMinutes}m` : '—'}
           icon={Clock}
           supporting={
-            <Pill tone="green" size="sm">&#8595; 2m vs avg</Pill>
+            <Pill tone="blue" size="sm">from resolved incidents</Pill>
           }
         />
         <StatCard
           label="Resolution rate"
-          value="96%"
+          value={`${reportStats.resolutionRate}%`}
           icon={CheckCircle2}
           supporting={
-            <Pill tone="green" size="sm">+3% vs avg</Pill>
+            <Pill tone="green" size="sm">resolved + closed</Pill>
           }
         />
       </div>

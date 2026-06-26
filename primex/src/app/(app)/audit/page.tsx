@@ -19,7 +19,22 @@ export default async function AuditPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const activity = await getActivity(50);
+  const activity = await getActivity(500);
 
-  return <AuditClient activity={activity} />;
+  // Compute audit stat values from activity data
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventsToday = activity.filter(
+    (a) => new Date(a.created_at) >= today
+  ).length;
+
+  const uniqueActors = new Set(activity.map((a) => a.who)).size;
+
+  const criticalActions = activity.filter((a) => a.tone === "red").length;
+
+  const systemEvents = activity.filter((a) => a.who === "System").length;
+
+  const auditStats = { eventsToday, uniqueActors, criticalActions, systemEvents };
+
+  return <AuditClient activity={activity} auditStats={auditStats} />;
 }

@@ -17,6 +17,8 @@ export interface DashboardStats {
   activeIncidents: number
   resolvedToday: number
   guardsOnDuty: number
+  avgResponseMinutes: number
+  resolvedIncidentCount: number
   recentAlerts: Alert[]
   recentActivity: ActivityItem[]
   criticalAlerts: Alert[]
@@ -40,6 +42,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { data: criticalAlertsData },
     { data: camerasRaw },
     { data: companiesRaw },
+    { data: resolvedIncidentsData },
   ] = await Promise.all([
     supabase.from('companies').select('*', { count: 'exact', head: true }),
     supabase.from('sites').select('*', { count: 'exact', head: true }),
@@ -54,6 +57,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supabase.from('alerts').select('*').eq('severity', 'Critical').neq('status', 'Closed').order('created_at', { ascending: false }).limit(5),
     supabase.from('cameras').select('id, status, site:sites!inner(company_id)'),
     supabase.from('companies').select('*'),
+    supabase.from('incidents').select('started_at, updated_at').in('status', ['Resolved', 'Closed']),
   ])
 
   // Build camera counts by company
@@ -75,6 +79,17 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     maintenance: countsByCompany[c.id]?.maintenance ?? 0,
   }))
 
+  // Compute average response time from resolved incidents
+  const resolvedIncidents = (resolvedIncidentsData ?? []) as Array<{ started_at: string; updated_at: string }>
+  let avgResponseMinutes = 0
+  if (resolvedIncidents.length > 0) {
+    const totalMinutes = resolvedIncidents.reduce((sum, inc) => {
+      const diff = new Date(inc.updated_at).getTime() - new Date(inc.started_at).getTime()
+      return sum + diff / 60_000
+    }, 0)
+    avgResponseMinutes = Math.round(totalMinutes / resolvedIncidents.length)
+  }
+
   return {
     totalCompanies: totalCompanies ?? 0,
     totalSites: totalSites ?? 0,
@@ -94,6 +109,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       icon: a.icon,
       tone: a.tone,
     })),
+    avgResponseMinutes,
+    resolvedIncidentCount: resolvedIncidents.length,
     criticalAlerts: (criticalAlertsData ?? []) as Alert[],
     camerasByCompany,
   }

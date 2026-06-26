@@ -99,11 +99,19 @@ function ActivityIcon({ iconName, tone }: { iconName: string; tone: ActivityItem
 // AuditClient
 // ---------------------------------------------------------------------------
 
-interface AuditClientProps {
-  activity: ActivityItem[];
+export interface AuditStats {
+  eventsToday: number;
+  uniqueActors: number;
+  criticalActions: number;
+  systemEvents: number;
 }
 
-export function AuditClient({ activity }: AuditClientProps) {
+interface AuditClientProps {
+  activity: ActivityItem[];
+  auditStats: AuditStats;
+}
+
+export function AuditClient({ activity, auditStats }: AuditClientProps) {
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("Today");
 
@@ -138,23 +146,23 @@ export function AuditClient({ activity }: AuditClientProps) {
       <div className="grid grid-cols-4 gap-3.5">
         <StatCard
           label="Events today"
-          value={247}
+          value={auditStats.eventsToday}
           icon={Activity}
         />
         <StatCard
           label="Unique actors"
-          value={18}
+          value={auditStats.uniqueActors}
           icon={Users}
         />
         <StatCard
           label="Critical actions"
-          value={9}
+          value={auditStats.criticalActions}
           icon={AlertTriangle}
           accent="text-p-amber"
         />
         <StatCard
           label="System events"
-          value={84}
+          value={auditStats.systemEvents}
           icon={Cpu}
         />
       </div>
