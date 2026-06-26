@@ -103,8 +103,42 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
         </div>
       </div>
 
-      {/* Camera tile preview */}
-      {camera && (
+      {/* AI frame snapshot or camera placeholder */}
+      {alert.frame_url ? (
+        <div className="w-full max-w-lg rounded-xl overflow-hidden border border-border">
+          <div className="relative" style={{ aspectRatio: "16/9" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={alert.frame_url}
+              alt={`AI detection frame — ${alert.title}`}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-2">
+              {alert.event_type && (
+                <Pill tone="blue" size="sm">
+                  {alert.event_type.replace(/_/g, ' ')}
+                </Pill>
+              )}
+              {alert.confidence != null && (
+                <Pill tone="gray" size="sm">
+                  {(alert.confidence * 100).toFixed(0)}% confidence
+                </Pill>
+              )}
+            </div>
+            <div className="absolute top-2.5 right-2.5">
+              <Pill tone="blue" size="sm">AI</Pill>
+            </div>
+          </div>
+          {camera && (
+            <div className="px-3 py-2 bg-surface flex items-center justify-between font-sans">
+              <span className="text-xs text-ink-3">{camera.name} — {camera.location}</span>
+              <Pill tone={camera.status === "Online" ? "green" : camera.status === "Offline" ? "red" : "amber"} size="sm">
+                {camera.status}
+              </Pill>
+            </div>
+          )}
+        </div>
+      ) : camera ? (
         <div className="w-full max-w-sm rounded-xl overflow-hidden border border-border">
           <div className="bg-navy flex flex-col items-center justify-center gap-3 h-44">
             <Camera size={28} strokeWidth={1.5} className="text-white/30" />
@@ -119,7 +153,7 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
             </Pill>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Two-column body */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-5">
