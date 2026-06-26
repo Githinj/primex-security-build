@@ -3,6 +3,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth/require-role'
 
+// NOTE: The AI detection Edge Function (supabase/functions/ai-event-ingest/index.ts)
+// duplicates this alert+incident insert pattern. If the schema changes,
+// update both this file and the Edge Function in lockstep.
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
   const caller = await requireRole('super_admin', 'company_manager', 'dispatcher')
   const supabase = await createServerSupabaseClient()
