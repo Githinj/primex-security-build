@@ -1,23 +1,22 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Eye,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Card, KV, Button, Label, Pill } from "@/components/ui";
-import { CameraTile } from "@/components/sites/camera-tile";
+import { CameraPlayer } from "@/components/streaming/camera-player";
+import { RecordingTimeline } from "@/components/streaming/recording-timeline";
+import { RecordingPlayer } from "@/components/streaming/recording-player";
 import { cameraTone } from "@/lib/utils";
 import { deleteCamera } from "@/lib/data/actions/cameras";
 import { toggleCameraAi } from "@/lib/data/actions/camera-ai-config";
-import type { Camera, Site, CameraAiConfig } from "@/lib/types";
+import type { Camera, Site, CameraAiConfig, Recording } from "@/lib/types";
 
 interface CameraDetailClientProps {
   camera: Camera;
   site: Site;
   aiConfig: CameraAiConfig | null;
+  recordings: Recording[];
 }
 
 function formatTime(iso: string): string {
@@ -31,11 +30,26 @@ function formatTime(iso: string): string {
   });
 }
 
-export function CameraDetailClient({ camera, site, aiConfig }: CameraDetailClientProps) {
+export function CameraDetailClient({ camera, site, aiConfig, recordings }: CameraDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [mode, setMode] = useState<'live' | 'playback'>('live');
+  const [activeRecording, setActiveRecording] = useState<Recording | null>(null);
+  const [seekTimestamp, setSeekTimestamp] = useState<Date | null>(null);
 
   const tone = cameraTone(camera.status);
+
+  const handleSeek = (timestamp: Date, recording: Recording) => {
+    setMode('playback');
+    setActiveRecording(recording);
+    setSeekTimestamp(timestamp);
+  };
+
+  const handleLive = () => {
+    setMode('live');
+    setActiveRecording(null);
+    setSeekTimestamp(null);
+  };
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-4xl">
@@ -49,9 +63,32 @@ export function CameraDetailClient({ camera, site, aiConfig }: CameraDetailClien
         Back to Cameras
       </button>
 
-      {/* Camera tile preview - large */}
-      <div className="w-full max-w-md">
-        <CameraTile camera={camera} site={site} />
+      {/* Live player or recording player */}
+      <div className="w-full max-w-2xl">
+        {mode === 'live' ? (
+          <CameraPlayer
+            cameraId={camera.id}
+            cameraName={camera.name}
+            status={camera.status}
+          />
+        ) : activeRecording ? (
+          <RecordingPlayer
+            recording={activeRecording}
+            seekToTimestamp={seekTimestamp ?? undefined}
+            cameraName={camera.name}
+          />
+        ) : null}
+      </div>
+
+      {/* Recording timeline */}
+      <div className="w-full max-w-2xl">
+        <RecordingTimeline
+          cameraId={camera.id}
+          initialRecordings={recordings}
+          onSeek={handleSeek}
+          onLive={handleLive}
+          isLive={mode === 'live'}
+        />
       </div>
 
       {/* Two-column layout */}
@@ -72,6 +109,7 @@ export function CameraDetailClient({ camera, site, aiConfig }: CameraDetailClien
               }
             />
             <KV k="Last checked" v={formatTime(camera.last_checked)} />
+            {camera.stream_id && <KV k="Stream ID" v={camera.stream_id} />}
             <KV
               k="Warning"
               v={
@@ -131,19 +169,10 @@ export function CameraDetailClient({ camera, site, aiConfig }: CameraDetailClien
           </div>
         </Card>
 
-        {/* Right: Actions */}
+        {/* Actions */}
         <Card className="flex flex-col gap-3">
           <Label>Actions</Label>
           <div className="flex flex-col gap-2 mt-1">
-            {/* View live - Phase 2 disabled */}
-            <Button
-              variant="primary"
-              icon={Eye}
-              full
-              disabled
-            >
-              View live (Phase 2)
-            </Button>
             <Button
               variant="danger"
               icon={Trash2}

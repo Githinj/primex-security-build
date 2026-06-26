@@ -1,6 +1,7 @@
 import { getCameraById } from "@/lib/data/cameras";
 import { getSiteById } from "@/lib/data/sites";
 import { getCameraAiConfig } from "@/lib/data/camera-ai-config";
+import { getRecordings } from "@/lib/data/recordings";
 import { notFound } from "next/navigation";
 import { CameraDetailClient } from "./camera-detail-client";
 
@@ -19,5 +20,8 @@ export default async function CameraDetailPage({ params }: PageProps) {
 
   const aiConfig = await getCameraAiConfig(camera.id);
 
-  return <CameraDetailClient camera={camera} site={site} aiConfig={aiConfig} />;
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const recordings = await getRecordings(camera.id, sixHoursAgo, new Date().toISOString());
+
+  return <CameraDetailClient camera={camera} site={site} aiConfig={aiConfig} recordings={recordings} />;
 }
