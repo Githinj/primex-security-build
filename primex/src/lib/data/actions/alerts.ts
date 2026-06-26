@@ -4,8 +4,18 @@ import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth/require-role'
 
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
-  await requireRole('super_admin', 'company_manager', 'dispatcher')
+  const caller = await requireRole('super_admin', 'company_manager', 'dispatcher')
   const supabase = await createServerSupabaseClient()
+  if (caller.role === 'company_manager' && caller.companyId) {
+    const { data: company } = await supabase
+      .from('companies')
+      .select('status')
+      .eq('id', caller.companyId)
+      .single()
+    if (company?.status !== 'Active') {
+      throw new Error('Your company must be approved before you can perform this action')
+    }
+  }
   const { data: alertData, error: alertError } = await supabase
     .from('alerts')
     .insert(data)

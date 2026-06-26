@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Shield, Send, CheckCircle2, ArrowLeft } from "lucide-react";
 import { Button, Field, TextInput, TextArea, Select } from "@/components/ui";
+import { registerCompany } from "@/lib/data/actions/register";
 
 const industryOptions = [
   { value: "retail", label: "Retail" },
@@ -29,10 +30,42 @@ export default function RequestAccessPage() {
   const [industry, setIndustry] = useState("");
   const [siteCount, setSiteCount] = useState("");
   const [message, setMessage] = useState("");
+  const [tempPassword, setTempPassword] = useState("");
+  const [resultEmail, setResultEmail] = useState("");
+  const [error, setError] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const industryToCompanyType: Record<string, string> = {
+    retail: "Retail",
+    security_firm: "Security Firm",
+    logistics: "Warehouse",
+    healthcare: "Other",
+    multi_site: "Other",
+    other: "Other",
+  };
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    setError("");
+
+    startTransition(async () => {
+      try {
+        const result = await registerCompany({
+          fullName,
+          email,
+          companyName,
+          companyType: industryToCompanyType[industry] || "Other",
+          sites: siteCount,
+          message,
+        });
+        setTempPassword(result.tempPassword);
+        setResultEmail(result.email);
+        setSubmitted(true);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+        setError(msg);
+      }
+    });
   }
 
   return (
@@ -55,14 +88,28 @@ export default function RequestAccessPage() {
               <CheckCircle2 size={28} className="text-p-green" strokeWidth={2} />
             </div>
             <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-ink mb-2">
-              Request submitted.
+              Account created.
             </h2>
-            <p className="text-ink-3 text-sm font-sans mb-8 max-w-sm">
-              We&apos;ll review your application and get back to you within 24 hours.
+            <p className="text-ink-3 text-sm font-sans mb-4 max-w-sm">
+              Your company has been created and is pending admin approval.
+            </p>
+            <p className="text-ink-3 text-sm font-sans mb-4 max-w-sm">
+              You can log in now with:
+            </p>
+            <div className="w-full max-w-sm bg-bg rounded-lg border border-border p-4 mb-4 text-left">
+              <p className="text-xs text-ink-3 font-sans mb-1">Email</p>
+              <p className="text-sm text-ink font-medium font-sans mb-3">{resultEmail}</p>
+              <p className="text-xs text-ink-3 font-sans mb-1">Temporary password</p>
+              <code className="block text-sm text-ink font-mono bg-surface border border-border rounded px-3 py-2 select-all">
+                {tempPassword}
+              </code>
+            </div>
+            <p className="text-ink-3 text-xs font-sans mb-8 max-w-sm">
+              Your account is active but your company is in Pending status. A Primex admin will review and activate your company.
             </p>
             <Link href="/login">
               <Button variant="secondary" icon={ArrowLeft}>
-                Back to login
+                Go to login
               </Button>
             </Link>
           </div>
@@ -136,6 +183,10 @@ export default function RequestAccessPage() {
                 />
               </Field>
 
+              {error && (
+                <p className="text-p-red text-sm font-sans">{error}</p>
+              )}
+
               <Button
                 variant="primary"
                 size="lg"
@@ -143,8 +194,9 @@ export default function RequestAccessPage() {
                 icon={Send}
                 type="submit"
                 className="mt-2"
+                disabled={isPending}
               >
-                Submit request
+                {isPending ? "Submitting..." : "Submit request"}
               </Button>
             </form>
 

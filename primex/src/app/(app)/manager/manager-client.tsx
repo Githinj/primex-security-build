@@ -206,6 +206,28 @@ export function ManagerClient({
 
       {/* Main content */}
       <main className="flex-1 bg-bg overflow-auto">
+        {company.status === 'Pending' && (
+          <div className="mx-4 sm:mx-9 mt-6 px-5 py-4 bg-p-amber-soft border border-p-amber/20 rounded-xl flex items-start gap-3">
+            <AlertTriangle size={18} className="text-p-amber flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Your company is pending approval</h3>
+              <p className="text-xs text-ink-3 mt-1 leading-relaxed">
+                A Primex administrator will review and activate your company. You can explore the dashboard but cannot create sites, cameras, or alerts until approved.
+              </p>
+            </div>
+          </div>
+        )}
+        {company.status === 'Suspended' && (
+          <div className="mx-4 sm:mx-9 mt-6 px-5 py-4 bg-p-red-soft border border-p-red/20 rounded-xl flex items-start gap-3">
+            <AlertTriangle size={18} className="text-p-red flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Your company has been suspended</h3>
+              <p className="text-xs text-ink-3 mt-1 leading-relaxed">
+                Contact Primex support for more information.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="px-4 sm:px-9 py-6 sm:py-8">
           {section === "dashboard" && (
             <CompanyDashboard

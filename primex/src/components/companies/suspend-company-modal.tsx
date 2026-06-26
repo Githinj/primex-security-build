@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Power } from "lucide-react";
+import { Ban, Power, CheckCircle } from "lucide-react";
 
 import {
   Modal,
@@ -34,6 +34,7 @@ export function SuspendCompanyModal({
   if (!company) return null;
 
   const isSuspended = company.status === "Suspended";
+  const isPending = company.status === "Pending";
 
   function handleClose() {
     setSuccess(false);
@@ -46,7 +47,7 @@ export function SuspendCompanyModal({
     setSubmitting(true);
     try {
       await updateCompany(company.id, {
-        status: isSuspended ? "Active" : "Suspended",
+        status: (isSuspended || isPending) ? "Active" : "Suspended",
       });
       setSuccess(true);
     } catch {
@@ -60,9 +61,11 @@ export function SuspendCompanyModal({
     <Modal open={open} onClose={handleClose} width="max-w-sm">
       {success ? (
         <SuccessState
-          title={isSuspended ? "Restored." : "Suspended."}
+          title={isPending ? "Approved." : isSuspended ? "Restored." : "Suspended."}
           sub={
-            isSuspended
+            isPending
+              ? `${company.name} has been approved. Users can now fully access the platform.`
+              : isSuspended
               ? `${company.name} has been restored. Users can access the platform again.`
               : `${company.name} has been suspended. All users have lost access.`
           }
@@ -73,7 +76,9 @@ export function SuspendCompanyModal({
           <ModalHeader
             eyebrow="Super Admin \u00b7 Confirm"
             title={
-              isSuspended
+              isPending
+                ? `Approve ${company.name}?`
+                : isSuspended
                 ? `Restore ${company.name}?`
                 : `Suspend ${company.name}?`
             }
@@ -83,8 +88,10 @@ export function SuspendCompanyModal({
             {error && (
               <InfoBox tone="amber">{error}</InfoBox>
             )}
-            <InfoBox tone={isSuspended ? "green" : "amber"}>
-              {isSuspended
+            <InfoBox tone={isPending ? "blue" : isSuspended ? "green" : "amber"}>
+              {isPending
+                ? "This company is awaiting approval. Approving will grant full platform access to all users."
+                : isSuspended
                 ? "Users will regain access immediately. Cameras and alerts will resume normal operation."
                 : "All users of this company will lose access. Alerts and incidents stop generating. No data is deleted \u2014 you can restore at any time."}
             </InfoBox>
@@ -94,12 +101,12 @@ export function SuspendCompanyModal({
               Cancel
             </Button>
             <Button
-              variant={isSuspended ? "primary" : "danger"}
-              icon={isSuspended ? Power : Ban}
+              variant={isPending ? "primary" : isSuspended ? "primary" : "danger"}
+              icon={isPending ? CheckCircle : isSuspended ? Power : Ban}
               onClick={handleConfirm}
               disabled={submitting}
             >
-              {isSuspended ? "Restore access" : "Suspend company"}
+              {isPending ? "Approve company" : isSuspended ? "Restore access" : "Suspend company"}
             </Button>
           </ModalFooter>
         </>
