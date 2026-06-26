@@ -126,7 +126,7 @@ export function AuditClient({ activity, auditStats }: AuditClientProps) {
   });
 
   return (
-    <div className="flex flex-col gap-6 font-sans">
+    <div className="flex flex-col gap-6 font-sans px-4 sm:px-9 py-6 sm:py-8">
       <PageTitle
         title="Audit log"
         sub="Every action across the platform - who did what, when. Tamper-evident, retained for 12 months."
@@ -143,7 +143,7 @@ export function AuditClient({ activity, auditStats }: AuditClientProps) {
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Events today"
           value={auditStats.eventsToday}
@@ -170,15 +170,15 @@ export function AuditClient({ activity, auditStats }: AuditClientProps) {
       {/* Activity log card */}
       <Card padding="p-0">
         {/* Card header */}
-        <div className="flex items-center justify-between gap-4 p-3.5 border-b border-border">
-          <div className="w-72">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-3.5 border-b border-border">
+          <div className="w-full sm:w-72">
             <SearchInput
               placeholder="Search by actor, action, or target…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {TIME_FILTERS.map((f) => (
               <button
                 key={f}

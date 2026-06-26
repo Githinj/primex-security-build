@@ -93,7 +93,7 @@ export function GuardsClient({ guards }: GuardsClientProps) {
   ]);
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
       <PageTitle
         title="Guards"
         sub="Field responders across all zones. Status updates from the mobile app in real-time."
@@ -105,10 +105,12 @@ export function GuardsClient({ guards }: GuardsClientProps) {
       />
 
       <Card padding="p-0">
-        <DataTable
-          columns={["Guard", "Zone", "Phone", "Shifts", "Status", ""]}
-          rows={rows}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            columns={["Guard", "Zone", "Phone", "Shifts", "Status", ""]}
+            rows={rows}
+          />
+        </div>
       </Card>
     </div>
   );

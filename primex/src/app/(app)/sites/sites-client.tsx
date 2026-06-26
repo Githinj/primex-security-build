@@ -110,7 +110,7 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
 
   return (
     <>
-      <div className="px-9 py-8 flex flex-col gap-6">
+      <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
         <PageTitle
           title="Sites"
           sub="Each site belongs to one company and carries its own cameras, alerts, and incidents. Super Admin can create or delete sites on behalf of any company."
@@ -131,10 +131,12 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
         />
 
         <Card padding="p-0">
-          <DataTable
-            columns={["Site", "Company", "Type", "Risk", "Cameras", "Status", ""]}
-            rows={rows}
-          />
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={["Site", "Company", "Type", "Risk", "Cameras", "Status", ""]}
+              rows={rows}
+            />
+          </div>
         </Card>
       </div>
 

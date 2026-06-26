@@ -18,7 +18,7 @@ export function ClientHelp() {
         sub="We're here whenever you need us."
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Call dispatch */}
         <Card>
           <div className="flex flex-col gap-4">

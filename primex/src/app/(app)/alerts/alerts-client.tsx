@@ -105,7 +105,7 @@ export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClient
 
   return (
     <>
-      <div className="px-9 py-8 flex flex-col gap-6">
+      <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
         <PageTitle
           title="Alerts"
           sub="Every signal across all companies. Manual creation only in Phase 1 — each alert automatically opens a linked incident."

@@ -41,7 +41,7 @@ export function GuardsOnDuty({ guards, incidents }: GuardsOnDutyProps) {
           No guards currently on duty.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {onDuty.map((guard) => {
             const activeIncident = guard.guard_status === 'On Incident'
               ? incidents.find(

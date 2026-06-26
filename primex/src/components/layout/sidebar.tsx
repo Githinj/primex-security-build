@@ -59,7 +59,7 @@ function roleLabel(role: string) {
   return map[role] ?? role;
 }
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const profile = useProfile();
@@ -200,6 +200,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => onClose?.()}
                 className={[
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150",
                   isActive

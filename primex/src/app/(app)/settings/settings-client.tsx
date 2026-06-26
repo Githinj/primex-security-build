@@ -124,7 +124,7 @@ function ProfileTab({ profile }: { profile: Profile }) {
           </div>
 
           {/* Form grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Full name">
               <TextInput
                 value={form.name}
@@ -367,7 +367,7 @@ function IntegrationsTab() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {INTEGRATIONS.map((intg) => {
             const Icon = intg.icon;
             return (
@@ -502,15 +502,15 @@ export function SettingsClient({ profile }: SettingsClientProps) {
   };
 
   return (
-    <div className="flex flex-col gap-6 font-sans">
+    <div className="flex flex-col gap-6 font-sans px-4 sm:px-9 py-6 sm:py-8">
       <PageTitle
         title="Settings"
         sub="Manage your platform configuration."
       />
 
-      <div className="flex gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 items-start">
         {/* Sidebar tabs */}
-        <nav className="w-60 flex-shrink-0 flex flex-col gap-1">
+        <nav className="flex md:flex-col gap-1 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -519,7 +519,7 @@ export function SettingsClient({ profile }: SettingsClientProps) {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors duration-100 text-left cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors duration-100 text-left cursor-pointer whitespace-nowrap ${
                   active
                     ? "bg-surface border border-border text-ink font-semibold"
                     : "bg-transparent text-ink-2 hover:bg-surface-subtle"

@@ -113,7 +113,7 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
   ]);
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
       {/* Header */}
       <PageTitle
@@ -138,7 +138,7 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Reports generated"
           value={String(reportStats.totalReports)}
@@ -174,7 +174,7 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-[1.4fr_1fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
 
         {/* Left: Incidents over time */}
         <Card padding="p-0">

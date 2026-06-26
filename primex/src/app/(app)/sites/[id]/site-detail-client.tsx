@@ -45,7 +45,7 @@ export function SiteDetailClient({
   const camerasTotal = cameras.length;
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6 max-w-5xl">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-5xl">
       {/* Back nav */}
       <button
         type="button"
@@ -75,7 +75,7 @@ export function SiteDetailClient({
       </div>
 
       {/* Mini stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Risk */}
         <Card className="flex flex-col gap-2">
           <span className="text-[11px] text-ink-3 font-semibold tracking-widest uppercase font-sans">

@@ -99,7 +99,7 @@ export function IncidentsClient({ incidents, sites, guards }: IncidentsClientPro
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
       <PageTitle
         title="Incidents"
         sub="Open → Dispatched → In Progress → Resolved → Closed. Full audit trail per incident."

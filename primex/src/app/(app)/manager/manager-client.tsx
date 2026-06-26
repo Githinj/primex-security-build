@@ -94,13 +94,13 @@ export function ManagerClient({
   ];
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col lg:flex-row h-full">
       {/* Left nav */}
-      <aside className="w-60 flex-shrink-0 bg-surface border-r border-border flex flex-col justify-between h-full">
+      <aside className="flex lg:flex-col lg:w-60 flex-shrink-0 bg-surface border-b lg:border-b-0 lg:border-r border-border lg:justify-between lg:h-full">
         {/* Top section */}
-        <div className="flex flex-col gap-6 p-5">
+        <div className="flex lg:flex-col gap-4 lg:gap-6 p-4 lg:p-5 w-full overflow-x-auto">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <div className="w-8 h-8 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
               <Shield size={16} className="text-white" strokeWidth={2} />
             </div>
@@ -115,7 +115,7 @@ export function ManagerClient({
           </div>
 
           {/* Organization label */}
-          <div className="flex flex-col gap-1.5">
+          <div className="hidden lg:flex flex-col gap-1.5">
             <span
               className="text-[10px] font-semibold uppercase text-ink-4 font-sans"
               style={{ letterSpacing: "1.3px" }}
@@ -129,7 +129,7 @@ export function ManagerClient({
           </div>
 
           {/* Navigation */}
-          <nav className="flex flex-col gap-0.5">
+          <nav className="flex lg:flex-col gap-0.5">
             {navItems.map((item) => {
               const isActive = section === item.id;
               const Icon = item.icon;
@@ -140,7 +140,7 @@ export function ManagerClient({
                   type="button"
                   onClick={() => setSection(item.id)}
                   className={[
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 w-full text-left",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 lg:w-full text-left whitespace-nowrap",
                     isActive
                       ? "bg-p-blue-soft text-p-blue font-semibold"
                       : "text-ink-2 hover:bg-surface-subtle hover:text-ink font-medium",
@@ -171,7 +171,7 @@ export function ManagerClient({
         </div>
 
         {/* Bottom section */}
-        <div className="p-5 flex flex-col gap-3">
+        <div className="hidden lg:flex p-5 flex-col gap-3">
           {/* System status */}
           <div className="flex items-center gap-2 px-3 py-2 bg-p-green-soft rounded-lg">
             <LiveDot color="green" />
@@ -206,7 +206,7 @@ export function ManagerClient({
 
       {/* Main content */}
       <main className="flex-1 bg-bg overflow-auto">
-        <div className="px-9 py-8">
+        <div className="px-4 sm:px-9 py-6 sm:py-8">
           {section === "dashboard" && (
             <CompanyDashboard
               company={company}

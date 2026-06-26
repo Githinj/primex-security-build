@@ -75,7 +75,7 @@ export function CompanyDashboard({
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Active sites"
           value={activeSites}
@@ -125,7 +125,7 @@ export function CompanyDashboard({
       </div>
 
       {/* 2-column grid */}
-      <div className="grid grid-cols-[1.4fr_1fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
         {/* Recent incidents */}
         <Card padding="p-0">
           <div className="flex flex-col gap-0.5 px-6 pt-5 pb-0">

@@ -105,7 +105,7 @@ export function DashboardClient({
   const totalCameras = stats.camerasOnline + stats.camerasOffline;
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
       {/* Page header */}
       <PageTitle
@@ -124,7 +124,7 @@ export function DashboardClient({
       />
 
       {/* ── Stat cards row 1 ── */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
         <StatCard
           label="Companies"
           value={String(stats.totalCompanies)}
@@ -170,7 +170,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Stat cards row 2 ── */}
-      <div className="grid grid-cols-4 gap-3.5 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 mb-4 sm:mb-8">
         <StatCard
           label="Active incidents"
           value={String(stats.activeIncidents)}
@@ -210,7 +210,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Main content grid ── */}
-      <div className="grid grid-cols-[1.6fr_1fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
 
         {/* Left: Recent active incidents */}
         <Card padding="p-0">
@@ -306,7 +306,7 @@ export function DashboardClient({
         </div>
 
         {/* Company columns */}
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {stats.camerasByCompany.map(({ company, online, offline, maintenance }, idx) => {
             const statusTone =
               company.status === "Active"
@@ -318,8 +318,8 @@ export function DashboardClient({
             return (
               <div
                 key={company.id}
-                className={`flex flex-col px-[22px] py-[22px] ${
-                  idx < stats.camerasByCompany.length - 1 ? "border-r border-border" : ""
+                className={`flex flex-col px-[22px] py-[22px] border-b sm:border-b lg:border-b-0 border-border ${
+                  idx < stats.camerasByCompany.length - 1 ? "lg:border-r" : ""
                 }`}
               >
                 {/* Company name + status pill */}

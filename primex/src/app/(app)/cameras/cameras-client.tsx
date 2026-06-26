@@ -27,7 +27,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
 
   return (
     <>
-      <div className="px-9 py-8 flex flex-col gap-6">
+      <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
         <PageTitle
           title="Cameras & devices"
           phaseTag="RTSP streaming · Phase 2"
@@ -72,7 +72,7 @@ export function CamerasClient({ cameras, sites, companies }: CamerasClientProps)
         </div>
 
         {/* Camera grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {cameras.map((camera) => {
             const site = sites.find((s) => s.id === camera.site_id)!;
             return (

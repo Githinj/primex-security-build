@@ -60,10 +60,10 @@ export function DispatcherClient({
   ]
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col lg:flex-row h-full">
       {/* Dispatcher nav panel */}
-      <nav className="w-60 flex-shrink-0 bg-surface border-r border-border p-4 flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase text-ink-4 font-sans tracking-widest px-3 pb-2">
+      <nav className="flex lg:flex-col lg:w-60 flex-shrink-0 bg-surface border-b lg:border-b-0 lg:border-r border-border p-4 gap-1 overflow-x-auto">
+        <span className="hidden lg:block text-[10px] font-semibold uppercase text-ink-4 font-sans tracking-widest px-3 pb-2">
           Dispatcher Console
         </span>
         {navItems.map((item) => {
@@ -75,7 +75,7 @@ export function DispatcherClient({
               type="button"
               onClick={() => setSection(item.key)}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 cursor-pointer w-full text-left',
+                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 cursor-pointer lg:w-full text-left whitespace-nowrap',
                 isActive
                   ? 'bg-p-blue-soft text-p-blue font-semibold'
                   : 'text-ink-2 hover:bg-surface-subtle hover:text-ink font-medium'
@@ -106,7 +106,7 @@ export function DispatcherClient({
       </nav>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 overflow-auto p-6">
+      <div className="flex-1 min-w-0 overflow-auto px-4 sm:px-6 py-6">
         {section === 'queue' && (
           <DispatcherQueue
             alerts={alerts}

@@ -141,7 +141,7 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
     siteCount >= 10 ? "Enterprise" : siteCount >= 5 ? "Growth" : "Starter";
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
       {/* Back nav */}
       <div>
@@ -176,7 +176,7 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Sites"
           value={company.sites ?? 0}
@@ -210,7 +210,7 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
       </div>
 
       {/* Two-column: KV details + sites */}
-      <div className="grid grid-cols-[260px_1fr] gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-5 items-start">
 
         {/* Left: Company details card */}
         <Card>
@@ -256,10 +256,12 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
               No sites found for this company.
             </p>
           ) : (
-            <DataTable
-              columns={["Site", "Type", "Address", "Cameras", "Risk", "Status"]}
-              rows={siteRows}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={["Site", "Type", "Address", "Cameras", "Risk", "Status"]}
+                rows={siteRows}
+              />
+            </div>
           )}
         </Card>
       </div>
@@ -280,10 +282,12 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
             No team members found.
           </p>
         ) : (
-          <DataTable
-            columns={["Member", "Email", "Role", "Status"]}
-            rows={teamRows}
-          />
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={["Member", "Email", "Role", "Status"]}
+              rows={teamRows}
+            />
+          </div>
         )}
       </Card>
     </div>

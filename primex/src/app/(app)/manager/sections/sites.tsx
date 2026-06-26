@@ -109,9 +109,9 @@ export function CompanySites({
         />
 
         {/* Split layout */}
-        <div className="flex gap-5 min-h-[600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 min-h-[600px]">
           {/* Left list */}
-          <div className="w-80 flex-shrink-0 flex flex-col gap-1.5 overflow-auto">
+          <div className="flex flex-col gap-1.5 overflow-auto">
             {sites.map((site) => {
               const isSelected = site.id === selectedSiteId;
               const cameraCount = cameras.filter(
@@ -181,7 +181,7 @@ export function CompanySites({
                   </div>
 
                   {/* Mini stats */}
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="flex flex-col gap-1 bg-bg rounded-lg p-3">
                       <span className="text-[10px] font-semibold uppercase text-ink-4 tracking-wider">
                         Risk
@@ -222,7 +222,7 @@ export function CompanySites({
                       <h3 className="text-sm font-semibold text-ink mb-3">
                         Cameras at {selectedSite.name}
                       </h3>
-                      <div className="grid grid-cols-2 gap-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         {siteCameras.map((cam) => (
                           <CameraTile
                             key={cam.id}

@@ -34,7 +34,7 @@ export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
   const tone = cameraTone(camera.status);
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6 max-w-4xl">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-4xl">
       {/* Back nav */}
       <button
         type="button"
@@ -51,7 +51,7 @@ export function CameraDetailClient({ camera, site }: CameraDetailClientProps) {
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4 md:gap-5 items-start">
         {/* Left: Camera info */}
         <Card className="flex flex-col gap-5">
           <Label>Camera info</Label>

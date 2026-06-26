@@ -50,11 +50,11 @@ export function PortalClient({
   ).length
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex flex-col lg:flex-row h-full min-h-0">
       {/* Left nav */}
-      <aside className="w-[240px] flex-shrink-0 bg-surface border-r border-border flex flex-col">
+      <aside className="flex lg:flex-col lg:w-[240px] flex-shrink-0 bg-surface border-b lg:border-b-0 lg:border-r border-border">
         {/* Logo area */}
-        <div className="px-5 pt-6 pb-5 flex items-center gap-2.5">
+        <div className="hidden lg:flex px-5 pt-6 pb-5 items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
             <Shield size={16} className="text-white" strokeWidth={2} />
           </div>
@@ -69,7 +69,7 @@ export function PortalClient({
         </div>
 
         {/* Organization */}
-        <div className="px-5 pb-3">
+        <div className="hidden lg:block px-5 pb-3">
           <p className="text-[10px] text-ink-3 font-semibold tracking-widest uppercase font-sans mb-2">
             Organization
           </p>
@@ -79,14 +79,14 @@ export function PortalClient({
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5">
+        <nav className="flex lg:flex-col lg:flex-1 px-3 py-2 gap-0.5 overflow-x-auto">
           {navItems.map(({ key, label, icon: Icon }) => {
             const active = section === key
             return (
               <button
                 key={key}
                 onClick={() => setSection(key)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-100 cursor-pointer w-full text-left ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-100 cursor-pointer lg:w-full text-left whitespace-nowrap ${
                   active
                     ? 'bg-p-blue-softer text-p-blue font-medium'
                     : 'text-ink-2 hover:bg-surface-subtle'
@@ -105,7 +105,7 @@ export function PortalClient({
         </nav>
 
         {/* User info card */}
-        <div className="px-4 pb-5 mt-auto">
+        <div className="hidden lg:block px-4 pb-5 mt-auto">
           <div className="bg-bg rounded-lg p-3 flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center text-white text-xs font-semibold font-sans flex-shrink-0">
               {profile.full_name
@@ -125,7 +125,7 @@ export function PortalClient({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-auto bg-bg p-8">
+      <main className="flex-1 min-w-0 overflow-auto bg-bg px-4 sm:px-8 py-6 sm:py-8">
         {section === 'home' && (
           <ClientHome
             cameras={cameras}

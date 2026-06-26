@@ -127,7 +127,7 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
   ]);
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
       {/* Header */}
       <PageTitle
@@ -161,10 +161,12 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
           />
         </div>
 
-        <DataTable
-          columns={["Company", "Type", "Sites", "Users", "Status", ""]}
-          rows={rows}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            columns={["Company", "Type", "Sites", "Users", "Status", ""]}
+            rows={rows}
+          />
+        </div>
 
         {filtered.length === 0 && (
           <p className="px-5 py-8 text-sm text-ink-3 font-sans text-center">

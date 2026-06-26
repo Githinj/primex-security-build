@@ -33,7 +33,7 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
   const router = useRouter();
 
   return (
-    <div className="px-9 py-8 flex flex-col gap-6 max-w-5xl">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-5xl">
       {/* Back nav */}
       <button
         type="button"
@@ -61,7 +61,7 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
         </div>
 
         {/* Title */}
-        <h1 className="font-serif text-3xl font-semibold text-ink leading-snug">
+        <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-ink leading-snug">
           {alert.title}
         </h1>
 

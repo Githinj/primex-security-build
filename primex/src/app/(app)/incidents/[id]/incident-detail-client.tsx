@@ -99,7 +99,7 @@ export function IncidentDetailClient({
   );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-5">
       {/* Breadcrumb */}
       <Breadcrumb items={["Incidents", incident.title]} />
 
@@ -115,7 +115,7 @@ export function IncidentDetailClient({
       </div>
 
       {/* Title */}
-      <h1 className="font-serif text-3xl font-bold text-ink leading-tight">
+      <h1 className="font-serif text-2xl sm:text-3xl font-bold text-ink leading-tight">
         {incident.title}
       </h1>
 

@@ -43,12 +43,12 @@ export function PageStrip() {
   const today = formatDate(new Date());
 
   return (
-    <header className="flex items-center justify-between px-9 py-3.5 border-b border-border bg-surface flex-shrink-0">
+    <header className="flex items-center justify-between px-4 sm:px-9 py-3.5 border-b border-border bg-surface flex-shrink-0">
       {/* Left — breadcrumb */}
       <Breadcrumb items={crumbs} />
 
       {/* Right — date + notifications */}
-      <div className="flex items-center gap-4">
+      <div className="hidden sm:flex items-center gap-4">
         <span className="text-sm font-sans text-ink-3">{today}</span>
 
         {/* Bell with badge */}

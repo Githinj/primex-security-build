@@ -8,7 +8,7 @@ interface DataTableProps {
 export function DataTable({ columns, rows }: DataTableProps) {
   return (
     <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse text-sm font-sans">
+      <table className="w-full min-w-[600px] border-collapse text-sm font-sans">
         <thead>
           <tr className="bg-bg">
             {columns.map((col, i) => (

@@ -27,7 +27,7 @@ export function OpenIncidents({ incidents, sites, guards }: OpenIncidentsProps) 
           No open incidents at this time.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {open.map((incident) => {
             const site = sites.find((s) => s.id === incident.site_id)
             const guard = incident.guard_id

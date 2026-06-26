@@ -117,7 +117,7 @@ export function TeamClient({ members }: TeamClientProps) {
 
   return (
     <>
-      <div className="flex flex-col gap-6 font-sans">
+      <div className="flex flex-col gap-6 font-sans px-4 sm:px-9 py-6 sm:py-8">
         <PageTitle
           title="Team"
           sub="Everyone with access to your company's data. Invite new members, edit details, deactivate accounts, or soft-delete from your team."
@@ -133,10 +133,12 @@ export function TeamClient({ members }: TeamClientProps) {
         />
 
         <Card padding="p-0">
-          <DataTable
-            columns={["Member", "Role", "Email", "Last active", "Status", ""]}
-            rows={rows}
-          />
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={["Member", "Role", "Email", "Last active", "Status", ""]}
+              rows={rows}
+            />
+          </div>
         </Card>
       </div>
 

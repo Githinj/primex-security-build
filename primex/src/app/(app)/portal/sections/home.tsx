@@ -142,7 +142,7 @@ export function ClientHome({ cameras, alerts, incidents, reports }: ClientHomePr
       </Card>
 
       {/* 3 stat cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="Cameras"
           value={`${camerasOnline} / ${totalCameras}`}
@@ -183,7 +183,7 @@ export function ClientHome({ cameras, alerts, incidents, reports }: ClientHomePr
       </div>
 
       {/* 2-column layout */}
-      <div className="grid grid-cols-[1fr_360px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6">
         {/* Left: Recent events */}
         <Card>
           <h3 className="font-serif text-lg font-semibold text-ink mb-4">

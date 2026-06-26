@@ -12,7 +12,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon: Icon, supporting, accent }: StatCardProps) {
   return (
-    <div className="bg-surface border border-border rounded-xl p-5 flex flex-col gap-3">
+    <div className="bg-surface border border-border rounded-xl p-4 sm:p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <span className="text-[11px] text-ink-3 font-semibold tracking-widest uppercase font-sans">
           {label}
@@ -24,7 +24,7 @@ export function StatCard({ label, value, icon: Icon, supporting, accent }: StatC
         )}
       </div>
       <p
-        className={`font-serif text-4xl font-semibold leading-none ${accent ?? "text-ink"}`}
+        className={`font-serif text-3xl sm:text-[42px] font-semibold leading-none ${accent ?? "text-ink"}`}
       >
         {value}
       </p>
