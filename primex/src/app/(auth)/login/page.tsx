@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -25,7 +26,9 @@ export default function LoginPage() {
       setError("Please enter your email first");
       return;
     }
-    await supabase.auth.resetPasswordForEmail(email);
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/callback?type=recovery`,
+    });
     setResetSent(true);
   }
 
@@ -159,9 +162,9 @@ export default function LoginPage() {
           {/* Footer */}
           <p className="text-sm text-ink-3 font-sans mt-6 text-center">
             Don&apos;t have an account?{" "}
-            <span className="text-p-blue hover:underline cursor-pointer font-medium">
+            <Link href="/request-access" className="text-p-blue hover:underline font-medium">
               Request access
-            </span>
+            </Link>
           </p>
         </div>
 
