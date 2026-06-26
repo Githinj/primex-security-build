@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createCamera } from "@/lib/data/actions/cameras";
 import {
   Modal,
   ModalHeader,
@@ -41,6 +42,7 @@ const INITIAL_FORM: FormState = {
 export function AddCameraModal({ open, onClose, companies, sites: allSites }: AddCameraModalProps) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [success, setSuccess] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
@@ -66,7 +68,19 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSuccess(true);
+    startTransition(async () => {
+      try {
+        await createCamera({
+          site_id: form.site_id,
+          name: form.name,
+          location: form.location,
+          status: form.status || undefined,
+        });
+        setSuccess(true);
+      } catch (err) {
+        console.error("Failed to create camera:", err);
+      }
+    });
   }
 
   function handleClose() {
@@ -161,9 +175,9 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
             <Button
               variant="primary"
               type="submit"
-              disabled={!canSubmit}
+              disabled={!canSubmit || isPending}
             >
-              Add camera
+              {isPending ? "Adding…" : "Add camera"}
             </Button>
           </ModalFooter>
         </form>

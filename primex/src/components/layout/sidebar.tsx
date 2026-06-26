@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
   Shield,
@@ -19,7 +19,9 @@ import {
   AlertTriangle,
   BarChart3,
   Building,
+  LogOut,
 } from "lucide-react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { LiveDot } from "@/components/ui";
 import { useProfile } from "@/components/providers/profile-provider";
 import { useScope } from "@/components/providers/scope-provider";
@@ -29,20 +31,21 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   count?: number;
+  roles: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",   href: "/dashboard",  icon: LayoutDashboard },
-  { label: "Companies",   href: "/companies",  icon: Building2,   count: 4 },
-  { label: "Sites",       href: "/sites",      icon: MapPin,      count: 6 },
-  { label: "Cameras",     href: "/cameras",    icon: Camera,      count: 86 },
-  { label: "Alerts",      href: "/alerts",     icon: Bell,        count: 4 },
-  { label: "Incidents",   href: "/incidents",  icon: AlertTriangle, count: 3 },
-  { label: "Guards",      href: "/guards",     icon: Users,       count: 4 },
-  { label: "Reports",     href: "/reports",    icon: BarChart3 },
-  { label: "Team",        href: "/team",       icon: UserCheck },
-  { label: "Audit log",   href: "/audit",      icon: ScrollText },
-  { label: "Settings",    href: "/settings",   icon: Settings },
+  { label: "Dashboard",   href: "/dashboard",  icon: LayoutDashboard, roles: ["super_admin"] },
+  { label: "Companies",   href: "/companies",  icon: Building2,   count: 4, roles: ["super_admin"] },
+  { label: "Sites",       href: "/sites",      icon: MapPin,      count: 6, roles: ["super_admin"] },
+  { label: "Cameras",     href: "/cameras",    icon: Camera,      count: 86, roles: ["super_admin"] },
+  { label: "Alerts",      href: "/alerts",     icon: Bell,        count: 4, roles: ["super_admin"] },
+  { label: "Incidents",   href: "/incidents",  icon: AlertTriangle, count: 3, roles: ["super_admin"] },
+  { label: "Guards",      href: "/guards",     icon: Users,       count: 4, roles: ["super_admin"] },
+  { label: "Reports",     href: "/reports",    icon: BarChart3, roles: ["super_admin"] },
+  { label: "Team",        href: "/team",       icon: UserCheck, roles: ["super_admin", "company_manager"] },
+  { label: "Audit log",   href: "/audit",      icon: ScrollText, roles: ["super_admin"] },
+  { label: "Settings",    href: "/settings",   icon: Settings, roles: ["super_admin", "company_manager"] },
 ];
 
 function roleLabel(role: string) {
@@ -58,6 +61,7 @@ function roleLabel(role: string) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const profile = useProfile();
   const { scope, scopeCompanyId, setScope, companies } = useScope();
   const userRole = profile?.role ?? "client";
@@ -185,7 +189,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => item.roles.includes(profile?.role ?? "")).map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -259,6 +263,22 @@ export function Sidebar() {
               strokeWidth={2}
             />
           </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              const supabase = createBrowserSupabaseClient();
+              await supabase.auth.signOut();
+              router.push("/login");
+              router.refresh();
+            }}
+            className="cursor-pointer"
+          >
+            <LogOut
+              size={15}
+              className="text-ink-4 hover:text-ink-2 transition-colors duration-150 flex-shrink-0"
+              strokeWidth={2}
+            />
+          </button>
         </div>
       </div>
     </aside>

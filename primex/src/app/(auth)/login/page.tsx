@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { getRoleHomePath } from "@/lib/auth/role-redirect";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,7 +32,19 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Fetch profile to determine role-based redirect
+    const { data: { user } } = await supabase.auth.getUser();
+    let homePath = '/dashboard';
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      homePath = getRoleHomePath(profile?.role ?? 'client');
+    }
+
+    router.push(homePath);
     router.refresh();
   }
 

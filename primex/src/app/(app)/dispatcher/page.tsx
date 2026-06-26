@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getRoleHomePath } from '@/lib/auth/role-redirect'
 import { getAlerts } from '@/lib/data/alerts'
 import { getIncidents } from '@/lib/data/incidents'
 import { getGuards } from '@/lib/data/guards'
@@ -7,6 +10,20 @@ import { getActivity } from '@/lib/data/activity'
 import { DispatcherClient } from './dispatcher-client'
 
 export default async function DispatcherPage() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !['dispatcher', 'super_admin'].includes(profile.role)) {
+    redirect(getRoleHomePath(profile?.role ?? 'client'))
+  }
+
   const [alerts, incidents, guards, sites, cameras, activity] = await Promise.all([
     getAlerts(),
     getIncidents(),

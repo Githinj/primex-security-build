@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getCompanyById } from "@/lib/data/companies";
 import { getSites } from "@/lib/data/sites";
 import { getCameras } from "@/lib/data/cameras";
@@ -22,6 +24,10 @@ export default async function ManagerPage() {
       .eq("id", user.id)
       .single();
     profile = data;
+  }
+
+  if (!profile || !['company_manager', 'super_admin'].includes(profile.role)) {
+    redirect(getRoleHomePath(profile?.role ?? 'client'));
   }
 
   if (!profile?.company_id) {

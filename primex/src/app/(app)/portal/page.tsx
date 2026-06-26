@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { getRoleHomePath } from '@/lib/auth/role-redirect'
 import { getSites } from '@/lib/data/sites'
 import { getCameras } from '@/lib/data/cameras'
 import { getAlerts } from '@/lib/data/alerts'
@@ -19,6 +21,10 @@ export default async function PortalPage() {
       .eq('id', user.id)
       .single()
     profile = data
+  }
+
+  if (profile && profile.role !== 'client') {
+    redirect(getRoleHomePath(profile.role))
   }
 
   if (!profile || !profile.company_id) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createAlert } from "@/lib/data/actions/alerts";
 import {
   Modal,
   ModalHeader,
@@ -36,6 +37,7 @@ export function CreateAlertModal({
   cameras: allCameras,
 }: CreateAlertModalProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [companyId, setCompanyId] = useState(lockedCompany?.id ?? "");
   const [siteId, setSiteId] = useState("");
   const [cameraId, setCameraId] = useState("");
@@ -55,7 +57,21 @@ export function CreateAlertModal({
 
   function handleSubmit() {
     if (!siteId || !severity || !title) return;
-    setSubmitted(true);
+    startTransition(async () => {
+      try {
+        await createAlert({
+          site_id: siteId,
+          camera_id: cameraId || null,
+          title,
+          severity,
+          description,
+          source: "Manual",
+        });
+        setSubmitted(true);
+      } catch (err) {
+        console.error("Failed to create alert:", err);
+      }
+    });
   }
 
   function handleDone() {
@@ -188,9 +204,9 @@ export function CreateAlertModal({
             <Button
               variant="primary"
               onClick={handleSubmit}
-              disabled={!siteId || !severity || !title}
+              disabled={!siteId || !severity || !title || isPending}
             >
-              Create alert
+              {isPending ? "Creating…" : "Create alert"}
             </Button>
           </ModalFooter>
         </>

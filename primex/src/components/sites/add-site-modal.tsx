@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createSite } from "@/lib/data/actions/sites";
 import { Building } from "lucide-react";
 import {
   Modal,
@@ -26,6 +27,7 @@ interface AddSiteModalProps {
 
 export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSiteModalProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const [form, setForm] = useState({
     company_id: lockedCompany?.id ?? "",
@@ -42,7 +44,20 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
   }
 
   function handleSubmit() {
-    setSubmitted(true);
+    startTransition(async () => {
+      try {
+        await createSite({
+          company_id: form.company_id,
+          name: form.name,
+          type: form.type,
+          address: form.address,
+          risk: form.risk || undefined,
+        });
+        setSubmitted(true);
+      } catch (err) {
+        console.error("Failed to create site:", err);
+      }
+    });
   }
 
   function handleDone() {
@@ -201,8 +216,8 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleSubmit}>
-              Create site &amp; invite client
+            <Button variant="primary" onClick={handleSubmit} disabled={isPending}>
+              {isPending ? "Creating…" : "Create site & invite client"}
             </Button>
           </ModalFooter>
         </>
