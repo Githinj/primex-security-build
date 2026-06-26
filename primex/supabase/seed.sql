@@ -409,3 +409,24 @@ INSERT INTO activity_log (actor_id, actor_name, action, target, icon, tone, crea
   -- System: Site status changed
   (NULL, 'System', 'Site status changed', 'Pinnacle HQ → Inactive',
    'MapPin', 'gray', '2025-06-08T11:00:00Z');
+
+-- ===================  AI DETECTION CONFIG  ==================
+
+-- Camera AI configs (enable AI on first 4 cameras, with zones on CAM-01 and CAM-03)
+INSERT INTO camera_ai_config (camera_id, enabled, zones) VALUES
+  ('00000000-0000-0000-0000-0000000ca001', true,
+   '[{"name":"Main Entry","type":"entry","coords":{"x1":0,"y1":0,"x2":320,"y2":480}},{"name":"Front Door","type":"door","coords":{"x1":280,"y1":100,"x2":360,"y2":400}}]'),
+  ('00000000-0000-0000-0000-0000000ca002', true, '[]'),
+  ('00000000-0000-0000-0000-0000000ca003', true,
+   '[{"name":"Loading Dock Gate","type":"door","coords":{"x1":100,"y1":50,"x2":540,"y2":400}},{"name":"Dock Restricted","type":"restricted","coords":{"x1":0,"y1":300,"x2":640,"y2":480}}]'),
+  ('00000000-0000-0000-0000-0000000ca004', true, '[]'),
+  ('00000000-0000-0000-0000-0000000ca005', false, '[]');
+
+-- Site business hours
+INSERT INTO site_business_hours (site_id, timezone, hours) VALUES
+  ('00000000-0000-0000-0000-00000000b001', 'Australia/Sydney',
+   '{"mon":{"open":"08:00","close":"18:00"},"tue":{"open":"08:00","close":"18:00"},"wed":{"open":"08:00","close":"18:00"},"thu":{"open":"08:00","close":"18:00"},"fri":{"open":"08:00","close":"18:00"}}'),
+  ('00000000-0000-0000-0000-00000000b002', 'Australia/Sydney',
+   '{"mon":{"open":"09:00","close":"17:00"},"tue":{"open":"09:00","close":"17:00"},"wed":{"open":"09:00","close":"17:00"},"thu":{"open":"09:00","close":"17:00"},"fri":{"open":"09:00","close":"17:00"},"sat":{"open":"10:00","close":"14:00"}}'),
+  ('00000000-0000-0000-0000-00000000b003', 'Australia/Sydney',
+   '{"mon":{"open":"06:00","close":"22:00"},"tue":{"open":"06:00","close":"22:00"},"wed":{"open":"06:00","close":"22:00"},"thu":{"open":"06:00","close":"22:00"},"fri":{"open":"06:00","close":"22:00"},"sat":{"open":"06:00","close":"22:00"},"sun":{"open":"06:00","close":"22:00"}}');
