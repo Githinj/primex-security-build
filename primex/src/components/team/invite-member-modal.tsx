@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Send } from "lucide-react";
 import {
   Modal,
@@ -14,6 +14,8 @@ import {
   InfoBox,
   Button,
 } from "@/components/ui";
+import { inviteUser } from "@/lib/data/actions/auth";
+import { useProfile } from "@/components/providers/profile-provider";
 
 const ROLE_OPTIONS = [
   { value: "company_manager", label: "Company Manager" },
@@ -28,7 +30,10 @@ interface InviteTeamMemberModalProps {
 }
 
 export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalProps) {
+  const profile = useProfile();
   const [submitted, setSubmitted] = useState(false);
+  const [tempPassword, setTempPassword] = useState("");
+  const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -37,17 +42,33 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
   });
 
   function handleSubmit() {
-    setSubmitted(true);
+    startTransition(async () => {
+      try {
+        const result = await inviteUser({
+          email: form.email,
+          full_name: form.name,
+          role: form.role as "company_manager" | "dispatcher" | "guard",
+          company_id: profile?.company_id,
+          phone: form.phone || null,
+        });
+        setTempPassword(result.tempPassword);
+        setSubmitted(true);
+      } catch (err) {
+        console.error("Failed to invite user:", err);
+      }
+    });
   }
 
   function handleDone() {
     setSubmitted(false);
+    setTempPassword("");
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
   }
 
   function handleClose() {
     setSubmitted(false);
+    setTempPassword("");
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
   }
@@ -59,7 +80,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
           title="Invite sent."
           sub={
             <>
-              An invitation has been sent to <strong>{form.email}</strong>.
+              Account created for <strong>{form.email}</strong>. Temporary password: <code>{tempPassword}</code>
             </>
           }
           onDone={handleDone}
@@ -124,7 +145,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
               variant="primary"
               icon={Send}
               onClick={handleSubmit}
-              disabled={!form.name || !form.email || !form.role}
+              disabled={!form.name || !form.email || !form.role || isPending}
             >
               Send invitation
             </Button>

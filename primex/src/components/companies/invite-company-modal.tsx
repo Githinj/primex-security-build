@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 
 import { createCompany } from "@/lib/data/actions/companies";
+import { inviteUser } from "@/lib/data/actions/auth";
 
 interface InviteCompanyModalProps {
   open: boolean;
@@ -50,9 +51,11 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [tempPassword, setTempPassword] = useState("");
 
   function handleClose() {
     setSuccess(false);
+    setTempPassword("");
     setForm(INITIAL_FORM);
     onClose();
   }
@@ -60,10 +63,17 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      await createCompany({ name: form.name, type: form.type });
+      const company = await createCompany({ name: form.name, type: form.type });
+      const result = await inviteUser({
+        email: form.contactEmail,
+        full_name: form.contactName,
+        role: "company_manager",
+        company_id: company.id,
+      });
+      setTempPassword(result.tempPassword);
       setSuccess(true);
-    } catch {
-      // silently handle for now
+    } catch (err) {
+      console.error("Failed to invite company:", err);
     } finally {
       setSubmitting(false);
     }
@@ -76,8 +86,7 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
           title="Invite sent."
           sub={
             <>
-              An invitation has been sent to{" "}
-              <span className="font-medium text-ink">{form.contactEmail}</span>.
+              Account created for <strong>{form.contactEmail}</strong>. Temporary password: <code>{tempPassword}</code>
             </>
           }
           onDone={handleClose}

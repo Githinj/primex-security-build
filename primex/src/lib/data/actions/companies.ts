@@ -4,9 +4,10 @@ import { revalidatePath } from 'next/cache'
 
 export async function createCompany(data: { name: string; type: string }) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('companies').insert(data)
+  const { data: company, error } = await supabase.from('companies').insert(data).select('id').single()
   if (error) throw error
   revalidatePath('/companies')
+  return company
 }
 
 export async function updateCompany(id: string, data: { name?: string; type?: string; status?: string }) {

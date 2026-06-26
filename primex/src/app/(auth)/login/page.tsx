@@ -15,6 +15,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+
+  async function handleForgotPassword() {
+    setError(null);
+    setResetSent(false);
+    if (!email.trim()) {
+      setError("Please enter your email first");
+      return;
+    }
+    await supabase.auth.resetPasswordForEmail(email);
+    setResetSent(true);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,6 +116,12 @@ export default function LoginPage() {
               <p className="text-sm text-p-red font-sans">{error}</p>
             )}
 
+            {resetSent && (
+              <p className="text-sm text-p-green font-sans">
+                Password reset email sent. Check your inbox.
+              </p>
+            )}
+
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between mt-1">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -117,6 +136,7 @@ export default function LoginPage() {
               </label>
               <button
                 type="button"
+                onClick={handleForgotPassword}
                 className="text-sm text-p-blue hover:underline font-sans"
               >
                 Forgot password?

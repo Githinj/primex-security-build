@@ -17,7 +17,7 @@ export async function getReports(companyId?: string): Promise<Report[]> {
     company_name: r.companies?.name ?? '',
     date: r.date,
     type: r.type,
-    incident_count: r.incident_count,
+    incident_count: r.incidents,
     size: r.size,
   }))
 }
