@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   FileText,
   AlertTriangle,
@@ -21,6 +21,7 @@ import {
 import { SimpleBarChart } from "@/components/charts/bar-chart";
 import { HorizontalBarList } from "@/components/charts/horizontal-bars";
 
+import { generateReportPdf } from "@/lib/data/actions/generate-report-pdf";
 import type { Report } from "@/lib/types";
 
 // --- types -------------------------------------------------------------------
@@ -77,8 +78,27 @@ interface ReportsClientProps {
 
 export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes }: ReportsClientProps) {
   const [_dateRange, setDateRange] = useState("Last 6 months");
+  const [isPending, startTransition] = useTransition();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const reportRows = reports.map((report) => [
+  function handleDownload(report: Report) {
+    setDownloadingId(report.id);
+    startTransition(async () => {
+      try {
+        const dataUri = await generateReportPdf({ reportId: report.id });
+        const link = document.createElement('a');
+        link.href = dataUri;
+        link.download = `${report.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+        link.click();
+      } catch (err) {
+        console.error('PDF generation failed:', err);
+      } finally {
+        setDownloadingId(null);
+      }
+    });
+  }
+
+  const reportRows = reports.map((report: Report) => [
     // Report name
     <span key="name" className="flex items-center gap-2.5">
       <span className="w-7 h-7 rounded-lg bg-p-blue-soft flex items-center justify-center flex-shrink-0">
@@ -109,7 +129,16 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
       {report.size}
     </span>,
     // Download
-    <Button key="dl" variant="ghost" size="sm" icon={Download} />,
+    <Button
+      key="dl"
+      variant="ghost"
+      size="sm"
+      icon={Download}
+      onClick={() => handleDownload(report)}
+      disabled={downloadingId === report.id}
+    >
+      {downloadingId === report.id ? '…' : ''}
+    </Button>,
   ]);
 
   return (

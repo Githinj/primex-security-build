@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -15,6 +16,7 @@ import {
   DataTable,
   Button,
 } from "@/components/ui";
+import { generateReportPdf } from "@/lib/data/actions/generate-report-pdf";
 import type { Report, Incident } from "@/lib/types";
 
 function reportTypeTone(type: string): "blue" | "green" | "amber" | "gray" {
@@ -44,6 +46,26 @@ interface CompanyReportsProps {
 }
 
 export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
+  const [isPending, startTransition] = useTransition();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  function handleDownload(report: Report) {
+    setDownloadingId(report.id);
+    startTransition(async () => {
+      try {
+        const dataUri = await generateReportPdf({ reportId: report.id });
+        const link = document.createElement('a');
+        link.href = dataUri;
+        link.download = `${report.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+        link.click();
+      } catch (err) {
+        console.error('PDF generation failed:', err);
+      } finally {
+        setDownloadingId(null);
+      }
+    });
+  }
+
   // Compute stats
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -72,7 +94,16 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
     <span key="size" className="text-ink-4 text-[13px]">
       {report.size}
     </span>,
-    <Button key="dl" variant="ghost" size="sm" icon={Download} />,
+    <Button
+      key="dl"
+      variant="ghost"
+      size="sm"
+      icon={Download}
+      onClick={() => handleDownload(report)}
+      disabled={downloadingId === report.id}
+    >
+      {downloadingId === report.id ? '…' : ''}
+    </Button>,
   ]);
 
   return (

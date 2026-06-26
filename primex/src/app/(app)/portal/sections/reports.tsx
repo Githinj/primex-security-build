@@ -1,7 +1,9 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import { FileText, Download } from 'lucide-react'
 import { PageTitle, Card, DataTable, Button } from '@/components/ui'
+import { generateReportPdf } from '@/lib/data/actions/generate-report-pdf'
 import type { Report } from '@/lib/types'
 
 interface ClientReportsProps {
@@ -18,6 +20,26 @@ function formatDate(dateStr: string): string {
 }
 
 export function ClientReports({ reports }: ClientReportsProps) {
+  const [isPending, startTransition] = useTransition()
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  function handleDownload(report: Report) {
+    setDownloadingId(report.id)
+    startTransition(async () => {
+      try {
+        const dataUri = await generateReportPdf({ reportId: report.id })
+        const link = document.createElement('a')
+        link.href = dataUri
+        link.download = `${report.name.replace(/\s+/g, '-').toLowerCase()}.pdf`
+        link.click()
+      } catch (err) {
+        console.error('PDF generation failed:', err)
+      } finally {
+        setDownloadingId(null)
+      }
+    })
+  }
+
   const columns = ['Report', 'Period', 'Incidents', 'Generated', '']
 
   const rows = reports.map((r) => [
@@ -36,8 +58,15 @@ export function ClientReports({ reports }: ClientReportsProps) {
     <span key={`date-${r.id}`} className="text-sm text-ink-3 font-sans whitespace-nowrap">
       {formatDate(r.date)}
     </span>,
-    <Button key={`dl-${r.id}`} variant="secondary" size="sm" icon={Download}>
-      PDF
+    <Button
+      key={`dl-${r.id}`}
+      variant="secondary"
+      size="sm"
+      icon={Download}
+      onClick={() => handleDownload(r)}
+      disabled={downloadingId === r.id}
+    >
+      {downloadingId === r.id ? '…' : 'PDF'}
     </Button>,
   ])
 
