@@ -18,6 +18,7 @@ import { cn, severityTone } from '@/lib/utils'
 import { updateAlertStatus } from '@/lib/data/actions/alerts'
 import { useRealtimeAlerts } from '@/lib/hooks/use-realtime-alerts'
 import type { Alert, AlertSeverity, Profile, Site, Camera as CameraType } from '@/lib/types'
+import { CameraPlayer } from '@/components/streaming/camera-player'
 
 type FilterSeverity = 'All' | AlertSeverity
 
@@ -222,6 +223,16 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
                   </span>
                 )}
               </div>
+
+              {/* Live stream — compact player */}
+              {selectedCamera && selectedCamera.status === 'Online' && selectedCamera.stream_id && (
+                <CameraPlayer
+                  cameraId={selectedCamera.id}
+                  cameraName={selectedCamera.name}
+                  status={selectedCamera.status}
+                  compact
+                />
+              )}
 
               {/* Description card */}
               <Card>
