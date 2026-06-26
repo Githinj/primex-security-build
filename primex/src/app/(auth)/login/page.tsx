@@ -62,12 +62,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center px-4">
-      <div className="w-full max-w-[1000px] grid grid-cols-2 rounded-2xl overflow-hidden shadow-xl border border-border">
+    <div className="min-h-screen bg-bg flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-[1000px] grid grid-cols-1 md:grid-cols-2 rounded-2xl overflow-hidden shadow-xl border border-border">
         {/* Left — form panel */}
-        <div className="bg-surface flex flex-col justify-center px-12 py-14">
+        <div className="bg-surface flex flex-col justify-center px-6 py-10 sm:px-12 sm:py-14">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-10">
+          <div className="flex items-center gap-2.5 sm:gap-3 mb-8 sm:mb-10">
             <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
               <Shield size={18} className="text-white" strokeWidth={2} />
             </div>
@@ -78,10 +78,10 @@ export default function LoginPage() {
 
           {/* Heading */}
           <Label className="mb-3">Sign in</Label>
-          <h1 className="font-serif text-4xl font-semibold text-ink leading-tight mb-2">
+          <h1 className="font-serif text-2xl sm:text-4xl font-semibold text-ink leading-tight mb-2">
             Welcome back.
           </h1>
-          <p className="text-ink-3 text-sm font-sans mb-8">
+          <p className="text-ink-3 text-xs sm:text-sm font-sans mb-6 sm:mb-8">
             Your dashboard adapts to your role — from live dispatch to executive
             reporting.
           </p>
@@ -165,8 +165,8 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Right — navy testimonial panel */}
-        <div className="relative bg-navy flex flex-col justify-between px-12 py-14 overflow-hidden">
+        {/* Right — navy testimonial panel (hidden on mobile) */}
+        <div className="relative bg-navy hidden md:flex flex-col justify-between px-8 lg:px-12 py-14 overflow-hidden">
           {/* SVG grid pattern */}
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none"
