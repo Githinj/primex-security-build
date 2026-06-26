@@ -177,6 +177,8 @@ CREATE TRIGGER trg_incidents_updated_at BEFORE UPDATE ON incidents
 
 -- ===================  5. RLS HELPER FUNCTIONS  ==============
 
+-- Read role from auth.users metadata (not profiles) to avoid
+-- infinite recursion when get_user_role is called inside profiles RLS policies.
 CREATE OR REPLACE FUNCTION get_user_role()
 RETURNS user_role
 LANGUAGE sql
@@ -184,18 +186,23 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM profiles WHERE id = auth.uid();
+  SELECT (raw_user_meta_data->>'role')::user_role
+  FROM auth.users
+  WHERE id = auth.uid();
 $$;
 
+-- Use plpgsql with row_security=off to avoid recursion when called from RLS policies.
 CREATE OR REPLACE FUNCTION get_user_company()
-RETURNS UUID
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT company_id FROM profiles WHERE id = auth.uid();
-$$;
+RETURNS UUID AS $$
+DECLARE
+  v_company_id UUID;
+BEGIN
+  PERFORM set_config('row_security', 'off', true);
+  SELECT company_id INTO v_company_id FROM public.profiles WHERE id = auth.uid();
+  PERFORM set_config('row_security', 'on', true);
+  RETURN v_company_id;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 
 
 -- ===================  6. ENABLE RLS  =======================
@@ -239,158 +246,59 @@ CREATE POLICY companies_client_select ON companies
 
 
 -- ─── sites ─────────────────────────────────────────────────
-
--- super_admin: full CRUD
-CREATE POLICY sites_super_admin_all ON sites
-  FOR ALL USING (get_user_role() = 'super_admin')
-  WITH CHECK (get_user_role() = 'super_admin');
-
--- company_manager: CRUD own company
-CREATE POLICY sites_manager_all ON sites
-  FOR ALL USING (
-    get_user_role() = 'company_manager'
-    AND company_id = get_user_company()
-  )
-  WITH CHECK (
-    get_user_role() = 'company_manager'
-    AND company_id = get_user_company()
-  );
-
--- dispatcher: read all
-CREATE POLICY sites_dispatcher_select ON sites
-  FOR SELECT USING (get_user_role() = 'dispatcher');
-
--- guard: read assigned site (sites linked via incidents)
-CREATE POLICY sites_guard_select ON sites
-  FOR SELECT USING (
-    get_user_role() = 'guard'
-    AND id IN (SELECT site_id FROM incidents WHERE guard_id = auth.uid())
-  );
-
--- client: read own company
-CREATE POLICY sites_client_select ON sites
-  FOR SELECT USING (
-    get_user_role() = 'client'
-    AND company_id = get_user_company()
-  );
-
+-- Single CASE policy avoids cross-table subqueries that cause recursion.
+-- Guard uses profiles.company_id directly (via SECURITY DEFINER context) instead
+-- of subquerying incidents→sites which creates circular RLS evaluation.
+CREATE POLICY sites_access ON sites FOR ALL USING (
+  CASE get_user_role()
+    WHEN 'super_admin' THEN true
+    WHEN 'dispatcher' THEN true
+    WHEN 'company_manager' THEN company_id = get_user_company()
+    WHEN 'client' THEN company_id = get_user_company()
+    WHEN 'guard' THEN company_id = get_user_company()
+    ELSE false
+  END
+);
 
 -- ─── cameras ───────────────────────────────────────────────
-
--- super_admin: full CRUD
-CREATE POLICY cameras_super_admin_all ON cameras
-  FOR ALL USING (get_user_role() = 'super_admin')
-  WITH CHECK (get_user_role() = 'super_admin');
-
--- company_manager: CRUD own company cameras
-CREATE POLICY cameras_manager_all ON cameras
-  FOR ALL USING (
-    get_user_role() = 'company_manager'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  )
-  WITH CHECK (
-    get_user_role() = 'company_manager'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
-
--- dispatcher: read all
-CREATE POLICY cameras_dispatcher_select ON cameras
-  FOR SELECT USING (get_user_role() = 'dispatcher');
-
--- guard: read cameras at assigned sites
-CREATE POLICY cameras_guard_select ON cameras
-  FOR SELECT USING (
-    get_user_role() = 'guard'
-    AND site_id IN (SELECT site_id FROM incidents WHERE guard_id = auth.uid())
-  );
-
--- client: read own company cameras
-CREATE POLICY cameras_client_select ON cameras
-  FOR SELECT USING (
-    get_user_role() = 'client'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
-
+-- Subqueries sites (safe: sites_access has no incidents dependency).
+CREATE POLICY cameras_access ON cameras FOR ALL USING (
+  CASE get_user_role()
+    WHEN 'super_admin' THEN true
+    WHEN 'dispatcher' THEN true
+    WHEN 'company_manager' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    WHEN 'client' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    WHEN 'guard' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    ELSE false
+  END
+);
 
 -- ─── alerts ────────────────────────────────────────────────
-
--- super_admin: full CRUD
-CREATE POLICY alerts_super_admin_all ON alerts
-  FOR ALL USING (get_user_role() = 'super_admin')
-  WITH CHECK (get_user_role() = 'super_admin');
-
--- company_manager: read own company alerts
-CREATE POLICY alerts_manager_select ON alerts
-  FOR SELECT USING (
-    get_user_role() = 'company_manager'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
-
--- dispatcher: read all + update
-CREATE POLICY alerts_dispatcher_select ON alerts
-  FOR SELECT USING (get_user_role() = 'dispatcher');
-
-CREATE POLICY alerts_dispatcher_update ON alerts
-  FOR UPDATE USING (get_user_role() = 'dispatcher')
-  WITH CHECK (get_user_role() = 'dispatcher');
-
--- guard: read alerts at assigned sites
-CREATE POLICY alerts_guard_select ON alerts
-  FOR SELECT USING (
-    get_user_role() = 'guard'
-    AND site_id IN (SELECT site_id FROM incidents WHERE guard_id = auth.uid())
-  );
-
--- client: read own company alerts
-CREATE POLICY alerts_client_select ON alerts
-  FOR SELECT USING (
-    get_user_role() = 'client'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
-
+-- Subqueries sites (safe: no circular dependency).
+CREATE POLICY alerts_access ON alerts FOR ALL USING (
+  CASE get_user_role()
+    WHEN 'super_admin' THEN true
+    WHEN 'dispatcher' THEN true
+    WHEN 'company_manager' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    WHEN 'client' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    WHEN 'guard' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    ELSE false
+  END
+);
 
 -- ─── incidents ─────────────────────────────────────────────
-
--- super_admin: full CRUD
-CREATE POLICY incidents_super_admin_all ON incidents
-  FOR ALL USING (get_user_role() = 'super_admin')
-  WITH CHECK (get_user_role() = 'super_admin');
-
--- company_manager: read own company incidents
-CREATE POLICY incidents_manager_select ON incidents
-  FOR SELECT USING (
-    get_user_role() = 'company_manager'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
-
--- dispatcher: full CRUD
-CREATE POLICY incidents_dispatcher_all ON incidents
-  FOR ALL USING (get_user_role() = 'dispatcher')
-  WITH CHECK (get_user_role() = 'dispatcher');
-
--- guard: read + update assigned incidents
-CREATE POLICY incidents_guard_select ON incidents
-  FOR SELECT USING (
-    get_user_role() = 'guard'
-    AND guard_id = auth.uid()
-  );
-
-CREATE POLICY incidents_guard_update ON incidents
-  FOR UPDATE USING (
-    get_user_role() = 'guard'
-    AND guard_id = auth.uid()
-  )
-  WITH CHECK (
-    get_user_role() = 'guard'
-    AND guard_id = auth.uid()
-  );
-
--- client: read own company incidents
-CREATE POLICY incidents_client_select ON incidents
-  FOR SELECT USING (
-    get_user_role() = 'client'
-    AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
-  );
+-- Guard uses guard_id = auth.uid() for strict assignment isolation.
+-- Others use sites subquery (safe: sites_access has no incidents dependency).
+CREATE POLICY incidents_access ON incidents FOR ALL USING (
+  CASE get_user_role()
+    WHEN 'super_admin' THEN true
+    WHEN 'dispatcher' THEN true
+    WHEN 'company_manager' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    WHEN 'guard' THEN guard_id = auth.uid()
+    WHEN 'client' THEN site_id IN (SELECT id FROM sites WHERE company_id = get_user_company())
+    ELSE false
+  END
+);
 
 
 -- ─── reports ───────────────────────────────────────────────
@@ -518,3 +426,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ===================  TABLE GRANTS  ========================
+-- Required for authenticated/anon roles to access tables through RLS
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO anon;

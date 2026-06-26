@@ -96,9 +96,9 @@ export function Sidebar() {
     : "My Organization";
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-surface border-r border-border flex flex-col justify-between h-full">
-      {/* ── Top section ─────────────────────────────── */}
-      <div className="flex flex-col gap-6 p-5">
+    <aside className="w-60 flex-shrink-0 bg-surface border-r border-border flex flex-col h-full">
+      {/* ── Top section (scrollable) ─────────────────── */}
+      <div className="flex flex-col gap-6 p-5 flex-1 overflow-y-auto min-h-0">
         {/* Logo */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
@@ -231,8 +231,8 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* ── Bottom section ───────────────────────────── */}
-      <div className="p-5 flex flex-col gap-3">
+      {/* ── Bottom section (pinned) ───────────────────── */}
+      <div className="p-5 flex flex-col gap-3 flex-shrink-0 border-t border-border">
         {/* System status */}
         <div className="flex items-center gap-2 px-3 py-2 bg-p-green-soft rounded-lg">
           <LiveDot color="green" />
