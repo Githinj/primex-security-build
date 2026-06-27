@@ -28,7 +28,7 @@ No test framework is configured for the Next.js app. The AI worker has tests in 
 - **Auth proxy**: `src/proxy.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
 - **Route groups**: `(app)` for authenticated routes, `(auth)` for login/reset
 - **Role-based dashboards**: Each role has its own route and UI:
-  - `super_admin` → `/dashboard` (full admin: companies, sites, cameras, alerts, incidents, guards, reports, audit, settings, team)
+  - `super_admin` → `/dashboard` (home) + shared top-level routes (`/alerts`, `/incidents`, `/sites`, `/cameras`, `/guards`, `/companies`, `/reports`, `/audit`, `/settings`, `/team`)
   - `dispatcher` → `/dispatcher` (queue, incidents, dispatch board, guards, activity)
   - `guard` → `/guard` (incident status flow, no sidebar)
   - `company_manager` → `/manager` (sites, cameras, alerts, incidents, team, reports)
@@ -44,7 +44,7 @@ No test framework is configured for the Next.js app. The AI worker has tests in 
 
 ### Supabase & RLS
 
-- 3 migration files in `supabase/migrations/` define the full schema
+- 4 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions)
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
@@ -93,3 +93,12 @@ Required in `.env.local`:
 - Icons: `lucide-react` exclusively
 - Drag-and-drop: `@dnd-kit` (dispatch board)
 - PDF generation: `jspdf` + `jspdf-autotable` (server actions)
+- Multi-table writes use Postgres functions (`004_transactional_functions.sql`) instead of sequential inserts
+- `AGENTS.md` at repo root contains Next.js 16 agent rules — read `node_modules/next/dist/docs/` before using unfamiliar Next.js APIs
+
+### Repo Layout
+
+The git root is above `primex/`. Top-level structure:
+- `primex/` — the Next.js app (run all commands from here)
+- `docs/superpowers/` — specs and implementation plans
+- `Primex-Build-Plan.md` — original project build plan
