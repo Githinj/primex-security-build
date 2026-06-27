@@ -4,14 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
 import { logActivity } from './activity'
 
-export async function createCamera(data: { site_id: string; name: string; location: string; status?: string }) {
+export async function createCamera(data: { site_id: string; name: string; location: string; status?: string; stream_id?: string | null }) {
   const caller = await requireRole('super_admin', 'company_manager')
   await requireActiveCompany(caller)
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('cameras').insert(data)
+  const { data: inserted, error } = await supabase.from('cameras').insert(data).select('id').single()
   if (error) throw error
   logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Camera added', target: data.name, icon: 'Camera', tone: 'blue' })
   revalidatePath('/cameras')
+  return inserted.id as string
 }
 
 export async function updateCamera(id: string, data: { name?: string; location?: string; status?: string; stream_id?: string | null }) {
