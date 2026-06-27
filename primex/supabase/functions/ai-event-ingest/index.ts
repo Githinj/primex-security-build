@@ -68,62 +68,37 @@ serve(async (req: Request) => {
     ? `AI detected ${event_type.replace(/_/g, ' ')}. Confidence: ${(confidence * 100).toFixed(0)}%.`
     : `AI detection event: ${event_type}`
 
-  // NOTE: This duplicates the alert+incident insert pattern from
-  // src/lib/data/actions/alerts.ts (createAlert). If the alerts or incidents
-  // schema changes, both this Edge Function and createAlert must be updated.
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  const { data: alertData, error: alertError } = await supabase
-    .from('alerts')
-    .insert({
-      title: eventConfig.title,
-      site_id,
-      camera_id,
-      severity: eventConfig.severity,
-      status: 'New',
-      source: 'AI Detection',
-      description,
-      frame_url: frame_url ?? null,
-      confidence,
-      event_type,
-      ai_metadata: { detections: detections ?? [], metadata: metadata ?? {} },
-    })
-    .select('id')
-    .single()
+  const { data: result, error } = await supabase.rpc('create_alert_with_incident', {
+    p_title: eventConfig.title,
+    p_site_id: site_id,
+    p_camera_id: camera_id,
+    p_severity: eventConfig.severity,
+    p_description: description,
+    p_source: 'AI Detection',
+    p_frame_url: frame_url ?? null,
+    p_confidence: confidence,
+    p_event_type: event_type,
+    p_ai_metadata: { detections: detections ?? [], metadata: metadata ?? {} },
+  })
 
-  if (alertError) {
+  if (error) {
     return new Response(
-      JSON.stringify({ error: 'Failed to create alert', detail: alertError.message }),
+      JSON.stringify({ error: 'Failed to create alert', detail: error.message }),
       { status: 500 }
     )
   }
 
-  const { data: incidentData, error: incidentError } = await supabase
-    .from('incidents')
-    .insert({
-      title: eventConfig.title,
-      site_id,
-      alert_id: alertData.id,
-      severity: eventConfig.severity,
-      status: 'Open',
-      guard_id: null,
-      started_at: new Date().toISOString(),
-      notes: description,
-    })
-    .select('id')
-    .single()
-
-  if (incidentError) {
-    console.error('Failed to create linked incident:', incidentError.message)
-  }
+  const row = Array.isArray(result) ? result[0] : result
 
   return new Response(
     JSON.stringify({
-      alert_id: alertData.id,
-      incident_id: incidentData?.id ?? null,
+      alert_id: row?.alert_id ?? null,
+      incident_id: row?.incident_id ?? null,
     }),
     { status: 201, headers: { 'Content-Type': 'application/json' } }
   )

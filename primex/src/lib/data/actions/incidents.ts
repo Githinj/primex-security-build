@@ -30,22 +30,16 @@ export async function assignGuard(incidentId: string, guardId: string) {
 export async function updateIncidentStatus(id: string, status: string) {
   await requireRole('super_admin', 'dispatcher', 'guard', 'company_manager')
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('incidents').update({ status }).eq('id', id)
-  if (error) throw error
 
-  // When resolved, set the guard back to Available
   if (status === 'Resolved') {
-    const { data: incident } = await supabase
-      .from('incidents')
-      .select('guard_id')
-      .eq('id', id)
-      .single()
-    if (incident?.guard_id) {
-      await supabase
-        .from('profiles')
-        .update({ guard_status: 'Available' })
-        .eq('id', incident.guard_id)
-    }
+    const { error } = await supabase.rpc('resolve_incident', {
+      p_incident_id: id,
+      p_status: status,
+    })
+    if (error) throw error
+  } else {
+    const { error } = await supabase.from('incidents').update({ status }).eq('id', id)
+    if (error) throw error
   }
 
   revalidatePath('/guard')

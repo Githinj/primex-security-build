@@ -3,9 +3,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth/require-role'
 
-// NOTE: The AI detection Edge Function (supabase/functions/ai-event-ingest/index.ts)
-// duplicates this alert+incident insert pattern. If the schema changes,
-// update both this file and the Edge Function in lockstep.
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
   const caller = await requireRole('super_admin', 'company_manager', 'dispatcher')
   const supabase = await createServerSupabaseClient()
@@ -19,24 +16,16 @@ export async function createAlert(data: { site_id: string; camera_id?: string | 
       throw new Error('Your company must be approved before you can perform this action')
     }
   }
-  const { data: alertData, error: alertError } = await supabase
-    .from('alerts')
-    .insert(data)
-    .select('id')
-    .single()
-  if (alertError) throw alertError
 
-  // Auto-create linked incident
-  await supabase.from('incidents').insert({
-    title: data.title,
-    site_id: data.site_id,
-    alert_id: alertData.id,
-    severity: data.severity,
-    status: 'Open',
-    guard_id: null,
-    started_at: new Date().toISOString(),
-    notes: data.description || null,
+  const { error } = await supabase.rpc('create_alert_with_incident', {
+    p_title: data.title,
+    p_site_id: data.site_id,
+    p_camera_id: data.camera_id ?? null,
+    p_severity: data.severity,
+    p_description: data.description || '',
+    p_source: data.source,
   })
+  if (error) throw error
 
   revalidatePath('/alerts')
   revalidatePath('/incidents')
