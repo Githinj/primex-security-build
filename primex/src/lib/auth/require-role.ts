@@ -7,7 +7,7 @@ export async function requireRole(...allowedRoles: string[]) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, company_id')
+    .select('role, company_id, full_name')
     .eq('id', user.id)
     .single()
 
@@ -15,7 +15,7 @@ export async function requireRole(...allowedRoles: string[]) {
     throw new Error('Unauthorized')
   }
 
-  return { userId: user.id, role: profile.role, companyId: profile.company_id }
+  return { userId: user.id, role: profile.role, companyId: profile.company_id, fullName: profile.full_name }
 }
 
 export async function requireActiveCompany(caller: { role: string; companyId: string | null }) {

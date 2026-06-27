@@ -2,6 +2,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
+import { logActivity } from './activity'
 
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
   const caller = await requireRole('super_admin', 'company_manager', 'dispatcher')
@@ -18,14 +19,16 @@ export async function createAlert(data: { site_id: string; camera_id?: string | 
   })
   if (error) throw error
 
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Alert created', target: data.title, icon: 'Bell', tone: data.severity === 'Critical' ? 'red' : 'amber' })
   revalidatePath('/alerts')
   revalidatePath('/incidents')
 }
 
 export async function updateAlertStatus(id: string, status: string) {
-  await requireRole('super_admin', 'dispatcher')
+  const caller = await requireRole('super_admin', 'dispatcher')
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('alerts').update({ status }).eq('id', id)
   if (error) throw error
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: `Alert ${status.toLowerCase()}`, target: id, icon: 'Bell', tone: status === 'Closed' ? 'green' : 'amber' })
   revalidatePath('/alerts')
 }

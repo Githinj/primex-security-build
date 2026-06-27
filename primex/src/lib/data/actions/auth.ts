@@ -15,7 +15,7 @@ interface InviteUserParams {
 }
 
 export async function inviteUser(params: InviteUserParams) {
-  await requireRole('super_admin', 'company_manager')
+  const caller = await requireRole('super_admin', 'company_manager')
   const admin = createAdminSupabaseClient()
 
   const password = params.temp_password || generateTempPassword()
@@ -49,6 +49,9 @@ export async function inviteUser(params: InviteUserParams) {
 
     if (profileError) throw profileError
   }
+
+  const { logActivity } = await import('./activity')
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'User account created', target: params.email, icon: 'UserPlus', tone: 'blue' })
 
   revalidatePath('/team')
   revalidatePath('/companies')

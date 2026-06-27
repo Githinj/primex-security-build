@@ -2,9 +2,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth/require-role'
+import { logActivity } from './activity'
 
 export async function dispatchGuard(alertId: string, guardId: string) {
-  await requireRole('super_admin', 'dispatcher')
+  const caller = await requireRole('super_admin', 'dispatcher')
   const supabase = await createServerSupabaseClient()
 
   const { error } = await supabase.rpc('dispatch_guard', {
@@ -13,6 +14,7 @@ export async function dispatchGuard(alertId: string, guardId: string) {
   })
   if (error) throw error
 
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Dispatched guard', target: `${guardId} → alert ${alertId}`, icon: 'Radio', tone: 'amber' })
   revalidatePath('/alerts')
   revalidatePath('/incidents')
   revalidatePath('/guards')
