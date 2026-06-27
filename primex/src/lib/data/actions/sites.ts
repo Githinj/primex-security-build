@@ -1,21 +1,12 @@
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { requireRole } from '@/lib/auth/require-role'
+import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
 
 export async function createSite(data: { company_id: string; name: string; type: string; address: string; risk?: string }) {
   const caller = await requireRole('super_admin', 'company_manager')
+  await requireActiveCompany(caller)
   const supabase = await createServerSupabaseClient()
-  if (caller.role === 'company_manager' && caller.companyId) {
-    const { data: company } = await supabase
-      .from('companies')
-      .select('status')
-      .eq('id', caller.companyId)
-      .single()
-    if (company?.status !== 'Active') {
-      throw new Error('Your company must be approved before you can perform this action')
-    }
-  }
   const { error } = await supabase.from('sites').insert(data)
   if (error) throw error
   revalidatePath('/sites')

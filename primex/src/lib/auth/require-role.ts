@@ -17,3 +17,17 @@ export async function requireRole(...allowedRoles: string[]) {
 
   return { userId: user.id, role: profile.role, companyId: profile.company_id }
 }
+
+export async function requireActiveCompany(caller: { role: string; companyId: string | null }) {
+  if (caller.role === 'company_manager' && caller.companyId) {
+    const supabase = await createServerSupabaseClient()
+    const { data: company } = await supabase
+      .from('companies')
+      .select('status')
+      .eq('id', caller.companyId)
+      .single()
+    if (company?.status !== 'Active') {
+      throw new Error('Your company must be approved before you can perform this action')
+    }
+  }
+}
