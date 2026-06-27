@@ -1,1 +1,95 @@
-@AGENTS.md
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# All commands run from the primex/ directory
+npm run dev          # Start dev server (Turbopack)
+npm run build        # Production build
+npm run lint         # ESLint (flat config, eslint.config.mjs)
+npm start            # Start production server
+
+# Supabase (requires Supabase CLI)
+supabase start       # Local Supabase stack
+supabase db reset    # Reset DB and re-run migrations + seed
+
+# AI worker (Python, separate runtime)
+cd ai_worker && pip install -r requirements.txt && python main.py
+```
+
+No test framework is configured for the Next.js app. The AI worker has tests in `ai_worker/tests/`.
+
+## Architecture
+
+### Next.js 16 with App Router
+
+- **Auth proxy**: `src/proxy.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
+- **Route groups**: `(app)` for authenticated routes, `(auth)` for login/reset
+- **Role-based dashboards**: Each role has its own route and UI:
+  - `super_admin` → `/dashboard` (full admin: companies, sites, cameras, alerts, incidents, guards, reports, audit, settings, team)
+  - `dispatcher` → `/dispatcher` (queue, incidents, dispatch board, guards, activity)
+  - `guard` → `/guard` (incident status flow, no sidebar)
+  - `company_manager` → `/manager` (sites, cameras, alerts, incidents, team, reports)
+  - `client` → `/portal` (alerts, incidents, reports, help)
+- **Params/cookies are async**: `await params`, `await cookies()` — Next.js 16 requirement
+
+### Data Layer
+
+- **Queries**: `lib/data/*.ts` — read-only server functions (e.g., `getAlerts()`, `getSites()`)
+- **Mutations**: `lib/data/actions/*.ts` — `"use server"` actions (e.g., `updateIncidentStatus()`, `inviteUser()`)
+- **Supabase clients**: `lib/supabase/client.ts` (browser), `server.ts` (server components/actions), `admin.ts` (service-role for admin ops)
+- **Types**: `lib/types/index.ts` — all domain types and enums
+
+### Supabase & RLS
+
+- 3 migration files in `supabase/migrations/` define the full schema
+- RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
+- `handle_new_user` trigger auto-creates profiles on signup
+- Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
+
+### Tailwind CSS v4
+
+Custom design tokens defined via `@theme inline` in `globals.css`. Use the project palette:
+- `p-blue`, `p-red`, `p-amber`, `p-green`, `p-gray` (each has `-soft` variant)
+- `navy`, `navy-darker`, `navy-tile` (dark backgrounds)
+- `ink`, `ink-2`, `ink-3`, `ink-4` (text hierarchy)
+- `bg`, `surface`, `surface-subtle`, `border`, `border-strong`
+
+### UI Components
+
+`components/ui/` — custom design system primitives (Button, Card, Modal, DataTable, StatCard, Pill, etc.) exported via barrel `index.ts`. No shadcn/ui or component library.
+
+### Context Providers
+
+- `ProfileProvider` — current user profile, available in all `(app)` routes
+- `ScopeProvider` — company scope filtering for super_admin
+
+### AI Detection Layer
+
+- Python worker in `ai_worker/` — runs independently, posts events to `supabase/functions/ai-event-ingest/` edge function
+- Detection types: `motion_afterhours`, `person_lingering`, `concealment_behavior`, `door_event`, `vehicle_detection`
+- Config tables: `camera_ai_config`, `site_business_hours`, `ai_worker_config`
+
+### Camera Streaming
+
+- Ant Media WebRTC primary (`@antmedia/webrtc_adaptor`), HLS fallback (`hls.js`)
+- Components: `components/streaming/` (CameraPlayer, RecordingTimeline, RecordingPlayer)
+- Webhook: `app/api/webhooks/antmedia/` handles stream lifecycle + recording events
+- Recordings stored in DO Spaces, timeline scrubber with 1h/6h/12h/24h presets
+
+### Env Vars
+
+Required in `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `ANTMEDIA_URL`, `ANTMEDIA_API_KEY`, `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
+- `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
+
+### Key Conventions
+
+- Path alias: `@/*` maps to `./src/*`
+- tsconfig excludes `supabase/functions` (Deno runtime) and `ai_worker` (Python)
+- Icons: `lucide-react` exclusively
+- Drag-and-drop: `@dnd-kit` (dispatch board)
+- PDF generation: `jspdf` + `jspdf-autotable` (server actions)
