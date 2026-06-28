@@ -88,7 +88,8 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 
 Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTMEDIA_URL`, `ANTMEDIA_API_KEY`, `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
+- `ANTMEDIA_URL`, `ANTMEDIA_APP` (default: `LiveApp`), `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
+- `ANTMEDIA_API_KEY` (optional — only needed for Enterprise Edition)
 - `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
 
 ### Key Conventions

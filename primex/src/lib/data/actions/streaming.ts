@@ -5,9 +5,17 @@ import { requireRole } from '@/lib/auth/require-role'
 import type { StreamToken } from '@/lib/types'
 
 const ANTMEDIA_URL = process.env.ANTMEDIA_URL!
-const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY!
+const ANTMEDIA_APP = process.env.ANTMEDIA_APP || 'LiveApp'
+const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY // optional for Community Edition
 const ANTMEDIA_WS_URL = process.env.ANTMEDIA_WS_URL!
 const TOKEN_DURATION_MS = 60 * 60 * 1000 // 1 hour
+
+function antmediaHeaders(contentType?: string): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (contentType) headers['Content-Type'] = contentType
+  if (ANTMEDIA_API_KEY) headers['Authorization'] = `Bearer ${ANTMEDIA_API_KEY}`
+  return headers
+}
 
 export async function getStreamToken(cameraId: string): Promise<StreamToken | null> {
   await requireRole('super_admin', 'dispatcher', 'company_manager', 'client', 'guard')
@@ -24,11 +32,22 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
   const streamId = camera.stream_id
   const expireDate = Date.now() + TOKEN_DURATION_MS
 
+  // Community Edition doesn't support the token API — return tokenless URLs
+  if (!ANTMEDIA_API_KEY) {
+    return {
+      token: null,
+      streamId,
+      webrtcUrl: ANTMEDIA_WS_URL,
+      hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8`,
+      expiresAt: expireDate,
+    }
+  }
+
   const res = await fetch(
-    `${ANTMEDIA_URL}/WebRTCAppEE/rest/v2/broadcasts/${streamId}/token?expireDate=${expireDate}&type=play`,
+    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${streamId}/token?expireDate=${expireDate}&type=play`,
     {
-      method: 'GET', // Ant Media token API uses GET, not POST
-      headers: { Authorization: `Bearer ${ANTMEDIA_API_KEY}` },
+      method: 'GET',
+      headers: antmediaHeaders(),
     }
   )
 
@@ -43,7 +62,7 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
     token: tokenId,
     streamId,
     webrtcUrl: ANTMEDIA_WS_URL,
-    hlsUrl: `${ANTMEDIA_URL}/WebRTCAppEE/streams/${streamId}.m3u8?token=${tokenId}`,
+    hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8?token=${tokenId}`,
     expiresAt: expireDate,
   }
 }
@@ -51,14 +70,13 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
 export async function createBroadcast(cameraId: string, cameraName: string, streamId: string): Promise<{ success: boolean; ingestUrl?: string }> {
   await requireRole('super_admin')
 
+  const ingestUrl = `rtmp://${new URL(ANTMEDIA_URL).hostname}/${ANTMEDIA_APP}/${streamId}`
+
   const res = await fetch(
-    `${ANTMEDIA_URL}/WebRTCAppEE/rest/v2/broadcasts`,
+    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${ANTMEDIA_API_KEY}`,
-      },
+      headers: antmediaHeaders('application/json'),
       body: JSON.stringify({
         streamId,
         name: cameraName,
@@ -68,7 +86,7 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
   )
 
   if (res.status === 409) {
-    return { success: true, ingestUrl: `rtmp://${new URL(ANTMEDIA_URL).hostname}/WebRTCAppEE/${streamId}` }
+    return { success: true, ingestUrl }
   }
 
   if (!res.ok) {
@@ -81,14 +99,11 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
     .from('cameras')
     .update({
       stream_id: streamId,
-      stream_url: `rtmp://${new URL(ANTMEDIA_URL).hostname}/WebRTCAppEE/${streamId}`,
+      stream_url: ingestUrl,
     })
     .eq('id', cameraId)
 
-  return {
-    success: true,
-    ingestUrl: `rtmp://${new URL(ANTMEDIA_URL).hostname}/WebRTCAppEE/${streamId}`,
-  }
+  return { success: true, ingestUrl }
 }
 
 export async function getRecordingsAction(

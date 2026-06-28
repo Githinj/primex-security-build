@@ -53,7 +53,7 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
           remoteVideoElement: videoRef.current,
           callback: (info: string) => {
             if (info === 'initialized') {
-              adaptor.play(token.streamId, token.token)
+              adaptor.play(token.streamId, token.token ?? undefined)
             }
             if (info === 'play_started') {
               setPlayerState('live')

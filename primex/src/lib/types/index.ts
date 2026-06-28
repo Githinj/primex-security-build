@@ -87,7 +87,7 @@ export interface Recording {
 }
 
 export interface StreamToken {
-  token: string
+  token: string | null
   streamId: string
   webrtcUrl: string
   hlsUrl: string
