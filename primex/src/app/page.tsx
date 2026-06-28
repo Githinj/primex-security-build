@@ -226,10 +226,10 @@ function HeroSection() {
           sizes="100vw"
         />
         {/* Multi-layer atmospheric gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-navy/40 via-navy/70 to-navy" />
-        <div className="absolute inset-0 bg-gradient-to-r from-p-blue/[0.06] via-transparent to-p-blue/[0.04]" />
-        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-p-blue/[0.07] rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-p-blue/[0.05] rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-navy/40 via-navy/70 to-navy pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-p-blue/[0.06] via-transparent to-p-blue/[0.04] pointer-events-none" />
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-p-blue/[0.07] rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-p-blue/[0.05] rounded-full blur-[120px] pointer-events-none" />
         <GridPattern id="hero-grid" className="opacity-[0.03]" />
 
         {/* Animated scan lines */}
@@ -707,7 +707,7 @@ function SolutionsSection() {
 
   return (
     <section className="relative py-16 sm:py-28 scroll-mt-24 overflow-hidden" id="solutions">
-      <div className="absolute inset-0 bg-gradient-to-b from-bg via-surface to-bg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-bg via-surface to-bg pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
@@ -1007,7 +1007,7 @@ const PLANS = [
 function PricingSection() {
   return (
     <section className="relative py-16 sm:py-28 scroll-mt-24 overflow-hidden" id="pricing">
-      <div className="absolute inset-0 bg-gradient-to-b from-bg via-surface-subtle/30 to-bg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-bg via-surface-subtle/30 to-bg pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
@@ -1114,7 +1114,7 @@ function BottomCTA() {
             className="object-cover opacity-15"
             sizes="100vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-navy/70 via-navy/85 to-navy" />
+          <div className="absolute inset-0 bg-gradient-to-b from-navy/70 via-navy/85 to-navy pointer-events-none" />
           <GridPattern id="cta-grid" className="opacity-[0.03]" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-p-blue/40 to-transparent" />
 
