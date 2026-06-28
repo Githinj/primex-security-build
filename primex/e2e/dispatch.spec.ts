@@ -8,14 +8,13 @@ test.describe('Dispatch Flow', () => {
 
   test('dispatch board columns render in correct order', async ({ page }) => {
     await page.getByRole('button', { name: /Dispatch board/ }).click()
-    await expect(page.getByText('Dispatch board')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dispatch board' })).toBeVisible()
 
-    // Verify 4 columns render
-    const columns = page.locator('h3')
-    await expect(columns.filter({ hasText: 'Open' }).first()).toBeVisible()
-    await expect(columns.filter({ hasText: 'Dispatched' }).first()).toBeVisible()
-    await expect(columns.filter({ hasText: 'In Progress' }).first()).toBeVisible()
-    await expect(columns.filter({ hasText: 'Resolved' }).first()).toBeVisible()
+    // Verify 4 column labels render (column headers use <span> not <h3>)
+    await expect(page.getByText('Open', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Dispatched', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('In Progress', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Resolved', { exact: true }).first()).toBeVisible()
   })
 
   test('assign guard via queue', async ({ page }) => {

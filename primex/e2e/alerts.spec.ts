@@ -15,11 +15,15 @@ test.describe('Alert & Incident Lifecycle', () => {
     // Fill the create alert form
     const dialog = page.getByRole('dialog')
     await dialog.locator('select').nth(0).selectOption({ label: 'Apex Retail Group' })
-    await dialog.locator('select').nth(1).waitFor({ state: 'attached' })
-    await dialog.locator('select').nth(1).selectOption({ label: /Apex Retail/ })
+    // Wait for sites to load after company selection, then pick first site
+    const siteSelect = dialog.locator('select').nth(1)
+    await siteSelect.waitFor({ state: 'attached' })
+    await expect(siteSelect.locator('option')).not.toHaveCount(1) // wait for options beyond placeholder
+    const siteOptions = await siteSelect.locator('option:not([value=""])').all()
+    if (siteOptions.length > 0) await siteSelect.selectOption({ index: 1 })
     await dialog.locator('select').nth(3).selectOption({ label: 'Warning' })
-    await dialog.getByPlaceholder('Brief description of the alert').fill(ALERT_TITLE)
-    await dialog.getByPlaceholder('Additional context').fill('Automated E2E test alert')
+    await dialog.getByPlaceholder(/Brief description of the alert/).fill(ALERT_TITLE)
+    await dialog.getByPlaceholder(/Additional context/).fill('Automated E2E test alert')
 
     // Submit
     await dialog.getByRole('button', { name: /Create alert/ }).click()

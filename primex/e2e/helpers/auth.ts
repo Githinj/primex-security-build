@@ -35,11 +35,13 @@ export async function loginAs(page: Page, role: Role) {
     // Verify we're authenticated (not redirected to login)
     const url = page.url()
     if (!url.includes('/login')) return
-    // If redirected, cache is stale — fall through to UI login
+    // If redirected, cache is stale — clear cookies and fall through to UI login
+    await page.context().clearCookies()
   }
 
   // UI login flow
   await page.goto('/login')
+  await page.waitForURL('**/login')
   await page.getByPlaceholder('you@example.com').fill(user.email)
   await page.getByPlaceholder('Enter your password').fill('testpass123')
   await page.getByRole('button', { name: /Continue/ }).click()

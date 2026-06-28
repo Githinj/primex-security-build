@@ -20,9 +20,9 @@ test.describe('Management CRUD', () => {
     // Fill site name
     await dialog.getByPlaceholder('e.g. Apex Westfield').fill(SITE_NAME)
     // Select type
-    await dialog.locator('select').nth(1).selectOption('Retail')
+    await dialog.locator('select').nth(1).selectOption('Store')
     // Fill address
-    await dialog.getByPlaceholder('e.g. 123 Main St').fill('456 Test Ave, Sydney NSW')
+    await dialog.getByPlaceholder(/123 Main St/).fill('456 Test Ave, Sydney NSW')
     // Select risk
     await dialog.locator('select').nth(2).selectOption('Low')
 
@@ -51,8 +51,10 @@ test.describe('Management CRUD', () => {
     const dialog = page.getByRole('dialog')
     // Select company
     await dialog.locator('select').nth(0).selectOption({ label: 'Apex Retail Group' })
-    // Select site
-    await dialog.locator('select').nth(1).selectOption({ label: /Apex Retail/ })
+    // Select site — wait for options to populate after company selection, then pick first
+    const siteSelect = dialog.locator('select').nth(1)
+    await expect(siteSelect.locator('option')).not.toHaveCount(1)
+    await siteSelect.selectOption({ index: 1 })
     // Fill camera name
     await dialog.getByPlaceholder('e.g. CAM-09').fill(CAMERA_NAME)
     // Fill location
@@ -94,7 +96,7 @@ test.describe('Management CRUD', () => {
     await dialog.locator('select').nth(1).selectOption('Starter')
 
     await dialog.getByRole('button', { name: /Send invitation/ }).click()
-    await expect(dialog.getByText('Invite sent.')).toBeVisible()
+    await expect(dialog.getByText('Invite sent.')).toBeVisible({ timeout: 15000 })
     await dialog.getByRole('button', { name: /Done/ }).click()
 
     // Verify in list

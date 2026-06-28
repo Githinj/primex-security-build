@@ -16,13 +16,18 @@ test.describe('Incident Lifecycle', () => {
   test('close an incident via action menu', async ({ page }) => {
     await page.goto('/incidents')
 
-    // Find an open seed incident
+    // Find an open seed incident and remember its title
     const row = page.getByRole('row').filter({ hasText: 'Open' }).first()
-    await row.getByRole('button').last().click()
-    await page.getByText('Close').click()
+    const titleCell = row.locator('td').nth(1)
+    const incidentTitle = await titleCell.textContent()
 
-    // Verify status changed
-    await expect(row.getByText('Closed')).toBeVisible()
+    // Open action menu and close
+    await row.getByRole('button').last().click()
+    await page.getByRole('button', { name: 'Close' }).click()
+
+    // Verify status changed — find the row by title, check it now shows Closed
+    const updatedRow = page.getByRole('row').filter({ hasText: incidentTitle! })
+    await expect(updatedRow.getByText('Closed')).toBeVisible()
   })
 
   test('status change persists after reload', async ({ page }) => {

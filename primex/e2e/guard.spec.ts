@@ -12,8 +12,8 @@ test.describe('Guard Mobile Flow', () => {
     // Verify greeting
     await expect(page.getByText(/Hi Marcus/)).toBeVisible()
 
-    // Verify no sidebar navigation (guard has no sidebar)
-    await expect(page.locator('nav')).toHaveCount(0)
+    // Verify no sidebar nav links visible (guard has no nav items — sidebar shell exists but is empty)
+    await expect(page.locator('nav a')).toHaveCount(0)
   })
 
   test('guard status flow to resolved', async ({ page }) => {
