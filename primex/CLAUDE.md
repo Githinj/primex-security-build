@@ -11,6 +11,11 @@ npm run build        # Production build
 npm run lint         # ESLint (flat config, eslint.config.mjs)
 npm start            # Start production server
 
+# E2E tests (Playwright, requires dev server running)
+npm run test:e2e           # Run all E2E tests (headless)
+npm run test:e2e:headed    # Run E2E tests with browser visible
+npx playwright test e2e/auth.spec.ts  # Run a single test file
+
 # Supabase (requires Supabase CLI)
 supabase start       # Local Supabase stack
 supabase db reset    # Reset DB and re-run migrations + seed
@@ -19,7 +24,7 @@ supabase db reset    # Reset DB and re-run migrations + seed
 cd ai_worker && pip install -r requirements.txt && python main.py
 ```
 
-No test framework is configured for the Next.js app. The AI worker has tests in `ai_worker/tests/`.
+E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI worker has unit tests in `ai_worker/tests/`.
 
 ## Architecture
 
@@ -44,7 +49,7 @@ No test framework is configured for the Next.js app. The AI worker has tests in 
 
 ### Supabase & RLS
 
-- 4 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions)
+- 5 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron)
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
