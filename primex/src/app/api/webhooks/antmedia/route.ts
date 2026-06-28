@@ -10,7 +10,7 @@ const DO_SPACES_ENDPOINT = process.env.DO_SPACES_RECORDINGS_BUCKET
   : ''
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Antmedia-Secret')
+  const secret = req.headers.get('X-Antmedia-Secret') ?? req.nextUrl.searchParams.get('secret')
   if (!secret || secret !== WEBHOOK_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
