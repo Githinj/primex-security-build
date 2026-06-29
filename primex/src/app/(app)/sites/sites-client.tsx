@@ -14,6 +14,7 @@ import {
 import { AddSiteModal } from "@/components/sites/add-site-modal";
 import { SiteToggleModal } from "@/components/sites/site-toggle-modal";
 import { DeleteSiteModal } from "@/components/sites/delete-site-modal";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import type { Site, Company, SiteRisk, SiteStatus } from "@/lib/types";
 
 function riskTone(risk: SiteRisk): "red" | "amber" | "green" {
@@ -33,11 +34,15 @@ function statusTone(status: SiteStatus): "green" | "amber" {
 
 interface SitesClientProps {
   sites: Site[];
+  total: number;
+  page: number;
+  pageSize: number;
   companies: Company[];
 }
 
-export function SitesClient({ sites, companies }: SitesClientProps) {
+export function SitesClient({ sites, total, page, pageSize, companies }: SitesClientProps) {
   const router = useRouter();
+  const { setPage } = usePagination({ defaultPageSize: pageSize });
   const [modalOpen, setModalOpen] = useState(false);
   const [toggleModal, setToggleModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
@@ -130,6 +135,7 @@ export function SitesClient({ sites, companies }: SitesClientProps) {
             <DataTable
               columns={["Site", "Company", "Type", "Risk", "Cameras", "Status", ""]}
               rows={rows}
+              pagination={{ page, pageSize, total, onPageChange: setPage }}
             />
           </div>
         </Card>

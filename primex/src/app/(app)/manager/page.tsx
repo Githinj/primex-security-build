@@ -3,9 +3,6 @@ import { redirect } from "next/navigation";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getCompanyById } from "@/lib/data/companies";
 import { getSites } from "@/lib/data/sites";
-import { getCameras } from "@/lib/data/cameras";
-import { getAlerts } from "@/lib/data/alerts";
-import { getIncidents } from "@/lib/data/incidents";
 import { getReports } from "@/lib/data/reports";
 import type { Profile } from "@/lib/types";
 import { ManagerClient } from "./manager-client";
@@ -42,11 +39,9 @@ export default async function ManagerPage() {
 
   const companyId = profile.company_id;
 
-  const [company, sites, alerts, incidents, reports] = await Promise.all([
+  const [company, sites, reports] = await Promise.all([
     getCompanyById(companyId),
     getSites(companyId),
-    getAlerts(),
-    getIncidents(),
     getReports(companyId),
   ]);
 
@@ -58,14 +53,19 @@ export default async function ManagerPage() {
     );
   }
 
-  // Fetch cameras for all company sites
+  // Fetch cameras, alerts, incidents filtered by company sites (server-side)
   const siteIds = sites.map((s) => s.id);
-  const allCameras = await getCameras();
-  const cameras = allCameras.filter((c) => siteIds.includes(c.site_id));
+  const supabaseForData = await createServerSupabaseClient();
 
-  // Filter alerts and incidents to only those belonging to company sites
-  const companyAlerts = alerts.filter((a) => siteIds.includes(a.site_id));
-  const companyIncidents = incidents.filter((i) => siteIds.includes(i.site_id));
+  const [camerasResult, alertsResult, incidentsResult] = await Promise.all([
+    supabaseForData.from('cameras').select('*').in('site_id', siteIds.length > 0 ? siteIds : ['']).order('name'),
+    supabaseForData.from('alerts').select('*').in('site_id', siteIds.length > 0 ? siteIds : ['']).order('created_at', { ascending: false }),
+    supabaseForData.from('incidents').select('*').in('site_id', siteIds.length > 0 ? siteIds : ['']).order('started_at', { ascending: false }),
+  ]);
+
+  const cameras = camerasResult.data ?? [];
+  const companyAlerts = alertsResult.data ?? [];
+  const companyIncidents = incidentsResult.data ?? [];
 
   // Fetch team members for this company
   const { data: teamData } = await supabase

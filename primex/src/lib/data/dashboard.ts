@@ -57,7 +57,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supabase.from('alerts').select('*').eq('severity', 'Critical').neq('status', 'Closed').order('created_at', { ascending: false }).limit(5),
     supabase.from('cameras').select('id, status, site:sites!inner(company_id)'),
     supabase.from('companies').select('*'),
-    supabase.from('incidents').select('started_at, updated_at').in('status', ['Resolved', 'Closed']),
+    supabase.from('incidents').select('started_at, updated_at').in('status', ['Resolved', 'Closed']).gte('updated_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()).limit(1000),
   ])
 
   // Build camera counts by company

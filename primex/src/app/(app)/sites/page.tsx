@@ -5,7 +5,12 @@ import { getSites } from "@/lib/data/sites";
 import { getCompanies } from "@/lib/data/companies";
 import { SitesClient } from "./sites-client";
 
-export default async function SitesPage() {
+interface Props {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function SitesPage({ searchParams }: Props) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -20,7 +25,21 @@ export default async function SitesPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const [sites, companies] = await Promise.all([getSites(), getCompanies()]);
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = 25;
 
-  return <SitesClient sites={sites} companies={companies} />;
+  const [sitesResult, companies] = await Promise.all([
+    getSites(undefined, { page, pageSize }),
+    getCompanies(),
+  ]);
+
+  return (
+    <SitesClient
+      sites={sitesResult.data}
+      total={sitesResult.total}
+      page={sitesResult.page}
+      pageSize={sitesResult.pageSize}
+      companies={companies}
+    />
+  );
 }

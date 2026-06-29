@@ -6,7 +6,12 @@ import { getSites } from "@/lib/data/sites";
 import { getCompanies } from "@/lib/data/companies";
 import { CamerasClient } from "./cameras-client";
 
-export default async function CamerasPage() {
+interface Props {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function CamerasPage({ searchParams }: Props) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -21,11 +26,23 @@ export default async function CamerasPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const [cameras, sites, companies] = await Promise.all([
-    getCameras(),
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = 24;
+
+  const [camerasResult, sites, companies] = await Promise.all([
+    getCameras(undefined, { page, pageSize }),
     getSites(),
     getCompanies(),
   ]);
 
-  return <CamerasClient cameras={cameras} sites={sites} companies={companies} />;
+  return (
+    <CamerasClient
+      cameras={camerasResult.data}
+      total={camerasResult.total}
+      page={camerasResult.page}
+      pageSize={camerasResult.pageSize}
+      sites={sites}
+      companies={companies}
+    />
+  );
 }
