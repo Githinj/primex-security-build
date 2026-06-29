@@ -30,7 +30,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 
 ### Next.js 16 with App Router
 
-- **Auth proxy**: `src/proxy.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
+- **Auth proxy**: `src/middleware.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
 - **Route groups**: `(app)` for authenticated routes, `(auth)` for login/reset
 - **Role-based dashboards**: Each role has its own route and UI:
   - `super_admin` → `/dashboard` (home) + shared top-level routes (`/alerts`, `/incidents`, `/sites`, `/cameras`, `/guards`, `/companies`, `/reports`, `/audit`, `/settings`, `/team`)
