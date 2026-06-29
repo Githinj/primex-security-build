@@ -9,11 +9,11 @@ import {
   Card,
   DataTable,
   Pill,
-  PhaseTag,
   Button,
   ActionMenu,
 } from "@/components/ui";
 import { CreateAlertModal } from "@/components/alerts/create-alert-modal";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { severityTone } from "@/lib/utils";
 import type { Alert, Site, Company, Camera } from "@/lib/types";
 
@@ -30,13 +30,17 @@ function formatTime(iso: string): string {
 
 interface AlertsClientProps {
   alerts: Alert[];
+  total: number;
+  page: number;
+  pageSize: number;
   sites: Site[];
   companies: Company[];
   cameras: Camera[];
 }
 
-export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClientProps) {
+export function AlertsClient({ alerts, total, page, pageSize, sites, companies, cameras }: AlertsClientProps) {
   const router = useRouter();
+  const { setPage } = usePagination({ defaultPageSize: pageSize });
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -45,54 +49,30 @@ export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClient
     const isAI = alert.source.includes("AI");
 
     return [
-      // Alert title
       <span key="title" className="font-medium text-ink">
         {alert.title}
       </span>,
-
-      // Site
       <span key="site" className="text-ink-2">
         {site?.name ?? "—"}
       </span>,
-
-      // Severity
       <Pill key="severity" tone={severityTone(alert.severity)}>
         {alert.severity}
       </Pill>,
-
-      // Status
       <Pill key="status" tone="gray">
         {alert.status}
       </Pill>,
-
-      // Source
       <span key="source" className="inline-flex items-center gap-1.5 text-ink-2">
         {alert.source}
         {isAI && <Pill tone="blue" size="sm">AI</Pill>}
       </span>,
-
-      // Time
-      <span
-        key="time"
-        className="text-ink-3 tabular-nums whitespace-nowrap text-xs"
-      >
+      <span key="time" className="text-ink-3 tabular-nums whitespace-nowrap text-xs">
         {formatTime(alert.created_at)}
       </span>,
-
-      // Actions
       <ActionMenu
         key="actions"
         actions={[
-          {
-            label: "View alert",
-            icon: Bell,
-            onClick: () => router.push(`/alerts/${alert.id}`),
-          },
-          {
-            label: "Open incident",
-            icon: ExternalLink,
-            onClick: () => router.push(`/incidents`),
-          },
+          { label: "View alert", icon: Bell, onClick: () => router.push(`/alerts/${alert.id}`) },
+          { label: "Open incident", icon: ExternalLink, onClick: () => router.push(`/incidents`) },
           { divider: true, label: "" },
           {
             label: "Close alert",
@@ -132,16 +112,9 @@ export function AlertsClient({ alerts, sites, companies, cameras }: AlertsClient
 
         <Card padding="p-0">
           <DataTable
-            columns={[
-              "Alert",
-              "Site",
-              "Severity",
-              "Status",
-              "Source",
-              "Time",
-              "",
-            ]}
+            columns={["Alert", "Site", "Severity", "Status", "Source", "Time", ""]}
             rows={rows}
+            pagination={{ page, pageSize, total, onPageChange: setPage }}
           />
         </Card>
       </div>

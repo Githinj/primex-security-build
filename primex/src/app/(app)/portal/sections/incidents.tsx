@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Eye } from 'lucide-react'
 import { PageTitle, Card, Pill, DataTable, Button } from '@/components/ui'
 import { severityTone, incidentTone } from '@/lib/utils'
@@ -20,10 +21,14 @@ function formatDate(dateStr: string): string {
   })
 }
 
-export function ClientIncidents({ incidents }: ClientIncidentsProps) {
-  const columns = ['Incident', 'Severity', 'Status', 'Guard', 'Started', '']
+const PAGE_SIZE = 15
 
-  const rows = incidents.map((inc) => [
+export function ClientIncidents({ incidents }: ClientIncidentsProps) {
+  const [page, setPage] = useState(1)
+  const columns = ['Incident', 'Severity', 'Status', 'Guard', 'Started', '']
+  const paginatedIncidents = incidents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const rows = paginatedIncidents.map((inc) => [
     <div key={`title-${inc.id}`}>
       <p className="text-sm text-ink font-medium font-sans">{inc.title}</p>
       {inc.notes && (
@@ -62,7 +67,11 @@ export function ClientIncidents({ incidents }: ClientIncidentsProps) {
             No incidents to display.
           </p>
         ) : (
-          <DataTable columns={columns} rows={rows} />
+          <DataTable
+            columns={columns}
+            rows={rows}
+            pagination={{ page, pageSize: PAGE_SIZE, total: incidents.length, onPageChange: setPage }}
+          />
         )}
       </Card>
     </div>

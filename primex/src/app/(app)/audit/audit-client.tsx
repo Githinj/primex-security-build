@@ -20,6 +20,8 @@ import {
   Bell,
   Zap,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   PageTitle,
@@ -28,11 +30,8 @@ import {
   StatCard,
   SearchInput,
 } from "@/components/ui";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import type { ActivityItem } from "@/lib/types";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 type TimeFilter = "All" | "Today" | "This week" | "This month";
 
@@ -49,7 +48,25 @@ function formatWhen(iso: string) {
   });
 }
 
-// Map icon string names to Lucide components
+function getTimeFilterDate(filter: TimeFilter): Date | null {
+  if (filter === "All") return null;
+  const now = new Date();
+  if (filter === "Today") {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  if (filter === "This week") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - d.getDay());
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  // This month
+  const d = new Date(now.getFullYear(), now.getMonth(), 1);
+  return d;
+}
+
 const ICON_MAP: Record<string, React.ElementType> = {
   Bell,
   Radio,
@@ -95,10 +112,6 @@ function ActivityIcon({ iconName, tone }: { iconName: string; tone: ActivityItem
   );
 }
 
-// ---------------------------------------------------------------------------
-// AuditClient
-// ---------------------------------------------------------------------------
-
 export interface AuditStats {
   eventsToday: number;
   uniqueActors: number;
@@ -108,14 +121,23 @@ export interface AuditStats {
 
 interface AuditClientProps {
   activity: ActivityItem[];
+  total: number;
+  page: number;
+  pageSize: number;
   auditStats: AuditStats;
 }
 
-export function AuditClient({ activity, auditStats }: AuditClientProps) {
+export function AuditClient({ activity, total, page, pageSize, auditStats }: AuditClientProps) {
   const [search, setSearch] = useState("");
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("Today");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("All");
+  const { setPage } = usePagination({ defaultPageSize: pageSize });
 
+  const totalPages = Math.ceil(total / pageSize);
+
+  // Apply client-side filters (search + time) on the current page of data
+  const cutoff = getTimeFilterDate(timeFilter);
   const filtered = activity.filter((item) => {
+    if (cutoff && new Date(item.created_at) < cutoff) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -144,27 +166,10 @@ export function AuditClient({ activity, auditStats }: AuditClientProps) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <StatCard
-          label="Events today"
-          value={auditStats.eventsToday}
-          icon={Activity}
-        />
-        <StatCard
-          label="Unique actors"
-          value={auditStats.uniqueActors}
-          icon={Users}
-        />
-        <StatCard
-          label="Critical actions"
-          value={auditStats.criticalActions}
-          icon={AlertTriangle}
-          accent="text-p-amber"
-        />
-        <StatCard
-          label="System events"
-          value={auditStats.systemEvents}
-          icon={Cpu}
-        />
+        <StatCard label="Events today" value={auditStats.eventsToday} icon={Activity} />
+        <StatCard label="Unique actors" value={auditStats.uniqueActors} icon={Users} />
+        <StatCard label="Critical actions" value={auditStats.criticalActions} icon={AlertTriangle} accent="text-p-amber" />
+        <StatCard label="System events" value={auditStats.systemEvents} icon={Cpu} />
       </div>
 
       {/* Activity log card */}
@@ -226,6 +231,42 @@ export function AuditClient({ activity, auditStats }: AuditClientProps) {
             ))
           )}
         </div>
+
+        {/* Pagination footer */}
+        {totalPages > 0 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+            <span className="text-xs text-ink-3 font-sans tabular-nums">
+              {total === 0
+                ? "0 results"
+                : `${(page - 1) * pageSize + 1}\u2013${Math.min(page * pageSize, total)} of ${total}`}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage(page - 1)}
+                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={16} strokeWidth={2} />
+                </button>
+                <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(page + 1)}
+                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight size={16} strokeWidth={2} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );

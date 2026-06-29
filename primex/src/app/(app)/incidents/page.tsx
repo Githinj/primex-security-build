@@ -6,7 +6,12 @@ import { getSites } from "@/lib/data/sites";
 import { getGuards } from "@/lib/data/guards";
 import { IncidentsClient } from "./incidents-client";
 
-export default async function IncidentsPage() {
+interface Props {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function IncidentsPage({ searchParams }: Props) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -21,13 +26,23 @@ export default async function IncidentsPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const [incidents, sites, guards] = await Promise.all([
-    getIncidents(),
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = 25;
+
+  const [incidentsResult, sites, guards] = await Promise.all([
+    getIncidents(undefined, { page, pageSize }),
     getSites(),
     getGuards(),
   ]);
 
   return (
-    <IncidentsClient incidents={incidents} sites={sites} guards={guards} />
+    <IncidentsClient
+      incidents={incidentsResult.data}
+      total={incidentsResult.total}
+      page={incidentsResult.page}
+      pageSize={incidentsResult.pageSize}
+      sites={sites}
+      guards={guards}
+    />
   );
 }

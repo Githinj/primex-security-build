@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   Bell,
   AlertTriangle,
@@ -10,6 +11,7 @@ import {
   Settings,
   Eye,
 } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageTitle, Card } from '@/components/ui'
 import type { ActivityItem } from '@/lib/types'
 
@@ -46,7 +48,13 @@ function formatTimestamp(dateStr: string) {
   })
 }
 
+const PAGE_SIZE = 20
+
 export function DispatcherActivity({ activity }: DispatcherActivityProps) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.ceil(activity.length / PAGE_SIZE)
+  const paginatedActivity = activity.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="flex flex-col gap-6">
       <PageTitle
@@ -56,12 +64,12 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
 
       <Card padding="p-0">
         <div className="divide-y divide-border">
-          {activity.length === 0 ? (
+          {paginatedActivity.length === 0 ? (
             <div className="text-center text-sm text-ink-3 py-12 font-sans">
               No recent activity.
             </div>
           ) : (
-            activity.map((item) => {
+            paginatedActivity.map((item) => {
               const Icon = iconMap[item.icon] ?? Bell
               const toneClass = toneBg[item.tone] ?? toneBg.gray
 
@@ -97,6 +105,35 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
             })
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+            <span className="text-xs text-ink-3 font-sans tabular-nums">
+              {(page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, activity.length)} of {activity.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={16} strokeWidth={2} />
+              </button>
+              <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={16} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

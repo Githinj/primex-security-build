@@ -21,6 +21,8 @@ interface CompanyIncidentsProps {
   teamMembers: Profile[];
 }
 
+const PAGE_SIZE = 25;
+
 export function CompanyIncidents({
   incidents,
   sites,
@@ -28,9 +30,12 @@ export function CompanyIncidents({
 }: CompanyIncidentsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [page, setPage] = useState(1);
   const guards = teamMembers.filter((m) => m.role === "guard");
 
-  const rows = incidents.map((incident) => {
+  const paginatedIncidents = incidents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const rows = paginatedIncidents.map((incident) => {
     const site = sites.find((s) => s.id === incident.site_id);
     const guard = incident.guard_id
       ? guards.find((g) => g.id === incident.guard_id)
@@ -110,6 +115,7 @@ export function CompanyIncidents({
         <DataTable
           columns={["Incident", "Site", "Severity", "Status", "Guard", "Started", ""]}
           rows={rows}
+          pagination={{ page, pageSize: PAGE_SIZE, total: incidents.length, onPageChange: setPage }}
         />
       </Card>
     </div>

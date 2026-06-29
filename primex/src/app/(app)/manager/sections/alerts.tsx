@@ -8,7 +8,6 @@ import {
   Card,
   DataTable,
   Pill,
-  PhaseTag,
   Button,
   ActionMenu,
 } from "@/components/ui";
@@ -35,12 +34,17 @@ interface CompanyAlertsProps {
   cameras: Camera[];
 }
 
+const PAGE_SIZE = 25;
+
 export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlertsProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [page, setPage] = useState(1);
 
-  const rows = alerts.map((alert) => {
+  const paginatedAlerts = alerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const rows = paginatedAlerts.map((alert) => {
     const site = sites.find((s) => s.id === alert.site_id);
     const isAI = alert.source.includes("AI");
 
@@ -116,6 +120,7 @@ export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlerts
           <DataTable
             columns={["Alert", "Site", "Severity", "Status", "Source", "Time", ""]}
             rows={rows}
+            pagination={{ page, pageSize: PAGE_SIZE, total: alerts.length, onPageChange: setPage }}
           />
         </Card>
       </div>
