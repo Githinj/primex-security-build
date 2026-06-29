@@ -15,6 +15,7 @@ import {
   Pill,
   ActionMenu,
 } from "@/components/ui";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import type { Profile } from "@/lib/types";
 import { InviteTeamMemberModal } from "@/components/team/invite-member-modal";
 import { EditTeamMemberModal } from "@/components/team/edit-member-modal";
@@ -62,9 +63,13 @@ function roleLabel(role: string) {
 
 interface TeamClientProps {
   members: Profile[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
-export function TeamClient({ members }: TeamClientProps) {
+export function TeamClient({ members, total, page, pageSize }: TeamClientProps) {
+  const { setPage } = usePagination({ defaultPageSize: pageSize });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editMember, setEditMember] = useState<Profile | null>(null);
   const [toggleMember, setToggleMember] = useState<Profile | null>(null);
@@ -137,6 +142,7 @@ export function TeamClient({ members }: TeamClientProps) {
             <DataTable
               columns={["Member", "Role", "Email", "Last active", "Status", ""]}
               rows={rows}
+              pagination={{ page, pageSize, total, onPageChange: setPage }}
             />
           </div>
         </Card>

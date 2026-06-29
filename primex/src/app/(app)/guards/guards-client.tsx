@@ -12,10 +12,14 @@ import {
   Button,
 } from "@/components/ui";
 import { toggleProfileStatus } from "@/lib/data/actions/profiles";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import type { Profile, GuardStatus } from "@/lib/types";
 
 interface GuardsClientProps {
   guards: Profile[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 function guardTone(status: GuardStatus): "green" | "amber" | "gray" {
@@ -38,8 +42,9 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function GuardsClient({ guards }: GuardsClientProps) {
+export function GuardsClient({ guards, total, page, pageSize }: GuardsClientProps) {
   const router = useRouter();
+  const { setPage } = usePagination({ defaultPageSize: pageSize });
   const [isPending, startTransition] = useTransition();
 
   const rows = guards.map((guard) => [
@@ -111,6 +116,7 @@ export function GuardsClient({ guards }: GuardsClientProps) {
           <DataTable
             columns={["Guard", "Zone", "Phone", "Shifts", "Status", ""]}
             rows={rows}
+            pagination={{ page, pageSize, total, onPageChange: setPage }}
           />
         </div>
       </Card>

@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getReports } from "@/lib/data/reports";
-import { getIncidents } from "@/lib/data/incidents";
 import { ReportsClient } from "./reports-client";
 
 export default async function ReportsPage() {
@@ -20,10 +19,16 @@ export default async function ReportsPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const [reports, allIncidents] = await Promise.all([
+  // Fetch reports and recent incidents (bounded to last 6 months for stats)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const supabaseForStats = await createServerSupabaseClient();
+  const [reports, { data: incidentsData }] = await Promise.all([
     getReports(),
-    getIncidents(),
+    supabaseForStats.from('incidents').select('*').gte('started_at', sixMonthsAgo.toISOString()).order('started_at', { ascending: false }).limit(1000),
   ]);
+  const allIncidents = incidentsData ?? [];
 
   // Compute report stats
   const totalReports = reports.length;

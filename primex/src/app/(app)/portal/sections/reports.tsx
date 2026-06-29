@@ -19,9 +19,12 @@ function formatDate(dateStr: string): string {
   })
 }
 
+const PAGE_SIZE = 15
+
 export function ClientReports({ reports }: ClientReportsProps) {
   const [isPending, startTransition] = useTransition()
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   function handleDownload(report: Report) {
     setDownloadingId(report.id)
@@ -42,7 +45,9 @@ export function ClientReports({ reports }: ClientReportsProps) {
 
   const columns = ['Report', 'Period', 'Incidents', 'Generated', '']
 
-  const rows = reports.map((r) => [
+  const paginatedReports = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const rows = paginatedReports.map((r) => [
     <div key={`name-${r.id}`} className="flex items-center gap-2.5">
       <div className="w-8 h-8 rounded-lg bg-p-blue-softer flex items-center justify-center flex-shrink-0">
         <FileText size={14} className="text-p-blue" strokeWidth={2} />
@@ -83,7 +88,11 @@ export function ClientReports({ reports }: ClientReportsProps) {
             No reports available yet.
           </p>
         ) : (
-          <DataTable columns={columns} rows={rows} />
+          <DataTable
+            columns={columns}
+            rows={rows}
+            pagination={{ page, pageSize: PAGE_SIZE, total: reports.length, onPageChange: setPage }}
+          />
         )}
       </Card>
     </div>

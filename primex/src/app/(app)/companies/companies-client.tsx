@@ -50,8 +50,11 @@ interface CompaniesClientProps {
   companies: Company[];
 }
 
+const PAGE_SIZE = 25;
+
 export function CompaniesClient({ companies }: CompaniesClientProps) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
@@ -82,8 +85,10 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
     setSelectedCompany(null);
   }
 
+  const paginatedFiltered = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // Build table rows
-  const rows = filtered.map((company) => [
+  const rows = paginatedFiltered.map((company) => [
     // Company name
     <span key="name" className="flex items-center gap-2.5">
       <span className="w-7 h-7 rounded-lg bg-surface-subtle border border-border flex items-center justify-center flex-shrink-0">
@@ -157,7 +162,7 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
           <SearchInput
             placeholder="Search companies..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
 
@@ -165,6 +170,7 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
           <DataTable
             columns={["Company", "Type", "Sites", "Users", "Status", ""]}
             rows={rows}
+            pagination={{ page, pageSize: PAGE_SIZE, total: filtered.length, onPageChange: (p) => setPage(p) }}
           />
         </div>
 

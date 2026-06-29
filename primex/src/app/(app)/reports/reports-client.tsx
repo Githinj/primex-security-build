@@ -76,10 +76,13 @@ interface ReportsClientProps {
   incidentTypes: IncidentTypeEntry[];
 }
 
+const PAGE_SIZE = 25;
+
 export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes }: ReportsClientProps) {
   const [_dateRange, setDateRange] = useState("Last 6 months");
   const [isPending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   function handleDownload(report: Report) {
     setDownloadingId(report.id);
@@ -98,7 +101,9 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
     });
   }
 
-  const reportRows = reports.map((report: Report) => [
+  const paginatedReports = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const reportRows = paginatedReports.map((report: Report) => [
     // Report name
     <span key="name" className="flex items-center gap-2.5">
       <span className="w-7 h-7 rounded-lg bg-p-blue-soft flex items-center justify-center flex-shrink-0">
@@ -246,6 +251,7 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
         <DataTable
           columns={["Report", "Scope", "Type", "Incidents", "Date", "Size", ""]}
           rows={reportRows}
+          pagination={{ page, pageSize: PAGE_SIZE, total: reports.length, onPageChange: setPage }}
         />
       </Card>
     </div>

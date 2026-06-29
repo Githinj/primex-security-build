@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getDashboardStats } from "@/lib/data/dashboard";
-import { getIncidents } from "@/lib/data/incidents";
 import { getSites } from "@/lib/data/sites";
 import { getGuards } from "@/lib/data/guards";
 import { getCompanies } from "@/lib/data/companies";
@@ -23,9 +22,16 @@ export default async function DashboardPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const [stats, incidents, sites, guards, companies] = await Promise.all([
+  // Fetch only 4 recent incidents for the table (not all incidents)
+  const incidentsQuery = supabase
+    .from('incidents')
+    .select('*')
+    .order('started_at', { ascending: false })
+    .limit(4);
+
+  const [stats, { data: incidents }, sites, guards, companies] = await Promise.all([
     getDashboardStats(),
-    getIncidents(),
+    incidentsQuery,
     getSites(),
     getGuards(),
     getCompanies(),
@@ -34,7 +40,7 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       stats={stats}
-      incidents={incidents}
+      incidents={incidents ?? []}
       sites={sites}
       guards={guards}
       companies={companies}

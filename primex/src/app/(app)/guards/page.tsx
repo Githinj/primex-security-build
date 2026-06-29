@@ -4,7 +4,12 @@ import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getGuards } from "@/lib/data/guards";
 import { GuardsClient } from "./guards-client";
 
-export default async function GuardsPage() {
+interface Props {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function GuardsPage({ searchParams }: Props) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -19,7 +24,17 @@ export default async function GuardsPage() {
     redirect(getRoleHomePath(profile?.role ?? "client"));
   }
 
-  const guards = await getGuards();
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = 25;
 
-  return <GuardsClient guards={guards} />;
+  const guardsResult = await getGuards({ page, pageSize });
+
+  return (
+    <GuardsClient
+      guards={guardsResult.data}
+      total={guardsResult.total}
+      page={guardsResult.page}
+      pageSize={guardsResult.pageSize}
+    />
+  );
 }
