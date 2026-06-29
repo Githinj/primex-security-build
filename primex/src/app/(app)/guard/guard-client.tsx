@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button, Pill, Label, LiveDot } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { updateIncidentStatus } from '@/lib/data/actions/incidents'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Incident, Site, Profile } from '@/lib/types'
 import {
   MapPin,
@@ -13,6 +15,7 @@ import {
   CheckCircle2,
   Upload,
   Phone,
+  LogOut,
 } from 'lucide-react'
 
 type GuardStatus = 'assigned' | 'accepted' | 'enroute' | 'arrived' | 'resolved'
@@ -106,11 +109,19 @@ interface Props {
 }
 
 export function GuardClient({ profile, incidents, sites }: Props) {
+  const router = useRouter()
   const [view, setView] = useState<'list' | 'detail'>('list')
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [status, setStatus] = useState<GuardStatus>('assigned')
   const [isPending, startTransition] = useTransition()
   const [resolvedTime, setResolvedTime] = useState<string | null>(null)
+
+  async function handleLogout() {
+    const supabase = createBrowserSupabaseClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   const siteMap = new Map(sites.map((s) => [s.id, s]))
   const firstName = profile.full_name?.split(' ')[0] ?? 'Guard'
@@ -157,6 +168,7 @@ export function GuardClient({ profile, incidents, sites }: Props) {
             incidents={incidents}
             siteMap={siteMap}
             onOpen={openDetail}
+            onLogout={handleLogout}
           />
         ) : selectedIncident ? (
           <DetailView
@@ -181,18 +193,25 @@ function ListView({
   incidents,
   siteMap,
   onOpen,
+  onLogout,
 }: {
   firstName: string
   incidents: Incident[]
   siteMap: Map<string, Site>
   onOpen: (i: Incident) => void
+  onLogout: () => void
 }) {
   return (
     <>
-      {/* Date header */}
-      <p className="text-[10.5px] text-ink-4 uppercase tracking-[0.12em] font-sans mb-3">
-        {formatDate()}
-      </p>
+      {/* Date header + logout */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10.5px] text-ink-4 uppercase tracking-[0.12em] font-sans">
+          {formatDate()}
+        </p>
+        <Button variant="ghost" size="sm" icon={LogOut} onClick={onLogout}>
+          Log out
+        </Button>
+      </div>
 
       {/* Greeting */}
       <h1 className="font-serif text-[26px] font-bold text-ink leading-tight mb-6">
@@ -279,6 +298,8 @@ function DetailView({
   onAdvance: () => void
 }) {
   const tone = severityTone(incident.severity)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachedFile, setAttachedFile] = useState<string | null>(null)
 
   if (status === 'resolved') {
     return (
@@ -359,10 +380,20 @@ function DetailView({
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" icon={Navigation}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Navigation}
+              onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site.address)}`, '_blank')}
+            >
               Directions
             </Button>
-            <Button variant="secondary" size="sm" icon={Phone}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Phone}
+              onClick={() => window.open(`tel:000`, '_self')}
+            >
               Call site
             </Button>
           </div>
@@ -386,10 +417,24 @@ function DetailView({
           placeholder="Add notes..."
           className="w-full mt-2 px-3 py-2 text-sm font-sans bg-surface text-ink border border-border rounded-lg placeholder:text-ink-4 outline-none focus:border-p-blue transition-colors duration-150 min-h-[70px] resize-y"
         />
-        <div className="mt-2">
-          <Button variant="secondary" size="sm" icon={Upload}>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) setAttachedFile(file.name)
+            }}
+          />
+          <Button variant="secondary" size="sm" icon={Upload} onClick={() => fileInputRef.current?.click()}>
             Attach photo
           </Button>
+          {attachedFile && (
+            <span className="text-xs text-ink-3 font-sans truncate max-w-[150px]">{attachedFile}</span>
+          )}
         </div>
       </div>
 

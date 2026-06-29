@@ -14,6 +14,7 @@ import {
 import { Button, Pill, Label, Card, LiveDot, KV } from '@/components/ui'
 import { Timeline } from '@/components/incidents/timeline'
 import { AssignGuardModal } from '@/components/dispatch/assign-guard-modal'
+import { CreateAlertModal } from '@/components/alerts/create-alert-modal'
 import { cn, severityTone } from '@/lib/utils'
 import { updateAlertStatus } from '@/lib/data/actions/alerts'
 import { useRealtimeAlerts } from '@/lib/hooks/use-realtime-alerts'
@@ -60,6 +61,7 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
   const [filter, setFilter] = useState<FilterSeverity>('All')
   const [selectedId, setSelectedId] = useState<string | null>(alerts[0]?.id ?? null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [createAlertOpen, setCreateAlertOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   useRealtimeAlerts()
@@ -99,7 +101,7 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
                   </span>
                 </h2>
               </div>
-              <Button variant="primary" size="sm" icon={Bell}>
+              <Button variant="primary" size="sm" icon={Bell} onClick={() => setCreateAlertOpen(true)}>
                 Create alert
               </Button>
             </div>
@@ -326,6 +328,16 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
         onClose={() => setModalOpen(false)}
         alert={selected}
         guards={guards}
+      />
+
+      {/* Create alert modal */}
+      <CreateAlertModal
+        open={createAlertOpen}
+        onClose={() => setCreateAlertOpen(false)}
+        mode="dispatcher"
+        companies={[]}
+        sites={sites}
+        cameras={cameras}
       />
     </>
   )

@@ -4,9 +4,18 @@ import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { PageStrip } from '@/components/layout/page-strip'
+import { useProfile } from '@/components/providers/profile-provider'
+
+const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard']
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const profile = useProfile()
+  const hideGlobalNav = SELF_NAV_ROLES.includes(profile?.role ?? '')
+
+  if (hideGlobalNav) {
+    return <div className="flex h-screen overflow-hidden">{children}</div>
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">

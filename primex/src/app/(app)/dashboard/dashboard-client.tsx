@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Users,
   Filter,
-  Plus,
   ArrowUpRight,
   ArrowRight,
 } from "lucide-react";
@@ -26,6 +25,7 @@ import {
   PhaseTag,
 } from "@/components/ui";
 
+import { useScope } from "@/components/providers/scope-provider";
 import type { DashboardStats } from "@/lib/data/dashboard";
 import type { Incident, Site, Profile, Company } from "@/lib/types";
 import { severityTone, incidentTone } from "@/lib/utils";
@@ -65,8 +65,40 @@ export function DashboardClient({
   guards,
   companies,
 }: DashboardClientProps) {
+  const { scopeCompanyId } = useScope();
+
+  // Filter data by selected company scope
+  const scopedSites = scopeCompanyId
+    ? sites.filter((s) => s.company_id === scopeCompanyId)
+    : sites;
+  const scopedSiteIds = new Set(scopedSites.map((s) => s.id));
+  const scopedIncidents = scopeCompanyId
+    ? incidents.filter((i) => scopedSiteIds.has(i.site_id))
+    : incidents;
+  const scopedCompanies = scopeCompanyId
+    ? companies.filter((c) => c.id === scopeCompanyId)
+    : companies;
+  const scopedCamerasByCompany = scopeCompanyId
+    ? stats.camerasByCompany.filter((c) => c.company.id === scopeCompanyId)
+    : stats.camerasByCompany;
+
+  // Recompute stats for scoped view
+  const scopedStats = scopeCompanyId
+    ? {
+        ...stats,
+        totalCompanies: scopedCompanies.length,
+        totalSites: scopedSites.length,
+        camerasOnline: scopedCamerasByCompany.reduce((sum, c) => sum + c.online, 0),
+        camerasOffline: scopedCamerasByCompany.reduce((sum, c) => sum + c.offline, 0),
+        openAlerts: scopedIncidents.length, // approximate
+        activeIncidents: scopedIncidents.filter((i) => i.status !== 'Resolved' && i.status !== 'Closed').length,
+        criticalAlerts: stats.criticalAlerts.filter((a) => scopedSiteIds.has(a.site_id)),
+        camerasByCompany: scopedCamerasByCompany,
+      }
+    : stats;
+
   // Incident table rows (first 4 incidents)
-  const incidentRows = incidents.slice(0, 4).map((incident) => {
+  const incidentRows = scopedIncidents.slice(0, 4).map((incident) => {
     const site = sites.find((s) => s.id === incident.site_id);
     const guard = incident.guard_id
       ? guards.find((g) => g.id === incident.guard_id)
@@ -102,7 +134,7 @@ export function DashboardClient({
     ];
   });
 
-  const totalCameras = stats.camerasOnline + stats.camerasOffline;
+  const totalCameras = scopedStats.camerasOnline + scopedStats.camerasOffline;
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
@@ -110,16 +142,11 @@ export function DashboardClient({
       {/* Page header */}
       <PageTitle
         title="Operational overview"
-        sub="A live view across every company, site, and camera on Primex."
+        sub={scopeCompanyId ? `Filtered view for selected company.` : "A live view across every company, site, and camera on Primex."}
         actions={
-          <>
-            <Button variant="secondary" size="sm" icon={Filter}>
-              Last 24 hours
-            </Button>
-            <Button variant="primary" size="sm" icon={Plus}>
-              New company
-            </Button>
-          </>
+          <Button variant="secondary" size="sm" icon={Filter}>
+            Last 24 hours
+          </Button>
         }
       />
 
@@ -127,43 +154,43 @@ export function DashboardClient({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
         <StatCard
           label="Companies"
-          value={String(stats.totalCompanies)}
+          value={String(scopedStats.totalCompanies)}
           icon={Briefcase}
           supporting={
             <>
-              <Pill tone="green" dot size="sm">{stats.totalCompanies} total</Pill>
+              <Pill tone="green" dot size="sm">{scopedStats.totalCompanies} total</Pill>
             </>
           }
         />
         <StatCard
           label="Active sites"
-          value={String(stats.totalSites)}
+          value={String(scopedStats.totalSites)}
           icon={MapPin}
           supporting={
             <>
-              <Pill tone="green" dot size="sm">{stats.totalSites} total</Pill>
+              <Pill tone="green" dot size="sm">{scopedStats.totalSites} total</Pill>
             </>
           }
         />
         <StatCard
           label="Cameras online"
-          value={`${stats.camerasOnline}/${totalCameras}`}
+          value={`${scopedStats.camerasOnline}/${totalCameras}`}
           icon={Camera}
           supporting={
             <>
-              <Pill tone="green" dot size="sm">{stats.camerasOnline} online</Pill>
-              <Pill tone="red" dot size="sm">{stats.camerasOffline} offline</Pill>
+              <Pill tone="green" dot size="sm">{scopedStats.camerasOnline} online</Pill>
+              <Pill tone="red" dot size="sm">{scopedStats.camerasOffline} offline</Pill>
             </>
           }
         />
         <StatCard
           label="Open alerts"
-          value={String(stats.openAlerts)}
+          value={String(scopedStats.openAlerts)}
           icon={Bell}
           accent="text-p-red"
           supporting={
             <>
-              <Pill tone="red" dot size="sm">{stats.openAlerts} open</Pill>
+              <Pill tone="red" dot size="sm">{scopedStats.openAlerts} open</Pill>
             </>
           }
         />
@@ -173,37 +200,37 @@ export function DashboardClient({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 mb-4 sm:mb-8">
         <StatCard
           label="Active incidents"
-          value={String(stats.activeIncidents)}
+          value={String(scopedStats.activeIncidents)}
           icon={AlertTriangle}
           supporting={
             <>
-              <Pill tone="amber" dot size="sm">{stats.activeIncidents} active</Pill>
+              <Pill tone="amber" dot size="sm">{scopedStats.activeIncidents} active</Pill>
             </>
           }
         />
         <StatCard
           label="Avg response"
-          value={stats.avgResponseMinutes > 0 ? `${stats.avgResponseMinutes}m` : '—'}
+          value={scopedStats.avgResponseMinutes > 0 ? `${scopedStats.avgResponseMinutes}m` : '—'}
           icon={Clock}
           supporting={
-            <Pill tone="blue" dot size="sm">from {stats.resolvedIncidentCount} incidents</Pill>
+            <Pill tone="blue" dot size="sm">from {scopedStats.resolvedIncidentCount} incidents</Pill>
           }
         />
         <StatCard
           label="Resolved today"
-          value={String(stats.resolvedToday)}
+          value={String(scopedStats.resolvedToday)}
           icon={CheckCircle2}
           supporting={
-            <Pill tone="green" dot size="sm">{stats.resolvedToday} closed</Pill>
+            <Pill tone="green" dot size="sm">{scopedStats.resolvedToday} closed</Pill>
           }
         />
         <StatCard
           label="Guards on duty"
-          value={String(stats.guardsOnDuty)}
+          value={String(scopedStats.guardsOnDuty)}
           icon={Users}
           supporting={
             <>
-              <Pill tone="green" dot size="sm">{stats.guardsOnDuty} on duty</Pill>
+              <Pill tone="green" dot size="sm">{scopedStats.guardsOnDuty} on duty</Pill>
             </>
           }
         />
@@ -249,10 +276,10 @@ export function DashboardClient({
 
           {/* Alert feed */}
           <div className="flex flex-col">
-            {stats.criticalAlerts.length === 0 ? (
+            {scopedStats.criticalAlerts.length === 0 ? (
               <p className="px-[22px] py-6 text-sm text-ink-3 font-sans">No critical alerts.</p>
             ) : (
-              stats.criticalAlerts.map((alert) => {
+              scopedStats.criticalAlerts.map((alert) => {
                 const site = sites.find((s) => s.id === alert.site_id);
                 return (
                   <div key={alert.id} className="flex gap-3 px-[16px] py-[16px] border-b border-border">
@@ -307,7 +334,7 @@ export function DashboardClient({
 
         {/* Company columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.camerasByCompany.map(({ company, online, offline, maintenance }, idx) => {
+          {scopedStats.camerasByCompany.map(({ company, online, offline, maintenance }, idx) => {
             const statusTone =
               company.status === "Active"
                 ? "green"
@@ -319,7 +346,7 @@ export function DashboardClient({
               <div
                 key={company.id}
                 className={`flex flex-col px-[22px] py-[22px] border-b sm:border-b lg:border-b-0 border-border ${
-                  idx < stats.camerasByCompany.length - 1 ? "lg:border-r" : ""
+                  idx < scopedStats.camerasByCompany.length - 1 ? "lg:border-r" : ""
                 }`}
               >
                 {/* Company name + status pill */}
