@@ -1,8 +1,25 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { applyPagination, toPaginatedResult } from './pagination'
+import type { PaginationParams, PaginatedResult } from './pagination'
 import type { Incident } from '@/lib/types'
 
-export async function getIncidents(siteId?: string): Promise<Incident[]> {
+export async function getIncidents(siteId?: string): Promise<Incident[]>
+export async function getIncidents(siteId: string | undefined, pagination: PaginationParams): Promise<PaginatedResult<Incident>>
+export async function getIncidents(siteId?: string, pagination?: PaginationParams) {
   const supabase = await createServerSupabaseClient()
+
+  if (pagination) {
+    let query = supabase
+      .from('incidents')
+      .select('*', { count: 'exact' })
+      .order('started_at', { ascending: false })
+    if (siteId) query = query.eq('site_id', siteId)
+    query = applyPagination(query, pagination)
+    const { data, error, count } = await query
+    if (error) throw error
+    return toPaginatedResult(data ?? [], count, pagination)
+  }
+
   let query = supabase.from('incidents').select('*').order('started_at', { ascending: false })
   if (siteId) query = query.eq('site_id', siteId)
   const { data, error } = await query
