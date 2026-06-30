@@ -24,11 +24,33 @@ export default async function AppLayout({
     profile = data
   }
 
-  // Fetch companies for scope dropdown (used by super_admin)
+  // Fetch companies for scope dropdown + nav counts (super_admin only)
   let companies: Company[] = []
+  let navCounts: Record<string, number> = {}
   if (profile?.role === 'super_admin') {
     try {
-      companies = await getCompanies()
+      const [companiesData, counts] = await Promise.all([
+        getCompanies(),
+        Promise.all([
+          supabase.from('companies').select('*', { count: 'exact', head: true }),
+          supabase.from('sites').select('*', { count: 'exact', head: true }),
+          supabase.from('cameras').select('*', { count: 'exact', head: true }),
+          supabase.from('alerts').select('*', { count: 'exact', head: true }).in('status', ['New', 'Reviewing', 'Escalated']),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['Open', 'In Progress', 'Dispatched']),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'guard'),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        ]),
+      ])
+      companies = companiesData
+      navCounts = {
+        companies: counts[0].count ?? 0,
+        sites: counts[1].count ?? 0,
+        cameras: counts[2].count ?? 0,
+        alerts: counts[3].count ?? 0,
+        incidents: counts[4].count ?? 0,
+        guards: counts[5].count ?? 0,
+        team: counts[6].count ?? 0,
+      }
     } catch {
       companies = []
     }
@@ -37,7 +59,7 @@ export default async function AppLayout({
   return (
     <ProfileProvider profile={profile}>
       <ScopeProvider companies={companies}>
-        <AppShell>{children}</AppShell>
+        <AppShell navCounts={navCounts}>{children}</AppShell>
       </ScopeProvider>
     </ProfileProvider>
   )

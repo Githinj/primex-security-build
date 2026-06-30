@@ -30,20 +30,20 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  count?: number;
+  countKey?: string;
   roles: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard",   href: "/dashboard",  icon: LayoutDashboard, roles: ["super_admin"] },
-  { label: "Companies",   href: "/companies",  icon: Building2,   count: 4, roles: ["super_admin"] },
-  { label: "Sites",       href: "/sites",      icon: MapPin,      count: 6, roles: ["super_admin"] },
-  { label: "Cameras",     href: "/cameras",    icon: Camera,      count: 86, roles: ["super_admin"] },
-  { label: "Alerts",      href: "/alerts",     icon: Bell,        count: 4, roles: ["super_admin"] },
-  { label: "Incidents",   href: "/incidents",  icon: AlertTriangle, count: 3, roles: ["super_admin"] },
-  { label: "Guards",      href: "/guards",     icon: Users,       count: 4, roles: ["super_admin"] },
+  { label: "Companies",   href: "/companies",  icon: Building2,   countKey: "companies", roles: ["super_admin"] },
+  { label: "Sites",       href: "/sites",      icon: MapPin,      countKey: "sites", roles: ["super_admin"] },
+  { label: "Cameras",     href: "/cameras",    icon: Camera,      countKey: "cameras", roles: ["super_admin"] },
+  { label: "Alerts",      href: "/alerts",     icon: Bell,        countKey: "alerts", roles: ["super_admin"] },
+  { label: "Incidents",   href: "/incidents",  icon: AlertTriangle, countKey: "incidents", roles: ["super_admin"] },
+  { label: "Guards",      href: "/guards",     icon: Users,       countKey: "guards", roles: ["super_admin"] },
   { label: "Reports",     href: "/reports",    icon: BarChart3, roles: ["super_admin"] },
-  { label: "Team",        href: "/team",       icon: UserCheck, roles: ["super_admin", "company_manager"] },
+  { label: "Team",        href: "/team",       icon: UserCheck, countKey: "team", roles: ["super_admin", "company_manager"] },
   { label: "Audit log",   href: "/audit",      icon: ScrollText, roles: ["super_admin"] },
   { label: "Settings",    href: "/settings",   icon: Settings, roles: ["super_admin", "company_manager"] },
 ];
@@ -59,7 +59,7 @@ function roleLabel(role: string) {
   return map[role] ?? role;
 }
 
-export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
+export function Sidebar({ onClose, navCounts = {} }: { onClose?: () => void; navCounts?: Record<string, number> } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const profile = useProfile();
@@ -214,7 +214,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                   className={isActive ? "text-p-blue" : "text-ink-3"}
                 />
                 <span className="flex-1 truncate">{item.label}</span>
-                {item.count !== undefined && (
+                {item.countKey && navCounts[item.countKey] !== undefined && (
                   <span
                     className={[
                       "text-[11px] font-semibold px-1.5 py-0.5 rounded-full leading-none",
@@ -223,7 +223,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                         : "bg-surface-subtle text-ink-3",
                     ].join(" ")}
                   >
-                    {item.count}
+                    {navCounts[item.countKey]}
                   </span>
                 )}
               </Link>

@@ -8,7 +8,12 @@ import { useProfile } from '@/components/providers/profile-provider'
 
 const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard']
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+interface AppShellProps {
+  children: React.ReactNode
+  navCounts?: Record<string, number>
+}
+
+export function AppShell({ children, navCounts }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const profile = useProfile()
   const hideGlobalNav = SELF_NAV_ROLES.includes(profile?.role ?? '')
@@ -21,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar — always visible */}
       <div className="hidden lg:flex w-60 flex-shrink-0">
-        <Sidebar />
+        <Sidebar navCounts={navCounts} />
       </div>
 
       {/* Mobile sidebar — overlay when open */}
@@ -35,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
         {/* Sidebar panel */}
         <div className="relative z-10 w-60 flex-shrink-0">
-          <Sidebar onClose={() => setSidebarOpen(false)} />
+          <Sidebar onClose={() => setSidebarOpen(false)} navCounts={navCounts} />
         </div>
       </div>
 
