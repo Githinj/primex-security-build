@@ -1,9 +1,50 @@
 'use server'
 
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { UserRole } from '@/lib/types'
 import { requireRole } from '@/lib/auth/require-role'
+import { getRoleHomePath } from '@/lib/auth/role-redirect'
+
+interface LoginResult {
+  success: boolean
+  error?: string
+  redirectTo?: string
+}
+
+export async function loginAction(email: string, password: string): Promise<LoginResult> {
+  try {
+    const supabase = await createServerSupabaseClient()
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authError) {
+      return { success: false, error: authError.message }
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    let redirectTo = '/dashboard'
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      redirectTo = getRoleHomePath(profile?.role ?? 'client')
+    }
+
+    return { success: true, redirectTo }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Login failed. Please try again.',
+    }
+  }
+}
 
 interface InviteUserParams {
   email: string

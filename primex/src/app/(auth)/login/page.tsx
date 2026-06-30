@@ -6,18 +6,16 @@ import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { getRoleHomePath } from "@/lib/auth/role-redirect";
+import { loginAction } from "@/lib/data/actions/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
 
   async function handleForgotPassword() {
     setError(null);
@@ -26,6 +24,7 @@ export default function LoginPage() {
       setError("Please enter your email first");
       return;
     }
+    const supabase = createBrowserSupabaseClient();
     await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/callback?type=recovery`,
     });
@@ -38,36 +37,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const result = await loginAction(email, password);
 
-      if (authError) {
-        setError(authError.message);
+      if (!result.success) {
+        setError(result.error ?? "Login failed");
         setLoading(false);
         return;
       }
 
-      // Fetch profile to determine role-based redirect
-      const { data: { user } } = await supabase.auth.getUser();
-      let homePath = '/dashboard';
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        homePath = getRoleHomePath(profile?.role ?? 'client');
-      }
-
-      router.push(homePath);
+      router.push(result.redirectTo ?? "/dashboard");
       router.refresh();
     } catch (err) {
       setError(
         err instanceof Error
-          ? `Connection error: ${err.message}. Please check your internet connection and try again.`
-          : 'An unexpected error occurred. Please try again.'
+          ? `Connection error: ${err.message}`
+          : "An unexpected error occurred. Please try again."
       );
       setLoading(false);
     }
