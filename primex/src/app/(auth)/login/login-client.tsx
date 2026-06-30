@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
@@ -9,10 +9,14 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export function LoginClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get("error")
+  );
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
@@ -35,46 +39,34 @@ export function LoginClient() {
     setError(null);
     setLoading(true);
 
-    // Retry loop — Supabase free tier may need time to wake up
-    const MAX_RETRIES = 8;
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
+    // Try JS fetch first
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-        const result = await res.json();
+      const result = await res.json();
 
-        // If Supabase is waking up, wait and retry
-        if (result.error === "__WAKING_UP__") {
-          setError(`Starting up... attempt ${attempt + 1}/${MAX_RETRIES}`);
-          await new Promise((r) => setTimeout(r, 3000));
-          continue;
-        }
-
-        if (!result.success) {
-          setError(result.error ?? "Invalid email or password");
-          setLoading(false);
-          return;
-        }
-
-        // Success — redirect
-        router.push(result.redirectTo ?? "/dashboard");
-        router.refresh();
+      if (!result.success) {
+        setError(result.error ?? "Invalid email or password");
+        setLoading(false);
         return;
-      } catch {
-        // Fetch itself failed — wait and retry
-        if (attempt < MAX_RETRIES - 1) {
-          setError(`Connecting... attempt ${attempt + 1}/${MAX_RETRIES}`);
-          await new Promise((r) => setTimeout(r, 3000));
-          continue;
-        }
+      }
+
+      router.push(result.redirectTo ?? "/dashboard");
+      router.refresh();
+      return;
+    } catch {
+      // JS fetch failed — submit as native HTML form (no JS needed)
+      if (formRef.current) {
+        formRef.current.submit();
+        return;
       }
     }
 
-    setError("Unable to connect. Please check your internet and try again.");
+    setError("Unable to connect. Please try again.");
     setLoading(false);
   }
 
@@ -103,14 +95,25 @@ export function LoginClient() {
             reporting.
           </p>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/*
+            Form has action="/api/auth/login" method="POST" as native fallback.
+            JS handler calls e.preventDefault() and uses fetch. If fetch fails,
+            it calls form.submit() which does a native POST (no JS needed).
+          */}
+          <form
+            ref={formRef}
+            action="/api/auth/login"
+            method="POST"
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-4"
+          >
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-ink-2 font-sans">
                 Email address
               </label>
               <TextInput
                 type="email"
+                name="email"
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setEmail(e.target.value)
@@ -125,6 +128,7 @@ export function LoginClient() {
               </label>
               <TextInput
                 type="password"
+                name="password"
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setPassword(e.target.value)

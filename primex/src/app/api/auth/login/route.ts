@@ -2,34 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { getRoleHomePath } from '@/lib/auth/role-redirect'
 
+// POST with JSON body (used by fetch)
 export async function POST(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  if (!url || !anonKey) {
-    return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 })
+  let email: string, password: string
+
+  // Support both JSON and form-encoded bodies
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const body = await request.json()
+    email = body.email
+    password = body.password
+  } else {
+    const formData = await request.formData()
+    email = formData.get('email') as string
+    password = formData.get('password') as string
   }
 
-  let body: { email?: string; password?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 })
-  }
-
-  const { email, password } = body
   if (!email || !password) {
-    return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
+    if (contentType.includes('application/json')) {
+      return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
+    }
+    return NextResponse.redirect(new URL('/login?error=Email+and+password+are+required', request.url))
   }
 
   try {
-    const response = NextResponse.json({ success: true })
+    const response = contentType.includes('application/json')
+      ? NextResponse.json({ success: true })
+      : NextResponse.redirect(new URL('/dashboard', request.url))
 
     const supabase = createServerClient(url, anonKey, {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -44,7 +50,11 @@ export async function POST(request: NextRequest) {
       const friendly = authError.message === 'Invalid login credentials'
         ? 'Invalid email or password'
         : authError.message
-      return NextResponse.json({ success: false, error: friendly }, { status: 401 })
+
+      if (contentType.includes('application/json')) {
+        return NextResponse.json({ success: false, error: friendly }, { status: 401 })
+      }
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(friendly)}`, request.url))
     }
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -58,17 +68,25 @@ export async function POST(request: NextRequest) {
       redirectTo = getRoleHomePath(profile?.role ?? 'client')
     }
 
-    const successResponse = NextResponse.json({ success: true, redirectTo })
-    response.cookies.getAll().forEach(cookie => {
-      successResponse.cookies.set(cookie.name, cookie.value)
-    })
+    if (contentType.includes('application/json')) {
+      const successResponse = NextResponse.json({ success: true, redirectTo })
+      response.cookies.getAll().forEach(cookie => {
+        successResponse.cookies.set(cookie.name, cookie.value)
+      })
+      return successResponse
+    }
 
-    return successResponse
+    // Form POST: redirect with auth cookies
+    const redirectResponse = NextResponse.redirect(new URL(redirectTo, request.url))
+    response.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({
-      success: false,
-      error: message.includes('fetch') ? '__WAKING_UP__' : `Login error: ${message}`,
-    }, { status: message.includes('fetch') ? 503 : 500 })
+    const message = err instanceof Error ? err.message : 'Login failed'
+    if (contentType.includes('application/json')) {
+      return NextResponse.json({ success: false, error: message }, { status: 500 })
+    }
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url))
   }
 }
