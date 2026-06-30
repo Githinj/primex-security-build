@@ -6,8 +6,8 @@ import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { loginAction } from "@/lib/data/actions/auth";
 
+// v5 — API route login
 export default function LoginPage() {
   const router = useRouter();
 
@@ -37,7 +37,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await loginAction(email, password);
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await res.json();
 
       if (!result.success) {
         setError(result.error ?? "Login failed");
