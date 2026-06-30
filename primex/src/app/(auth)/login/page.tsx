@@ -37,31 +37,40 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      setError(authError.message);
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch profile to determine role-based redirect
+      const { data: { user } } = await supabase.auth.getUser();
+      let homePath = '/dashboard';
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        homePath = getRoleHomePath(profile?.role ?? 'client');
+      }
+
+      router.push(homePath);
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Connection error: ${err.message}. Please check your internet connection and try again.`
+          : 'An unexpected error occurred. Please try again.'
+      );
       setLoading(false);
-      return;
     }
-
-    // Fetch profile to determine role-based redirect
-    const { data: { user } } = await supabase.auth.getUser();
-    let homePath = '/dashboard';
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      homePath = getRoleHomePath(profile?.role ?? 'client');
-    }
-
-    router.push(homePath);
-    router.refresh();
   }
 
   return (
