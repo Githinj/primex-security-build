@@ -35,109 +35,47 @@ export function LoginClient() {
     setError(null);
     setLoading(true);
 
-    // Strategy 1: Server-side API route (avoids cross-origin Supabase call)
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    // Retry loop — Supabase free tier may need time to wake up
+    const MAX_RETRIES = 8;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
 
-      const result = await res.json();
+        const result = await res.json();
 
-      if (!result.success) {
-        const debugInfo = result.debug ? ` [${JSON.stringify(result.debug)}]` : '';
-        setError((result.error ?? "Invalid email or password") + debugInfo);
-        setLoading(false);
+        // If Supabase is waking up, wait and retry
+        if (result.error === "__WAKING_UP__") {
+          setError(`Starting up... attempt ${attempt + 1}/${MAX_RETRIES}`);
+          await new Promise((r) => setTimeout(r, 3000));
+          continue;
+        }
+
+        if (!result.success) {
+          setError(result.error ?? "Invalid email or password");
+          setLoading(false);
+          return;
+        }
+
+        // Success — redirect
+        router.push(result.redirectTo ?? "/dashboard");
+        router.refresh();
         return;
+      } catch {
+        // Fetch itself failed — wait and retry
+        if (attempt < MAX_RETRIES - 1) {
+          setError(`Connecting... attempt ${attempt + 1}/${MAX_RETRIES}`);
+          await new Promise((r) => setTimeout(r, 3000));
+          continue;
+        }
       }
-
-      router.push(result.redirectTo ?? "/dashboard");
-      router.refresh();
-      return;
-    } catch {
-      // API route failed — try direct Supabase
     }
 
-    // Strategy 2: Direct client-side Supabase auth
-    try {
-      const supabase = createBrowserSupabaseClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) {
-        setError(
-          authError.message === "Invalid login credentials"
-            ? "Invalid email or password"
-            : authError.message
-        );
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        const roleMap: Record<string, string> = {
-          super_admin: "/dashboard",
-          dispatcher: "/dispatcher",
-          guard: "/guard",
-          company_manager: "/manager",
-          client: "/portal",
-        };
-        router.push(roleMap[profile?.role ?? "client"] ?? "/dashboard");
-      } else {
-        router.push("/dashboard");
-      }
-      router.refresh();
-      return;
-    } catch {
-      // Both strategies failed
-    }
-
-    // Strategy 3: Plain XMLHttpRequest as last resort
-    try {
-      const result = await new Promise<{ success: boolean; error?: string; redirectTo?: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/auth/login");
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onload = () => {
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch {
-            reject(new Error("Invalid response"));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.ontimeout = () => reject(new Error("Request timed out"));
-        xhr.timeout = 15000;
-        xhr.send(JSON.stringify({ email, password }));
-      });
-
-      if (!result.success) {
-        setError(result.error ?? "Invalid email or password");
-        setLoading(false);
-        return;
-      }
-
-      window.location.href = result.redirectTo ?? "/dashboard";
-      return;
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? `Unable to sign in: ${err.message}`
-          : "Unable to sign in. Please try again."
-      );
-      setLoading(false);
-    }
+    setError("Unable to connect. Please check your internet and try again.");
+    setLoading(false);
   }
 
   return (
