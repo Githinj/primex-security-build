@@ -6,13 +6,8 @@ export async function POST(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Return diagnostic info if env vars missing
   if (!url || !anonKey) {
-    return NextResponse.json({
-      success: false,
-      error: 'Server configuration error',
-      debug: { hasUrl: !!url, hasKey: !!anonKey },
-    }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 })
   }
 
   let body: { email?: string; password?: string }
@@ -25,25 +20,6 @@ export async function POST(request: NextRequest) {
   const { email, password } = body
   if (!email || !password) {
     return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
-  }
-
-  // Quick health check — if Supabase is paused, return 503 so client can retry
-  try {
-    const healthRes = await fetch(`${url}/auth/v1/health`, {
-      headers: { apikey: anonKey },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!healthRes.ok) {
-      return NextResponse.json({
-        success: false,
-        error: '__WAKING_UP__',
-      }, { status: 503 })
-    }
-  } catch {
-    return NextResponse.json({
-      success: false,
-      error: '__WAKING_UP__',
-    }, { status: 503 })
   }
 
   try {
@@ -65,10 +41,10 @@ export async function POST(request: NextRequest) {
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
-      const friendlyError = authError.message === 'Invalid login credentials'
+      const friendly = authError.message === 'Invalid login credentials'
         ? 'Invalid email or password'
         : authError.message
-      return NextResponse.json({ success: false, error: friendlyError }, { status: 401 })
+      return NextResponse.json({ success: false, error: friendly }, { status: 401 })
     }
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -90,11 +66,9 @@ export async function POST(request: NextRequest) {
     return successResponse
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    const stack = err instanceof Error ? err.stack?.split('\n').slice(0, 3).join(' | ') : undefined
     return NextResponse.json({
       success: false,
-      error: `Authentication error: ${message}`,
-      debug: { errorType: err?.constructor?.name, stack },
-    }, { status: 500 })
+      error: message.includes('fetch') ? '__WAKING_UP__' : `Login error: ${message}`,
+    }, { status: message.includes('fetch') ? 503 : 500 })
   }
 }
