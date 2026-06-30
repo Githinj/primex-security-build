@@ -19,21 +19,24 @@ export function Modal({ open, onClose, children, width = "max-w-lg" }: ModalProp
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto"
       aria-modal="true"
       role="dialog"
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-navy/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-navy/50 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Panel */}
-      <div
-        className={`relative z-10 w-full ${width} bg-surface rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden`}
-      >
-        {children}
+      {/* Scroll container — top-aligned on mobile, centered on desktop */}
+      <div className="flex min-h-full items-start sm:items-center justify-center p-4">
+        {/* Panel */}
+        <div
+          className={`relative z-10 w-full ${width} bg-surface rounded-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] my-4 sm:my-0`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
