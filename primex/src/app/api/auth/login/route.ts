@@ -32,7 +32,10 @@ export async function POST(request: NextRequest) {
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
-      return NextResponse.json({ success: false, error: authError.message }, { status: 401 })
+      const friendlyError = authError.message === 'Invalid login credentials'
+        ? 'Invalid email or password'
+        : authError.message
+      return NextResponse.json({ success: false, error: friendlyError }, { status: 401 })
     }
 
     const { data: { user } } = await supabase.auth.getUser()

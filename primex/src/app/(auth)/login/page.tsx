@@ -7,7 +7,6 @@ import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-// v5 — API route login
 export default function LoginPage() {
   const router = useRouter();
 
@@ -36,6 +35,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    // Try API route first (server-side auth), fall back to client-side
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -46,18 +46,58 @@ export default function LoginPage() {
       const result = await res.json();
 
       if (!result.success) {
-        setError(result.error ?? "Login failed");
+        setError(result.error ?? "Invalid email or password");
         setLoading(false);
         return;
       }
 
       router.push(result.redirectTo ?? "/dashboard");
       router.refresh();
+      return;
+    } catch {
+      // API route fetch failed — fall back to client-side Supabase
+    }
+
+    // Fallback: direct client-side Supabase auth
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(authError.message === "Invalid login credentials"
+          ? "Invalid email or password"
+          : authError.message);
+        setLoading(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        const roleMap: Record<string, string> = {
+          super_admin: "/dashboard",
+          dispatcher: "/dispatcher",
+          guard: "/guard",
+          company_manager: "/manager",
+          client: "/portal",
+        };
+        router.push(roleMap[profile?.role ?? "client"] ?? "/dashboard");
+      } else {
+        router.push("/dashboard");
+      }
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof Error
-          ? `Connection error: ${err.message}`
-          : "An unexpected error occurred. Please try again."
+          ? `Unable to connect: ${err.message}`
+          : "Unable to connect. Please check your internet connection."
       );
       setLoading(false);
     }
