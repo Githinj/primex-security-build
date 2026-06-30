@@ -27,28 +27,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
   }
 
-  // Wake up Supabase (free tier may be paused) with retry
+  // Wake up Supabase (free tier pauses after inactivity, can take ~60s to wake)
   let supabaseAlive = false
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const healthRes = await fetch(`${url}/auth/v1/health`, {
         headers: { apikey: anonKey },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(12000),
       })
       if (healthRes.ok) {
         supabaseAlive = true
         break
       }
     } catch {
-      // Retry after a short delay
-      if (attempt < 2) await new Promise(r => setTimeout(r, 1000))
+      if (attempt < 4) await new Promise(r => setTimeout(r, 2000))
     }
   }
 
   if (!supabaseAlive) {
     return NextResponse.json({
       success: false,
-      error: 'Authentication server is waking up. Please try again in a few seconds.',
+      error: 'The server is starting up. Please wait a moment and try again.',
     }, { status: 503 })
   }
 
