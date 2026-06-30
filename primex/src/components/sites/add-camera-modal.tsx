@@ -187,7 +187,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
           )}
         </div>
       ) : (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <ModalHeader
             eyebrow="Cameras"
             title="Add a new camera"

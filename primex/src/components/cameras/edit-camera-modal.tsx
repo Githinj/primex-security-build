@@ -132,7 +132,7 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
           onDone={handleClose}
         />
       ) : (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <ModalHeader
             title={`Edit ${camera.name}`}
             sub="Update camera details and streaming configuration."
