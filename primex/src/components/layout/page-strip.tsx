@@ -37,15 +37,22 @@ function formatDate(date: Date): string {
   });
 }
 
-export function PageStrip() {
+interface PageStripProps {
+  menuButton?: React.ReactNode;
+}
+
+export function PageStrip({ menuButton }: PageStripProps) {
   const pathname = usePathname();
   const crumbs = buildBreadcrumb(pathname ?? "");
   const today = formatDate(new Date());
 
   return (
     <header className="flex items-center justify-between px-4 sm:px-9 py-3.5 border-b border-border bg-surface flex-shrink-0">
-      {/* Left — breadcrumb */}
-      <Breadcrumb items={crumbs} />
+      {/* Left — hamburger (mobile) + breadcrumb */}
+      <div className="flex items-center gap-2">
+        {menuButton}
+        <Breadcrumb items={crumbs} />
+      </div>
 
       {/* Right — date + notifications */}
       <div className="hidden sm:flex items-center gap-4">

@@ -40,20 +40,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Mobile hamburger + page strip row */}
-        <div className="flex items-center flex-shrink-0">
-          <button
-            type="button"
-            className="lg:hidden flex items-center justify-center p-3 text-ink-2"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={22} strokeWidth={2} />
-          </button>
-          <div className="flex-1 min-w-0">
-            <PageStrip />
-          </div>
-        </div>
+        {/* Navbar: hamburger (mobile) + page strip */}
+        <PageStrip
+          menuButton={
+            <button
+              type="button"
+              className="lg:hidden flex items-center justify-center p-1.5 -ml-1 rounded-lg hover:bg-surface-subtle transition-colors text-ink-2"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={20} strokeWidth={2} />
+            </button>
+          }
+        />
         <main className="flex-1 bg-bg overflow-auto">{children}</main>
       </div>
     </div>
