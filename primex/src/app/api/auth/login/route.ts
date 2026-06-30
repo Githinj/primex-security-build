@@ -33,13 +33,17 @@ export async function POST(request: NextRequest) {
       ? NextResponse.json({ success: true })
       : NextResponse.redirect(new URL('/dashboard', request.url))
 
+    // Start with a clean cookie slate — ignore stale auth cookies from previous attempts
+    const freshCookies: Array<{ name: string; value: string; options?: Record<string, unknown> }> = []
+
     const supabase = createServerClient(url, anonKey, {
       cookies: {
-        getAll() { return request.cookies.getAll() },
+        getAll() { return [] },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
+            freshCookies.push({ name, value, options })
             response.cookies.set(name, value, options)
-          )
+          })
         },
       },
     })
