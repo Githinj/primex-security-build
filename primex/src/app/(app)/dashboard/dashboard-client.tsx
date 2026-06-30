@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Briefcase,
   MapPin,
@@ -9,7 +10,6 @@ import {
   Clock,
   CheckCircle2,
   Users,
-  Filter,
   ArrowUpRight,
   ArrowRight,
 } from "lucide-react";
@@ -23,6 +23,7 @@ import {
   Button,
   LiveDot,
   PhaseTag,
+  FilterPills,
 } from "@/components/ui";
 
 import { useScope } from "@/components/providers/scope-provider";
@@ -66,6 +67,17 @@ export function DashboardClient({
   companies,
 }: DashboardClientProps) {
   const { scopeCompanyId } = useScope();
+  const [timeWindow, setTimeWindow] = useState<string>("Last 24h");
+
+  const timeWindowMs: Record<string, number> = {
+    "Last 24h": 24 * 60 * 60 * 1000,
+    "Last 7d": 7 * 24 * 60 * 60 * 1000,
+    "Last 30d": 30 * 24 * 60 * 60 * 1000,
+    "All time": Infinity,
+  };
+  const cutoff = timeWindowMs[timeWindow] === Infinity
+    ? 0
+    : Date.now() - timeWindowMs[timeWindow];
 
   // Filter data by selected company scope
   const scopedSites = scopeCompanyId
@@ -97,8 +109,16 @@ export function DashboardClient({
       }
     : stats;
 
+  // Apply time window filter to incidents and critical alerts
+  const timeFilteredIncidents = scopedIncidents.filter(
+    (i) => new Date(i.started_at).getTime() >= cutoff
+  );
+  const timeFilteredCriticalAlerts = scopedStats.criticalAlerts.filter(
+    (a) => new Date(a.created_at).getTime() >= cutoff
+  );
+
   // Incident table rows (first 4 incidents)
-  const incidentRows = scopedIncidents.slice(0, 4).map((incident) => {
+  const incidentRows = timeFilteredIncidents.slice(0, 4).map((incident) => {
     const site = sites.find((s) => s.id === incident.site_id);
     const guard = incident.guard_id
       ? guards.find((g) => g.id === incident.guard_id)
@@ -144,9 +164,11 @@ export function DashboardClient({
         title="Operational overview"
         sub={scopeCompanyId ? `Filtered view for selected company.` : "A live view across every company, site, and camera on Primex."}
         actions={
-          <Button variant="secondary" size="sm" icon={Filter}>
-            Last 24 hours
-          </Button>
+          <FilterPills
+            options={["Last 24h", "Last 7d", "Last 30d", "All time"]}
+            value={timeWindow}
+            onChange={setTimeWindow}
+          />
         }
       />
 
@@ -276,10 +298,10 @@ export function DashboardClient({
 
           {/* Alert feed */}
           <div className="flex flex-col">
-            {scopedStats.criticalAlerts.length === 0 ? (
+            {timeFilteredCriticalAlerts.length === 0 ? (
               <p className="px-[22px] py-6 text-sm text-ink-3 font-sans">No critical alerts.</p>
             ) : (
-              scopedStats.criticalAlerts.map((alert) => {
+              timeFilteredCriticalAlerts.map((alert) => {
                 const site = sites.find((s) => s.id === alert.site_id);
                 return (
                   <div key={alert.id} className="flex gap-3 px-[16px] py-[16px] border-b border-border">

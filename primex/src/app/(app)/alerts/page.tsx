@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
-import { getAlerts } from "@/lib/data/alerts";
 import { getSites } from "@/lib/data/sites";
 import { getCompanies } from "@/lib/data/companies";
 import { getCameras } from "@/lib/data/cameras";
+import { applyPagination, toPaginatedResult } from "@/lib/data/pagination";
 import { AlertsClient } from "./alerts-client";
 
 interface Props {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; severity?: string; status?: string }>;
 }
 
 export default async function AlertsPage({ searchParams }: Props) {
@@ -29,9 +29,24 @@ export default async function AlertsPage({ searchParams }: Props) {
 
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = 25;
+  const severity = params.severity || "All";
+  const status = params.status || "All";
 
-  const [alertsResult, sites, companies, cameras] = await Promise.all([
-    getAlerts(undefined, { page, pageSize }),
+  // Build filtered + paginated query
+  let query = supabase
+    .from("alerts")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (severity !== "All") query = query.eq("severity", severity);
+  if (status !== "All") query = query.eq("status", status);
+  query = applyPagination(query, { page, pageSize });
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  const alertsResult = toPaginatedResult(data ?? [], count, { page, pageSize });
+
+  const [sites, companies, cameras] = await Promise.all([
     getSites(),
     getCompanies(),
     getCameras(),
@@ -43,6 +58,8 @@ export default async function AlertsPage({ searchParams }: Props) {
       total={alertsResult.total}
       page={alertsResult.page}
       pageSize={alertsResult.pageSize}
+      severity={severity}
+      status={status}
       sites={sites}
       companies={companies}
       cameras={cameras}

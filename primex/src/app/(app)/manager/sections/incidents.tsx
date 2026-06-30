@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, Eye, Pencil, X } from "lucide-react";
+import { Eye, Pencil, X } from "lucide-react";
 import {
   PageTitle,
   Card,
   DataTable,
-  Button,
   Pill,
   ActionMenu,
+  FilterPills,
 } from "@/components/ui";
 import { updateIncidentStatus } from "@/lib/data/actions/incidents";
 import { severityTone, incidentTone } from "@/lib/utils";
@@ -22,6 +22,7 @@ interface CompanyIncidentsProps {
 }
 
 const PAGE_SIZE = 25;
+const STATUS_OPTIONS = ["All", "Open", "Dispatched", "In Progress", "Resolved", "Closed"] as const;
 
 export function CompanyIncidents({
   incidents,
@@ -31,9 +32,13 @@ export function CompanyIncidents({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<string>("All");
   const guards = teamMembers.filter((m) => m.role === "guard");
 
-  const paginatedIncidents = incidents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const filteredIncidents = statusFilter === "All"
+    ? incidents
+    : incidents.filter((i) => i.status === statusFilter);
+  const paginatedIncidents = filteredIncidents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const rows = paginatedIncidents.map((incident) => {
     const site = sites.find((s) => s.id === incident.site_id);
@@ -104,18 +109,20 @@ export function CompanyIncidents({
       <PageTitle
         title="Incidents"
         sub="Open, dispatched, in progress, resolved, and closed incidents for your company."
-        actions={
-          <Button variant="secondary" size="sm" icon={Filter}>
-            Status
-          </Button>
-        }
+      />
+
+      <FilterPills
+        label="Status"
+        options={[...STATUS_OPTIONS]}
+        value={statusFilter}
+        onChange={(v) => { setStatusFilter(v); setPage(1); }}
       />
 
       <Card padding="p-0">
         <DataTable
           columns={["Incident", "Site", "Severity", "Status", "Guard", "Started", ""]}
           rows={rows}
-          pagination={{ page, pageSize: PAGE_SIZE, total: incidents.length, onPageChange: setPage }}
+          pagination={{ page, pageSize: PAGE_SIZE, total: filteredIncidents.length, onPageChange: setPage }}
         />
       </Card>
     </div>

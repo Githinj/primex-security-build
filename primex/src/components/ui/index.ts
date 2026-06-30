@@ -21,3 +21,4 @@ export { TextInput } from "./text-input";
 export { TextArea } from "./text-area";
 export { Select } from "./select";
 export { InfoBox } from "./info-box";
+export { FilterPills } from "./filter-pills";

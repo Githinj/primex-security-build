@@ -8,7 +8,6 @@ import {
   Pencil,
   Ban,
   Power,
-  Filter,
 } from "lucide-react";
 
 import {
@@ -19,6 +18,7 @@ import {
   Button,
   SearchInput,
   ActionMenu,
+  FilterPills,
 } from "@/components/ui";
 
 import type { Company, CompanyStatus } from "@/lib/types";
@@ -51,19 +51,23 @@ interface CompaniesClientProps {
 }
 
 const PAGE_SIZE = 25;
+const STATUS_OPTIONS = ["All", "Active", "Pending", "Suspended"] as const;
+type StatusFilter = typeof STATUS_OPTIONS[number];
 
 export function CompaniesClient({ companies }: CompaniesClientProps) {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [page, setPage] = useState(1);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
-  // Filter companies by search
-  const filtered = companies.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.type.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter companies by search + status
+  const filtered = companies.filter((c) => {
+    if (statusFilter !== "All" && c.status !== statusFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.type.toLowerCase().includes(q);
+  });
 
   function openDetails(company: Company) {
     setSelectedCompany(company);
@@ -139,30 +143,32 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
         title="Companies"
         sub="Every company is a hard data boundary. Sites, users, alerts and incidents are scoped per company. Only Super Admin can invite new companies."
         actions={
-          <>
-            <Button variant="secondary" size="sm" icon={Filter}>
-              Status
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={UserPlus}
-              onClick={() => setModalMode("invite")}
-            >
-              Invite company
-            </Button>
-          </>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={UserPlus}
+            onClick={() => setModalMode("invite")}
+          >
+            Invite company
+          </Button>
         }
       />
 
       {/* Main table card */}
       <Card padding="p-0">
-        {/* Search bar header */}
-        <div className="px-4 py-3 border-b border-border">
-          <SearchInput
-            placeholder="Search companies..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        {/* Search + filter header */}
+        <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-64">
+            <SearchInput
+              placeholder="Search companies..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+          <FilterPills
+            options={[...STATUS_OPTIONS]}
+            value={statusFilter}
+            onChange={(v) => { setStatusFilter(v); setPage(1); }}
           />
         </div>
 

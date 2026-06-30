@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, Plus, Eye, Power, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Plus, Eye, Power, Trash2 } from "lucide-react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   PageTitle,
   Card,
@@ -10,12 +10,14 @@ import {
   Pill,
   Button,
   ActionMenu,
+  FilterPills,
 } from "@/components/ui";
 import { AddSiteModal } from "@/components/sites/add-site-modal";
 import { SiteToggleModal } from "@/components/sites/site-toggle-modal";
 import { DeleteSiteModal } from "@/components/sites/delete-site-modal";
-import { usePagination } from "@/lib/hooks/use-pagination";
 import type { Site, Company, SiteRisk, SiteStatus } from "@/lib/types";
+
+const RISK_OPTIONS = ["All", "High", "Medium", "Low"] as const;
 
 function riskTone(risk: SiteRisk): "red" | "amber" | "green" {
   switch (risk) {
@@ -37,13 +39,30 @@ interface SitesClientProps {
   total: number;
   page: number;
   pageSize: number;
+  risk: string;
   companies: Company[];
 }
 
-export function SitesClient({ sites, total, page, pageSize, companies }: SitesClientProps) {
+export function SitesClient({ sites, total, page, pageSize, risk, companies }: SitesClientProps) {
   const router = useRouter();
-  const { setPage } = usePagination({ defaultPageSize: pageSize });
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
+
+  function updateFilter(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "All") { params.delete(key); } else { params.set(key, value); }
+    params.delete("page");
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+  }
+
+  function setPage(newPage: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newPage <= 1) { params.delete("page"); } else { params.set("page", String(newPage)); }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+  }
   const [toggleModal, setToggleModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
 
@@ -115,19 +134,21 @@ export function SitesClient({ sites, total, page, pageSize, companies }: SitesCl
           title="Sites"
           sub="Each site belongs to one company and carries its own cameras, alerts, and incidents. Super Admin can create or delete sites on behalf of any company."
           actions={
-            <>
-              <Button variant="secondary" icon={Filter}>
-                Risk
-              </Button>
-              <Button
-                variant="primary"
-                icon={Plus}
-                onClick={() => setModalOpen(true)}
-              >
-                Add site
-              </Button>
-            </>
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => setModalOpen(true)}
+            >
+              Add site
+            </Button>
           }
+        />
+
+        <FilterPills
+          label="Risk"
+          options={[...RISK_OPTIONS]}
+          value={risk as typeof RISK_OPTIONS[number]}
+          onChange={(v) => updateFilter("risk", v)}
         />
 
         <Card padding="p-0">
