@@ -27,18 +27,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
   }
 
-  // Test raw connectivity to Supabase first
+  // Wake up Supabase (free tier may be paused) with retry
   let supabaseAlive = false
-  try {
-    const healthRes = await fetch(`${url}/auth/v1/health`, {
-      headers: { apikey: anonKey },
-    })
-    supabaseAlive = healthRes.ok
-  } catch {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const healthRes = await fetch(`${url}/auth/v1/health`, {
+        headers: { apikey: anonKey },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (healthRes.ok) {
+        supabaseAlive = true
+        break
+      }
+    } catch {
+      // Retry after a short delay
+      if (attempt < 2) await new Promise(r => setTimeout(r, 1000))
+    }
+  }
+
+  if (!supabaseAlive) {
     return NextResponse.json({
       success: false,
-      error: 'Cannot reach authentication server. Please try again.',
-      debug: { supabaseUrl: url, reachable: false },
+      error: 'Authentication server is waking up. Please try again in a few seconds.',
     }, { status: 503 })
   }
 
