@@ -46,7 +46,8 @@ export function LoginClient() {
       const result = await res.json();
 
       if (!result.success) {
-        setError(result.error ?? "Invalid email or password");
+        const debugInfo = result.debug ? ` [${JSON.stringify(result.debug)}]` : '';
+        setError((result.error ?? "Invalid email or password") + debugInfo);
         setLoading(false);
         return;
       }

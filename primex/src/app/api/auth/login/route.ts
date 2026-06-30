@@ -3,31 +3,60 @@ import { createServerClient } from '@supabase/ssr'
 import { getRoleHomePath } from '@/lib/auth/role-redirect'
 
 export async function POST(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Return diagnostic info if env vars missing
+  if (!url || !anonKey) {
+    return NextResponse.json({
+      success: false,
+      error: 'Server configuration error',
+      debug: { hasUrl: !!url, hasKey: !!anonKey },
+    }, { status: 500 })
+  }
+
+  let body: { email?: string; password?: string }
   try {
-    const { email, password } = await request.json()
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 })
+  }
 
-    if (!email || !password) {
-      return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
-    }
+  const { email, password } = body
+  if (!email || !password) {
+    return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
+  }
 
-    const response = NextResponse.json({ success: true, redirectTo: '/dashboard' })
+  // Test raw connectivity to Supabase first
+  let supabaseAlive = false
+  try {
+    const healthRes = await fetch(`${url}/auth/v1/health`, {
+      headers: { apikey: anonKey },
+    })
+    supabaseAlive = healthRes.ok
+  } catch {
+    return NextResponse.json({
+      success: false,
+      error: 'Cannot reach authentication server. Please try again.',
+      debug: { supabaseUrl: url, reachable: false },
+    }, { status: 503 })
+  }
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            )
-          },
+  try {
+    const response = NextResponse.json({ success: true })
+
+    const supabase = createServerClient(url, anonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
         },
-      }
-    )
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    })
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -49,7 +78,6 @@ export async function POST(request: NextRequest) {
       redirectTo = getRoleHomePath(profile?.role ?? 'client')
     }
 
-    // Return the redirect path and auth cookies
     const successResponse = NextResponse.json({ success: true, redirectTo })
     response.cookies.getAll().forEach(cookie => {
       successResponse.cookies.set(cookie.name, cookie.value)
@@ -57,9 +85,12 @@ export async function POST(request: NextRequest) {
 
     return successResponse
   } catch (err) {
-    return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Login failed' },
-      { status: 500 }
-    )
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    const stack = err instanceof Error ? err.stack?.split('\n').slice(0, 3).join(' | ') : undefined
+    return NextResponse.json({
+      success: false,
+      error: `Authentication error: ${message}`,
+      debug: { supabaseAlive, errorType: err?.constructor?.name, stack },
+    }, { status: 500 })
   }
 }
