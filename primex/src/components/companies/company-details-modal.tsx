@@ -147,7 +147,7 @@ export function CompanyDetailsModal({
                   options={TYPE_OPTIONS}
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Primary contact">
                   <TextInput
                     placeholder="Contact name"

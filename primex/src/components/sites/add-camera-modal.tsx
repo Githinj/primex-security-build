@@ -133,7 +133,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
     form.company_id && form.site_id && form.name.trim() && form.location.trim() && form.status;
 
   return (
-    <Modal open={open} onClose={handleClose}>
+    <Modal open={open} onClose={handleClose} width="max-w-xl">
       {success ? (
         <div>
           <SuccessState
@@ -189,15 +189,16 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
       ) : (
         <form onSubmit={handleSubmit}>
           <ModalHeader
-            title="Add camera"
-            sub="Register a new camera to a company site."
+            eyebrow="Cameras"
+            title="Add a new camera"
+            sub="Register a new camera to a company site. You can configure streaming after creation."
             onClose={handleClose}
           />
 
           <ModalBody>
             <div className="flex flex-col gap-5">
-              {/* Company + Site — 2-column grid */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Company + Site */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Company" required>
                   <Select
                     value={form.company_id}

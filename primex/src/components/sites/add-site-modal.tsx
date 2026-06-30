@@ -133,7 +133,7 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
               )}
 
               {/* Site name + Type */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Site name" required>
                   <TextInput
                     placeholder="e.g. Apex Westfield"
@@ -188,7 +188,7 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Full name">
                     <TextInput
                       placeholder="e.g. Brett Collins"
