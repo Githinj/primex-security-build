@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { ForgotPasswordModal } from "./forgot-password-modal";
 
 export function LoginClient() {
   const router = useRouter();
@@ -18,21 +18,7 @@ export function LoginClient() {
     searchParams.get("error")
   );
   const [loading, setLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-
-  async function handleForgotPassword() {
-    setError(null);
-    setResetSent(false);
-    if (!email.trim()) {
-      setError("Please enter your email first");
-      return;
-    }
-    const supabase = createBrowserSupabaseClient();
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/callback?type=recovery`,
-    });
-    setResetSent(true);
-  }
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,12 +127,6 @@ export function LoginClient() {
               <p className="text-sm text-p-red font-sans">{error}</p>
             )}
 
-            {resetSent && (
-              <p className="text-sm text-p-green font-sans">
-                Password reset email sent. Check your inbox.
-              </p>
-            )}
-
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between mt-1">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -161,7 +141,7 @@ export function LoginClient() {
               </label>
               <button
                 type="button"
-                onClick={handleForgotPassword}
+                onClick={() => setForgotOpen(true)}
                 className="text-sm text-p-blue hover:underline font-sans"
               >
                 Forgot password?
@@ -242,6 +222,12 @@ export function LoginClient() {
           </div>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        initialEmail={email}
+      />
     </div>
   );
 }
