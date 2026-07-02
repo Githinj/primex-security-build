@@ -12,8 +12,6 @@ import {
   Field,
   InfoBox,
 } from "@/components/ui";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-
 interface ForgotPasswordModalProps {
   open: boolean;
   onClose: () => void;
@@ -43,20 +41,23 @@ export function ForgotPasswordModal({ open, onClose, initialEmail = "" }: Forgot
     setLoading(true);
 
     try {
-      const supabase = createBrowserSupabaseClient();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/callback?type=recovery`,
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
       });
 
-      if (resetError) {
-        setError(resetError.message);
+      const result = await res.json();
+
+      if (!result.success) {
+        setError(result.error ?? "Unable to send reset link.");
         setLoading(false);
         return;
       }
 
       setSent(true);
     } catch {
-      setError("Unable to send reset link. Please try again.");
+      setError("Unable to connect. Please try again.");
     }
     setLoading(false);
   }
