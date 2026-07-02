@@ -129,7 +129,7 @@ export function ManagerClient({
           </div>
 
           {/* Navigation */}
-          <nav className="flex lg:flex-col gap-0.5">
+          <nav className="flex lg:flex-col gap-1 lg:gap-0.5">
             {navItems.map((item) => {
               const isActive = section === item.id;
               const Icon = item.icon;

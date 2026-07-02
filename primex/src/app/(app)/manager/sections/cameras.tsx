@@ -35,7 +35,7 @@ export function CompanyCameras({ company, cameras, sites }: CompanyCamerasProps)
         />
 
         {cameras.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginatedCameras.map((camera) => {
               const site = sites.find((s) => s.id === camera.site_id);
               if (!site) return null;
