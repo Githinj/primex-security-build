@@ -122,7 +122,7 @@ export function CompanySites({
             </div>
           </Card>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 min-h-[600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
           {/* Left list */}
           <div className="flex flex-col gap-1.5 overflow-auto">
             {sites.map((site) => {

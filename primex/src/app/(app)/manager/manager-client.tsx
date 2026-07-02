@@ -205,7 +205,7 @@ export function ManagerClient({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 bg-bg overflow-auto">
+      <main className="flex-1 min-w-0 bg-bg overflow-auto">
         {company.status === 'Pending' && (
           <div className="mx-4 sm:mx-9 mt-6 px-5 py-4 bg-p-amber-soft border border-p-amber/20 rounded-xl flex items-start gap-3">
             <AlertTriangle size={18} className="text-p-amber flex-shrink-0 mt-0.5" />
