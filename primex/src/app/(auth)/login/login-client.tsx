@@ -14,9 +14,14 @@ export function LoginClient() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    searchParams.get("error")
-  );
+  const [error, setError] = useState<string | null>(() => {
+    const err = searchParams.get("error");
+    if (!err) return null;
+    const errorMap: Record<string, string> = {
+      auth_callback_failed: "The link has expired or is invalid. Please request a new one.",
+    };
+    return errorMap[err] ?? err;
+  });
   const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
 
