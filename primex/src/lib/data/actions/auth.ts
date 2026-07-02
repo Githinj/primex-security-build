@@ -46,6 +46,42 @@ export async function loginAction(email: string, password: string): Promise<Logi
   }
 }
 
+export async function resetPasswordAction(newPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: 'Not authenticated. Please use the reset link again.' }
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+    if (updateError) {
+      return { success: false, error: updateError.message }
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const { logActivity } = await import('./activity')
+    logActivity({
+      actorId: user.id,
+      actorName: profile?.full_name ?? user.email ?? 'Unknown',
+      action: 'Password reset',
+      target: user.email ?? 'Unknown user',
+      icon: 'Clock',
+      tone: 'amber',
+    })
+
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Password reset failed' }
+  }
+}
+
 interface InviteUserParams {
   email: string
   full_name: string

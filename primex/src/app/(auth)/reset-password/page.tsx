@@ -4,11 +4,9 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput } from "@/components/ui";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { resetPasswordAction } from "@/lib/data/actions/auth";
 
 export default function ResetPasswordPage() {
-  const supabase = createBrowserSupabaseClient();
-
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,12 +28,10 @@ export default function ResetPasswordPage() {
     }
 
     startTransition(async () => {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const result = await resetPasswordAction(newPassword);
 
-      if (updateError) {
-        setError(updateError.message);
+      if (!result.success) {
+        setError(result.error ?? "Password reset failed");
         return;
       }
 
