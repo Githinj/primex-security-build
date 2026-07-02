@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Briefcase,
   MapPin,
@@ -22,7 +23,6 @@ import {
   DataTable,
   Button,
   LiveDot,
-  PhaseTag,
   FilterPills,
 } from "@/components/ui";
 
@@ -66,6 +66,7 @@ export function DashboardClient({
   guards,
   companies,
 }: DashboardClientProps) {
+  const router = useRouter();
   const { scopeCompanyId } = useScope();
   const [timeWindow, setTimeWindow] = useState<string>("Last 24h");
 
@@ -271,7 +272,7 @@ export function DashboardClient({
               </h2>
               <p className="text-ink-3 text-xs font-sans">Live · all companies</p>
             </div>
-            <Button variant="link" size="sm" icon={ArrowRight}>
+            <Button variant="link" size="sm" icon={ArrowRight} onClick={() => router.push("/incidents")}>
               View all
             </Button>
           </div>
@@ -332,7 +333,7 @@ export function DashboardClient({
 
           {/* Footer link */}
           <div className="px-[22px] py-[14px]">
-            <Button variant="link" size="sm" icon={ArrowRight}>
+            <Button variant="link" size="sm" icon={ArrowRight} onClick={() => router.push("/dispatcher")}>
               Open dispatcher console
             </Button>
           </div>
@@ -343,14 +344,11 @@ export function DashboardClient({
       <Card padding="p-0">
         {/* Card header */}
         <div className="px-[22px] py-4 border-b border-border flex flex-col gap-1">
-          <div className="flex items-center gap-2.5">
-            <h2 className="font-serif text-[20px] font-bold text-ink">
-              Camera status by company
-            </h2>
-            <PhaseTag>Live streaming · Phase 2</PhaseTag>
-          </div>
+          <h2 className="font-serif text-[20px] font-bold text-ink">
+            Camera status by company
+          </h2>
           <p className="text-[12.5px] text-ink-3 font-sans">
-            Phase 1 — status monitoring only (Online · Offline · Maintenance · Unknown)
+            Online · Offline · Maintenance · Unknown
           </p>
         </div>
 
