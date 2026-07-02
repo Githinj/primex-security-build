@@ -249,6 +249,7 @@ export function ManagerClient({
           )}
           {section === "cameras" && (
             <CompanyCameras
+              company={company}
               cameras={cameras}
               sites={sites}
             />

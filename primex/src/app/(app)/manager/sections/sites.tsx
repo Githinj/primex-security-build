@@ -108,7 +108,20 @@ export function CompanySites({
           }
         />
 
-        {/* Split layout */}
+        {sites.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <MapPin size={32} className="text-ink-4" strokeWidth={1.5} />
+              <div className="text-center">
+                <p className="text-sm font-medium text-ink mb-1">No sites yet</p>
+                <p className="text-xs text-ink-3">Add your first site to start monitoring cameras, alerts, and incidents.</p>
+              </div>
+              <Button variant="primary" icon={Plus} onClick={() => setAddSiteOpen(true)}>
+                Add site
+              </Button>
+            </div>
+          </Card>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 min-h-[600px]">
           {/* Left list */}
           <div className="flex flex-col gap-1.5 overflow-auto">
@@ -250,6 +263,7 @@ export function CompanySites({
             )}
           </div>
         </div>
+        )}
       </div>
 
       <AddSiteModal

@@ -5,7 +5,7 @@ import {
   Camera,
   Bell,
   AlertTriangle,
-  ArrowDown,
+  Clock,
 } from "lucide-react";
 import { PageTitle, StatCard, Card, Pill, DataTable } from "@/components/ui";
 import { severityTone, incidentTone } from "@/lib/utils";
@@ -34,6 +34,30 @@ export function CompanyDashboard({
   const activeIncidents = incidents.filter((i) =>
     ["Open", "In Progress", "Dispatched"].includes(i.status)
   ).length;
+
+  // Compute avg response time from resolved/closed incidents
+  const resolvedIncidents = incidents.filter((i) =>
+    ["Resolved", "Closed"].includes(i.status)
+  );
+  let avgResponseMin = 0;
+  let fastestMin = 0;
+  let slowestMin = 0;
+  let resolutionRate = 0;
+
+  if (resolvedIncidents.length > 0) {
+    const times = resolvedIncidents.map((i) => {
+      const start = new Date(i.started_at).getTime();
+      const end = new Date((i as unknown as Record<string, string>).updated_at ?? i.started_at).getTime();
+      return Math.max(0, (end - start) / 60_000);
+    });
+    avgResponseMin = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+    fastestMin = Math.round(Math.min(...times));
+    slowestMin = Math.round(Math.max(...times));
+  }
+
+  if (incidents.length > 0) {
+    resolutionRate = Math.round((resolvedIncidents.length / incidents.length) * 100);
+  }
 
   // Recent incidents — last 5
   const recentIncidents = incidents.slice(0, 5);
@@ -150,35 +174,44 @@ export function CompanyDashboard({
             <h2 className="font-serif text-[20px] font-bold text-ink">
               Avg response time
             </h2>
-            <p className="text-[12.5px] text-ink-3">This month</p>
+            <p className="text-[12.5px] text-ink-3">All time</p>
           </div>
 
           <div className="flex items-baseline gap-3 mb-6">
             <span className="font-serif text-[48px] font-semibold text-ink leading-none">
-              8m
+              {avgResponseMin > 0 ? `${avgResponseMin}m` : "\u2014"}
             </span>
-            <span className="inline-flex items-center gap-1 text-p-green font-semibold text-sm">
-              <ArrowDown size={14} strokeWidth={2.5} />
-              3m
-            </span>
+            {resolutionRate > 0 && (
+              <Pill tone="green" size="sm">
+                {resolutionRate}% resolved
+              </Pill>
+            )}
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-ink-3">Fastest</span>
-              <span className="text-sm font-semibold text-ink">2m</span>
+              <span className="text-sm font-semibold text-ink">
+                {resolvedIncidents.length > 0 ? `${fastestMin}m` : "\u2014"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-ink-3">Slowest</span>
-              <span className="text-sm font-semibold text-ink">18m</span>
+              <span className="text-sm font-semibold text-ink">
+                {resolvedIncidents.length > 0 ? `${slowestMin}m` : "\u2014"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-ink-3">Target SLA</span>
-              <span className="text-sm font-semibold text-ink">10m</span>
+              <span className="text-xs text-ink-3">Resolved</span>
+              <span className="text-sm font-semibold text-ink">
+                {resolvedIncidents.length} of {incidents.length}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-ink-3">SLA compliance</span>
-              <span className="text-sm font-semibold text-p-green">94%</span>
+              <span className="text-xs text-ink-3">Resolution rate</span>
+              <span className={`text-sm font-semibold ${resolutionRate >= 80 ? "text-p-green" : resolutionRate >= 50 ? "text-p-amber" : "text-ink"}`}>
+                {incidents.length > 0 ? `${resolutionRate}%` : "\u2014"}
+              </span>
             </div>
           </div>
         </Card>

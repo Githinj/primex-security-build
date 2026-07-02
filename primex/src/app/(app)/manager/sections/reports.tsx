@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   Download,
+  Plus,
 } from "lucide-react";
 import {
   PageTitle,
@@ -69,12 +70,30 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
     });
   }
 
-  // Compute stats
+  // Compute real stats
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const incidentsThisMonth = incidents.filter(
     (i) => new Date(i.started_at) >= startOfMonth
   ).length;
+
+  const resolvedIncidents = incidents.filter((i) =>
+    ["Resolved", "Closed"].includes(i.status)
+  );
+
+  let avgResponseMin = 0;
+  if (resolvedIncidents.length > 0) {
+    const totalMin = resolvedIncidents.reduce((sum, i) => {
+      const start = new Date(i.started_at).getTime();
+      const end = new Date((i as unknown as Record<string, string>).updated_at ?? i.started_at).getTime();
+      return sum + Math.max(0, (end - start) / 60_000);
+    }, 0);
+    avgResponseMin = Math.round(totalMin / resolvedIncidents.length);
+  }
+
+  const resolutionRate = incidents.length > 0
+    ? Math.round((resolvedIncidents.length / incidents.length) * 100)
+    : 0;
 
   const paginatedReports = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -116,10 +135,15 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
       <PageTitle
         title="Reports"
         sub="Monthly summaries, response-time analytics, and site-level reports."
+        actions={
+          <Button variant="primary" icon={Plus}>
+            Generate report
+          </Button>
+        }
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <StatCard
           label="Incidents this month"
           value={incidentsThisMonth}
@@ -127,22 +151,26 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
         />
         <StatCard
           label="Avg response"
-          value="8m"
+          value={avgResponseMin > 0 ? `${avgResponseMin}m` : "\u2014"}
           icon={Clock}
           supporting={
-            <Pill tone="green" size="sm">
-              &#8595; 2m vs avg
-            </Pill>
+            resolvedIncidents.length > 0 ? (
+              <Pill tone="blue" size="sm">
+                from {resolvedIncidents.length} resolved
+              </Pill>
+            ) : null
           }
         />
         <StatCard
           label="Resolution rate"
-          value="96%"
+          value={incidents.length > 0 ? `${resolutionRate}%` : "\u2014"}
           icon={CheckCircle2}
           supporting={
-            <Pill tone="green" size="sm">
-              +3% vs avg
-            </Pill>
+            resolutionRate >= 80 ? (
+              <Pill tone="green" size="sm">On track</Pill>
+            ) : resolutionRate > 0 ? (
+              <Pill tone="amber" size="sm">Needs improvement</Pill>
+            ) : null
           }
         />
       </div>
