@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { PageTitle, Button } from "@/components/ui";
+import { Plus, ChevronLeft, ChevronRight, Camera as CameraIcon } from "lucide-react";
+import { PageTitle, Button, Card } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
 import type { Camera, Site, Company } from "@/lib/types";
@@ -45,12 +45,22 @@ export function CompanyCameras({ company, cameras, sites }: CompanyCamerasProps)
             })}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-ink-4 gap-3">
-            <p className="text-sm">No cameras found for your company.</p>
-            <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}>
-              Add camera
-            </Button>
-          </div>
+          <Card>
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="w-14 h-14 rounded-full bg-surface-subtle flex items-center justify-center">
+                <CameraIcon size={24} className="text-ink-4" strokeWidth={1.5} />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-ink mb-1">No cameras yet</p>
+                <p className="text-xs text-ink-3 max-w-[300px]">
+                  Add cameras to your sites to start monitoring live feeds, recording events, and receiving AI-powered alerts.
+                </p>
+              </div>
+              <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}>
+                Add your first camera
+              </Button>
+            </div>
+          </Card>
         )}
 
         {totalPages > 1 && (
