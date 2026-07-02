@@ -31,7 +31,6 @@ interface InviteTeamMemberModalProps {
 export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalProps) {
   const profile = useProfile();
   const [submitted, setSubmitted] = useState(false);
-  const [tempPassword, setTempPassword] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -44,14 +43,13 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
   function handleSubmit() {
     startTransition(async () => {
       try {
-        const result = await inviteUser({
+        await inviteUser({
           email: form.email,
           full_name: form.name,
           role: form.role as "company_manager" | "dispatcher" | "guard",
           company_id: profile?.company_id,
           phone: form.phone || null,
         });
-        setTempPassword(result.tempPassword);
         setSubmitted(true);
       } catch {
         setError("Something went wrong. Please try again.");
@@ -61,7 +59,6 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
 
   function handleDone() {
     setSubmitted(false);
-    setTempPassword("");
     setError(null);
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
@@ -69,7 +66,6 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
 
   function handleClose() {
     setSubmitted(false);
-    setTempPassword("");
     setError(null);
     setForm({ name: "", email: "", role: "", phone: "" });
     onClose();
@@ -82,7 +78,7 @@ export function InviteTeamMemberModal({ open, onClose }: InviteTeamMemberModalPr
           title="Invite sent."
           sub={
             <>
-              Account created for <strong>{form.email}</strong>. Temporary password: <code>{tempPassword}</code>
+              An invite email has been sent to <strong>{form.email}</strong>. They can click the link to set their password and access the platform.
             </>
           }
           onDone={handleDone}

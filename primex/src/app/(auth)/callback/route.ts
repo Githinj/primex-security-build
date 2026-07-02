@@ -30,9 +30,13 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // Check if this is a recovery (password reset) flow
       const type = searchParams.get('type')
+      // Recovery flow → set new password
       if (type === 'recovery') {
+        return NextResponse.redirect(new URL('/reset-password', request.url))
+      }
+      // Invite flow → set initial password
+      if (type === 'invite') {
         return NextResponse.redirect(new URL('/reset-password', request.url))
       }
       return NextResponse.redirect(new URL(next, request.url))

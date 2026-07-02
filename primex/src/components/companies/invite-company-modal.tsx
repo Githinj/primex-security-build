@@ -51,12 +51,10 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [tempPassword, setTempPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function handleClose() {
     setSuccess(false);
-    setTempPassword("");
     setError(null);
     setForm(INITIAL_FORM);
     onClose();
@@ -66,13 +64,12 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
     setSubmitting(true);
     try {
       const company = await createCompany({ name: form.name, type: form.type });
-      const result = await inviteUser({
+      await inviteUser({
         email: form.contactEmail,
         full_name: form.contactName,
         role: "company_manager",
         company_id: company.id,
       });
-      setTempPassword(result.tempPassword);
       setSuccess(true);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -88,7 +85,7 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
           title="Invite sent."
           sub={
             <>
-              Account created for <strong>{form.contactEmail}</strong>. Temporary password: <code>{tempPassword}</code>
+              An invite email has been sent to <strong>{form.contactEmail}</strong>. They can click the link to set their password and access the platform.
             </>
           }
           onDone={handleClose}
