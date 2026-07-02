@@ -122,7 +122,7 @@ export function CompanySites({
             </div>
           </Card>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-5">
           {/* Left list */}
           <div className="flex flex-col gap-1.5 overflow-auto">
             {sites.map((site) => {
@@ -194,7 +194,7 @@ export function CompanySites({
                   </div>
 
                   {/* Mini stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="flex flex-col gap-1 bg-bg rounded-lg p-3">
                       <span className="text-[10px] font-semibold uppercase text-ink-4 tracking-wider">
                         Risk
