@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   UserIcon,
   Lock,
@@ -27,6 +27,10 @@ import {
   Toggle,
 } from "@/components/ui";
 import type { Profile } from "@/lib/types";
+import {
+  updateNotificationPreference,
+  type NotificationPrefs,
+} from "@/lib/data/actions/notification-preferences";
 
 // ---------------------------------------------------------------------------
 // ROLES_PERMS (inline constant, previously from mock-data)
@@ -231,6 +235,7 @@ function RolesTab() {
 // ---------------------------------------------------------------------------
 
 interface NotifRow {
+  key: string;
   event: string;
   channels: string[];
   on: boolean;
@@ -238,12 +243,13 @@ interface NotifRow {
 }
 
 const NOTIF_ROWS: NotifRow[] = [
-  { event: "New critical alert", channels: ["Email", "Push"], on: true },
-  { event: "Incident assigned", channels: ["Email", "Push"], on: true },
-  { event: "Incident resolved", channels: ["Email"], on: true },
-  { event: "Camera offline", channels: ["Email"], on: true },
-  { event: "Weekly summary", channels: ["Email"], on: true },
+  { key: "critical_alert", event: "New critical alert", channels: ["Email", "Push"], on: true },
+  { key: "incident_assigned", event: "Incident assigned", channels: ["Email", "Push"], on: true },
+  { key: "incident_resolved", event: "Incident resolved", channels: ["Email"], on: true },
+  { key: "camera_offline", event: "Camera offline", channels: ["Email"], on: true },
+  { key: "weekly_summary", event: "Weekly summary", channels: ["Email"], on: true },
   {
+    key: "sms",
     event: "SMS notifications",
     channels: ["SMS"],
     on: false,
@@ -251,10 +257,31 @@ const NOTIF_ROWS: NotifRow[] = [
   },
 ];
 
-function NotificationsTab() {
+function NotificationsTab({ prefs }: { prefs: NotificationPrefs }) {
   const [states, setStates] = useState<boolean[]>(
-    NOTIF_ROWS.map((r) => r.on)
+    NOTIF_ROWS.map((r) => prefs[r.key]?.email ?? r.on)
   );
+  const [, startTransition] = useTransition();
+
+  function handleToggle(i: number, val: boolean) {
+    const previous = states[i];
+    setStates((s) => {
+      const next = [...s];
+      next[i] = val;
+      return next;
+    });
+    startTransition(async () => {
+      const res = await updateNotificationPreference(NOTIF_ROWS[i].key, val);
+      if (!res.success) {
+        // Revert on failure
+        setStates((s) => {
+          const next = [...s];
+          next[i] = previous;
+          return next;
+        });
+      }
+    });
+  }
 
   return (
     <Card>
@@ -288,11 +315,7 @@ function NotificationsTab() {
               </div>
               <Toggle
                 on={states[i]}
-                onChange={(val) => {
-                  const next = [...states];
-                  next[i] = val;
-                  setStates(next);
-                }}
+                onChange={(val) => handleToggle(i, val)}
               />
             </div>
           ))}
@@ -488,15 +511,16 @@ function BillingTab() {
 
 interface SettingsClientProps {
   profile: Profile;
+  notificationPrefs: NotificationPrefs;
 }
 
-export function SettingsClient({ profile }: SettingsClientProps) {
+export function SettingsClient({ profile, notificationPrefs }: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
   const tabContent: Record<Tab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} />,
     roles: <RolesTab />,
-    notifications: <NotificationsTab />,
+    notifications: <NotificationsTab prefs={notificationPrefs} />,
     integrations: <IntegrationsTab />,
     billing: <BillingTab />,
   };

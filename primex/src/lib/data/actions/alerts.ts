@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
 import { logActivity } from './activity'
+import { notifyCriticalAlert } from '@/lib/notifications/notify'
 
 export async function createAlert(data: { site_id: string; camera_id?: string | null; title: string; severity: string; description: string; source: string }) {
   const caller = await requireRole('super_admin', 'company_manager', 'dispatcher')
@@ -20,6 +21,10 @@ export async function createAlert(data: { site_id: string; camera_id?: string | 
   if (error) throw error
 
   logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Alert created', target: data.title, icon: 'Bell', tone: data.severity === 'Critical' ? 'red' : 'amber' })
+
+  // Notify company managers + clients on critical alerts (self-contained; never throws).
+  await notifyCriticalAlert({ siteId: data.site_id, title: data.title, severity: data.severity, description: data.description })
+
   revalidatePath('/alerts')
   revalidatePath('/incidents')
 }

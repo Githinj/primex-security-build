@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getProfile } from "@/lib/data/profiles";
+import { getNotificationPreferences } from "@/lib/data/actions/notification-preferences";
 import { SettingsClient } from "./settings-client";
 import { redirect } from "next/navigation";
 
@@ -15,5 +16,7 @@ export default async function SettingsPage() {
     redirect(getRoleHomePath(profile.role));
   }
 
-  return <SettingsClient profile={profile} />;
+  const notificationPrefs = await getNotificationPreferences();
+
+  return <SettingsClient profile={profile} notificationPrefs={notificationPrefs} />;
 }
