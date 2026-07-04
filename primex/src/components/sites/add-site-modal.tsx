@@ -29,6 +29,7 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [inviteWarning, setInviteWarning] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     company_id: lockedCompany?.id ?? "",
@@ -47,13 +48,16 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
   function handleSubmit() {
     startTransition(async () => {
       try {
-        await createSite({
+        const result = await createSite({
           company_id: form.company_id,
           name: form.name,
           type: form.type,
           address: form.address,
           risk: form.risk || undefined,
+          client_name: form.client_name || undefined,
+          client_email: form.client_email || undefined,
         });
+        setInviteWarning(result?.inviteError ?? null);
         setSubmitted(true);
       } catch {
         setError("Something went wrong. Please try again.");
@@ -64,6 +68,7 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
   function handleDone() {
     setSubmitted(false);
     setError(null);
+    setInviteWarning(null);
     setForm({
       company_id: lockedCompany?.id ?? "",
       name: "",
@@ -75,6 +80,13 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
     });
     onClose();
   }
+
+  const clientProvided = Boolean(form.client_name && form.client_email);
+  const successSub = inviteWarning
+    ? `Site created, but the client invite couldn't be sent: ${inviteWarning} You can invite them later from the Team page.`
+    : clientProvided
+      ? "Site created and a portal invite has been emailed to the business client."
+      : "The site has been added.";
 
   const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
@@ -96,7 +108,7 @@ export function AddSiteModal({ open, onClose, lockedCompany, companies }: AddSit
       {submitted ? (
         <SuccessState
           title="Site created."
-          sub="The site has been added and the business client will receive a portal invite."
+          sub={successSub}
           onDone={handleDone}
         />
       ) : (

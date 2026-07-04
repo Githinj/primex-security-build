@@ -3,15 +3,46 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
 import { logActivity } from './activity'
+import { inviteUser } from './auth'
 
-export async function createSite(data: { company_id: string; name: string; type: string; address: string; risk?: string }) {
+export async function createSite(data: {
+  company_id: string
+  name: string
+  type: string
+  address: string
+  risk?: string
+  client_name?: string
+  client_email?: string
+}): Promise<{ inviteError: string | null }> {
   const caller = await requireRole('super_admin', 'company_manager')
   await requireActiveCompany(caller)
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('sites').insert(data)
+
+  // Separate the optional business-client fields — they are not columns on `sites`.
+  const { client_name, client_email, ...siteData } = data
+  const { error } = await supabase.from('sites').insert(siteData)
   if (error) throw error
-  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Site created', target: data.name, icon: 'MapPin', tone: 'blue' })
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Site created', target: siteData.name, icon: 'MapPin', tone: 'blue' })
+
+  // Provision the business client for the portal, if details were provided.
+  // The site is already created, so an invite failure is surfaced (not fatal) —
+  // the caller can retry the invite from the Team page.
+  let inviteError: string | null = null
+  if (client_email?.trim() && client_name?.trim()) {
+    try {
+      await inviteUser({
+        email: client_email.trim(),
+        full_name: client_name.trim(),
+        role: 'client',
+        company_id: siteData.company_id,
+      })
+    } catch (e) {
+      inviteError = e instanceof Error ? e.message : 'Failed to send the client invite.'
+    }
+  }
+
   revalidatePath('/sites')
+  return { inviteError }
 }
 
 export async function toggleSiteStatus(id: string, newStatus: 'Active' | 'Inactive') {
