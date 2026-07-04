@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # All commands run from the primex/ directory
-npm run dev          # Start dev server (Turbopack)
+npm run dev          # Start dev server (next dev)
 npm run build        # Production build
 npm run lint         # ESLint (flat config, eslint.config.mjs)
 npm start            # Start production server
@@ -28,7 +28,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 
 ## Architecture
 
-### Next.js 16 with App Router
+### Next.js 15 with App Router
 
 - **Auth proxy**: `src/middleware.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
 - **Route groups**: `(app)` for authenticated routes, `(auth)` for login/reset
@@ -38,7 +38,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
   - `guard` → `/guard` (incident status flow, no sidebar)
   - `company_manager` → `/manager` (sites, cameras, alerts, incidents, team, reports)
   - `client` → `/portal` (alerts, incidents, reports, help)
-- **Params/cookies are async**: `await params`, `await cookies()` — Next.js 16 requirement
+- **Params/cookies are async**: `await params`, `await cookies()` — Next.js 15 requirement
 
 ### Data Layer
 
@@ -49,7 +49,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 
 ### Supabase & RLS
 
-- 5 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron)
+- 6 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix)
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
@@ -100,7 +100,7 @@ Required in `.env.local`:
 - Drag-and-drop: `@dnd-kit` (dispatch board)
 - PDF generation: `jspdf` + `jspdf-autotable` (server actions)
 - Multi-table writes use Postgres functions (`004_transactional_functions.sql`) instead of sequential inserts
-- `AGENTS.md` at repo root contains Next.js 16 agent rules — read `node_modules/next/dist/docs/` before using unfamiliar Next.js APIs
+- `primex/AGENTS.md` contains Next.js agent rules — read `node_modules/next/dist/docs/` before using unfamiliar Next.js APIs
 
 ### Repo Layout
 
