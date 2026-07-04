@@ -33,7 +33,7 @@ const IMAGES = {
   securityFirm: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80&auto=format&fit=crop",
   cctv: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=800&q=80&auto=format&fit=crop",
   dashboard: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80&auto=format&fit=crop",
-  controlRoom: "https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&q=80&auto=format&fit=crop",
+  controlRoom: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80&auto=format&fit=crop",
 };
 
 // ─── Animated Counter ────────────────────────────────────────────────────────
@@ -459,7 +459,7 @@ function OperationalShowcase() {
       {/* Image grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         <Reveal delay={0} className="col-span-2 row-span-2">
-          <div className="relative rounded-xl sm:rounded-2xl overflow-hidden aspect-[4/3] group">
+          <div className="relative rounded-xl sm:rounded-2xl overflow-hidden aspect-square group">
             <Image
               src={IMAGES.controlRoom}
               alt="Security control room with multiple monitoring screens"
