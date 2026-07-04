@@ -30,19 +30,29 @@ export async function generateReportPdf({ reportId }: GenerateReportPdfParams): 
   const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1).toISOString()
   const monthEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-  // RLS handles company scoping automatically
+  // Scope strictly to the report's company via its site IDs.
+  // RLS does NOT constrain super_admin/dispatcher (they can read every company's rows),
+  // so relying on RLS alone would leak other companies' incidents/alerts into the report.
+  const { data: companySites } = await supabase
+    .from('sites')
+    .select('id')
+    .eq('company_id', report.company_id)
+  const siteIds = (companySites ?? []).map((s: { id: string }) => s.id)
+
   const { data: incidents } = await supabase
     .from('incidents')
     .select('*, sites(name)')
+    .in('site_id', siteIds)
     .gte('started_at', monthStart)
     .lte('started_at', monthEnd)
     .order('started_at', { ascending: false })
     .limit(50)
 
-  // Fetch alerts for the same period
+  // Fetch alerts for the same period, scoped to the same company's sites
   const { data: alerts } = await supabase
     .from('alerts')
     .select('*')
+    .in('site_id', siteIds)
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd)
     .order('created_at', { ascending: false })
