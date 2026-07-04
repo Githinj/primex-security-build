@@ -1,2 +1,5 @@
 .claude/
 .mcp.json
+
+# Supabase CLI scratch state at repo root (real project lives in primex/supabase/)
+/supabase/
