@@ -1,16 +1,14 @@
 'use client'
 
-import {
-  Phone,
-  AlertTriangle,
-  BookOpen,
-  Mail,
-  Plus,
-  ExternalLink,
-} from 'lucide-react'
+import { useState } from 'react'
+import { Phone, AlertTriangle, Mail, Plus } from 'lucide-react'
 import { PageTitle, Card, Button } from '@/components/ui'
+import { DISPATCH_PHONE_DISPLAY, DISPATCH_PHONE_TEL, SUPPORT_EMAIL } from '@/lib/support'
+import { ReportIssueModal } from '../report-issue-modal'
 
-export function ClientHelp() {
+export function ClientHelp({ siteId }: { siteId: string }) {
+  const [reportOpen, setReportOpen] = useState(false)
+
   return (
     <div className="flex flex-col gap-6 max-w-[900px]">
       <PageTitle
@@ -34,9 +32,13 @@ export function ClientHelp() {
               </p>
             </div>
             <p className="font-serif text-2xl font-semibold text-ink">
-              1-800-PRIMEX-1
+              {DISPATCH_PHONE_DISPLAY}
             </p>
-            <Button variant="primary" icon={Phone}>
+            <Button
+              variant="primary"
+              icon={Phone}
+              onClick={() => { window.location.href = `tel:${DISPATCH_PHONE_TEL}` }}
+            >
               Call now
             </Button>
           </div>
@@ -56,28 +58,8 @@ export function ClientHelp() {
                 Let us know about something suspicious or an issue at your location.
               </p>
             </div>
-            <Button variant="secondary" icon={Plus}>
+            <Button variant="secondary" icon={Plus} onClick={() => setReportOpen(true)}>
               New incident report
-            </Button>
-          </div>
-        </Card>
-
-        {/* Help center */}
-        <Card>
-          <div className="flex flex-col gap-4">
-            <div className="w-11 h-11 rounded-full bg-p-green-soft flex items-center justify-center">
-              <BookOpen size={20} className="text-p-green" strokeWidth={2} />
-            </div>
-            <div>
-              <h3 className="font-serif text-[22px] font-semibold text-ink leading-snug">
-                Help center
-              </h3>
-              <p className="text-sm text-ink-3 font-sans mt-1">
-                Browse guides, FAQs, and tutorials about your security system.
-              </p>
-            </div>
-            <Button variant="secondary" icon={ExternalLink}>
-              Open help center
             </Button>
           </div>
         </Card>
@@ -93,15 +75,25 @@ export function ClientHelp() {
                 Email support
               </h3>
               <p className="text-sm text-ink-3 font-sans mt-1">
-                Send us a message and we'll get back to you within 24 hours.
+                Send us a message and we&apos;ll get back to you within 24 hours.
               </p>
             </div>
-            <Button variant="secondary" icon={Mail}>
-              support@primex.com
+            <Button
+              variant="secondary"
+              icon={Mail}
+              onClick={() => { window.location.href = `mailto:${SUPPORT_EMAIL}` }}
+            >
+              {SUPPORT_EMAIL}
             </Button>
           </div>
         </Card>
       </div>
+
+      <ReportIssueModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        siteId={siteId}
+      />
     </div>
   )
 }

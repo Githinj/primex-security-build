@@ -138,7 +138,7 @@ export function PortalClient({
         {section === 'alerts' && <ClientAlerts alerts={alerts} />}
         {section === 'incidents' && <ClientIncidents incidents={incidents} />}
         {section === 'reports' && <ClientReports reports={reports} />}
-        {section === 'help' && <ClientHelp />}
+        {section === 'help' && <ClientHelp siteId={site.id} />}
       </main>
     </div>
   )
