@@ -98,6 +98,7 @@ Required in `.env.local`:
 - `ANTMEDIA_URL`, `ANTMEDIA_APP` (default: `LiveApp`), `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
 - `ANTMEDIA_API_KEY` (optional — only needed for Enterprise Edition)
 - `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
+- `DO_SPACES_KEY`, `DO_SPACES_SECRET`, `DO_SPACES_REGION` (optional — only needed to presign recording playback for a private recordings bucket; without them the stored public URL is served as-is). Signing lives in `lib/storage/presign.ts` (hand-rolled SigV4, no AWS SDK)
 
 ### Key Conventions
 
