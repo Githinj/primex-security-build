@@ -9,13 +9,13 @@
 -- ============================================================
 
 -- ---------- 1. Mapping table ----------
-CREATE TABLE client_sites (
+CREATE TABLE IF NOT EXISTS client_sites (
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   site_id    UUID NOT NULL REFERENCES sites(id)    ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, site_id)
 );
-CREATE INDEX idx_client_sites_user ON client_sites(user_id);
+CREATE INDEX IF NOT EXISTS idx_client_sites_user ON client_sites(user_id);
 
 -- Backfill existing clients to their company's first site so they keep access.
 -- Best-effort: for companies with multiple clients (the leak case) the true
@@ -45,22 +45,25 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 -- ---------- 3. client_sites RLS ----------
 ALTER TABLE client_sites ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS client_sites_super_admin_all ON client_sites;
 CREATE POLICY client_sites_super_admin_all ON client_sites
   FOR ALL USING (get_user_role() = 'super_admin')
   WITH CHECK (get_user_role() = 'super_admin');
 
+DROP POLICY IF EXISTS client_sites_manager ON client_sites;
 CREATE POLICY client_sites_manager ON client_sites
   FOR ALL
   USING (get_user_role() = 'company_manager' AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company()))
   WITH CHECK (get_user_role() = 'company_manager' AND site_id IN (SELECT id FROM sites WHERE company_id = get_user_company()));
 
+DROP POLICY IF EXISTS client_sites_self_select ON client_sites;
 CREATE POLICY client_sites_self_select ON client_sites
   FOR SELECT USING (user_id = auth.uid());
 
 -- ---------- 4. Re-scope client branches ----------
 -- Only the `client` branch changes in each policy; other roles are unchanged.
 
-DROP POLICY sites_access ON sites;
+DROP POLICY IF EXISTS sites_access ON sites;
 CREATE POLICY sites_access ON sites FOR ALL USING (
   CASE get_user_role()
     WHEN 'super_admin' THEN true
@@ -72,7 +75,7 @@ CREATE POLICY sites_access ON sites FOR ALL USING (
   END
 );
 
-DROP POLICY cameras_access ON cameras;
+DROP POLICY IF EXISTS cameras_access ON cameras;
 CREATE POLICY cameras_access ON cameras FOR ALL USING (
   CASE get_user_role()
     WHEN 'super_admin' THEN true
@@ -84,7 +87,7 @@ CREATE POLICY cameras_access ON cameras FOR ALL USING (
   END
 );
 
-DROP POLICY alerts_access ON alerts;
+DROP POLICY IF EXISTS alerts_access ON alerts;
 CREATE POLICY alerts_access ON alerts FOR ALL USING (
   CASE get_user_role()
     WHEN 'super_admin' THEN true
@@ -96,7 +99,7 @@ CREATE POLICY alerts_access ON alerts FOR ALL USING (
   END
 );
 
-DROP POLICY incidents_access ON incidents;
+DROP POLICY IF EXISTS incidents_access ON incidents;
 CREATE POLICY incidents_access ON incidents FOR ALL USING (
   CASE get_user_role()
     WHEN 'super_admin' THEN true
@@ -109,8 +112,9 @@ CREATE POLICY incidents_access ON incidents FOR ALL USING (
 );
 
 -- ---------- 5. incident_updates: split client from manager, site-scope client ----------
-DROP POLICY incident_updates_company_select ON incident_updates;
+DROP POLICY IF EXISTS incident_updates_company_select ON incident_updates;
 
+DROP POLICY IF EXISTS incident_updates_manager_select ON incident_updates;
 CREATE POLICY incident_updates_manager_select ON incident_updates
   FOR SELECT USING (
     get_user_role() = 'company_manager'
@@ -120,6 +124,7 @@ CREATE POLICY incident_updates_manager_select ON incident_updates
     )
   );
 
+DROP POLICY IF EXISTS incident_updates_client_select ON incident_updates;
 CREATE POLICY incident_updates_client_select ON incident_updates
   FOR SELECT USING (
     get_user_role() = 'client'

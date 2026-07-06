@@ -6,7 +6,7 @@
 -- `incidents.notes`) so the incident keeps a real audit trail.
 -- ============================================================
 
-CREATE TABLE incident_updates (
+CREATE TABLE IF NOT EXISTS incident_updates (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
   author_id   UUID REFERENCES profiles(id) ON DELETE SET NULL,
@@ -17,22 +17,25 @@ CREATE TABLE incident_updates (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_incident_updates_incident ON incident_updates(incident_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_incident_updates_incident ON incident_updates(incident_id, created_at);
 
 -- ---------- RLS ----------
 ALTER TABLE incident_updates ENABLE ROW LEVEL SECURITY;
 
 -- super_admin + dispatcher: full access (they run the incident desk).
+DROP POLICY IF EXISTS incident_updates_super_admin_all ON incident_updates;
 CREATE POLICY incident_updates_super_admin_all ON incident_updates
   FOR ALL USING (get_user_role() = 'super_admin')
   WITH CHECK (get_user_role() = 'super_admin');
 
+DROP POLICY IF EXISTS incident_updates_dispatcher_all ON incident_updates;
 CREATE POLICY incident_updates_dispatcher_all ON incident_updates
   FOR ALL USING (get_user_role() = 'dispatcher')
   WITH CHECK (get_user_role() = 'dispatcher');
 
 -- guard: read/write updates only for incidents assigned to them, and only as
 -- themselves. Mirrors incidents_access (guard_id = auth.uid()).
+DROP POLICY IF EXISTS incident_updates_guard ON incident_updates;
 CREATE POLICY incident_updates_guard ON incident_updates
   FOR ALL
   USING (
@@ -46,6 +49,7 @@ CREATE POLICY incident_updates_guard ON incident_updates
   );
 
 -- company_manager + client: read-only, scoped to their company's incidents.
+DROP POLICY IF EXISTS incident_updates_company_select ON incident_updates;
 CREATE POLICY incident_updates_company_select ON incident_updates
   FOR SELECT USING (
     get_user_role() IN ('company_manager', 'client')
