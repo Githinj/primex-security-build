@@ -84,9 +84,9 @@ export function CompanyDetailsModal({
       setForm({
         name: company.name,
         type: company.type,
-        contactName: "",
-        contactEmail: "",
-        plan: "Professional",
+        contactName: company.primary_contact ?? "",
+        contactEmail: company.contact_email ?? "",
+        plan: company.plan ?? "Professional",
       });
     }
   }, [company, open]);
@@ -105,6 +105,9 @@ export function CompanyDetailsModal({
       await updateCompany(company.id, {
         name: form.name,
         type: form.type,
+        primary_contact: form.contactName.trim() || null,
+        contact_email: form.contactEmail.trim() || null,
+        plan: form.plan,
       });
       setSuccess(true);
     } catch {
@@ -228,16 +231,27 @@ export function CompanyDetailsModal({
                 />
               </div>
               <div className="py-2.5 border-t border-border">
-                <KV k="Primary contact" v="\u2014" />
+                <KV k="Primary contact" v={company.primary_contact || "\u2014"} />
               </div>
               <div className="py-2.5 border-t border-border">
-                <KV k="Contact email" v="\u2014" />
+                <KV k="Contact email" v={company.contact_email || "\u2014"} />
               </div>
               <div className="py-2.5 border-t border-border">
-                <KV k="Plan" v="Professional" />
+                <KV k="Plan" v={company.plan || "\u2014"} />
               </div>
               <div className="py-2.5 border-t border-border">
-                <KV k="Joined" v="\u2014" />
+                <KV
+                  k="Joined"
+                  v={
+                    company.created_at
+                      ? new Date(company.created_at).toLocaleDateString("en-AU", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "\u2014"
+                  }
+                />
               </div>
             </div>
           </ModalBody>

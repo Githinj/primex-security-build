@@ -11,6 +11,10 @@ function mapCompany(c: any): Company {
     status: c.status,
     sites: c.sites[0]?.count ?? 0,
     users: c.profiles[0]?.count ?? 0,
+    primary_contact: c.primary_contact ?? null,
+    contact_email: c.contact_email ?? null,
+    plan: c.plan ?? null,
+    created_at: c.created_at ?? null,
   }
 }
 

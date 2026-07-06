@@ -63,7 +63,13 @@ export function InviteCompanyModal({ open, onClose }: InviteCompanyModalProps) {
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      const company = await createCompany({ name: form.name, type: form.type });
+      const company = await createCompany({
+        name: form.name,
+        type: form.type,
+        primary_contact: form.contactName,
+        contact_email: form.contactEmail,
+        plan: form.plan,
+      });
       await inviteUser({
         email: form.contactEmail,
         full_name: form.contactName,

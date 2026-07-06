@@ -135,10 +135,7 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
     </Pill>,
   ]);
 
-  // Determine plan label (mocked based on site count)
-  const siteCount = company.sites ?? 0;
-  const plan =
-    siteCount >= 10 ? "Enterprise" : siteCount >= 5 ? "Growth" : "Starter";
+  const plan = company.plan || "—";
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
@@ -231,6 +228,8 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
             <KV k="Sites" v={company.sites ?? 0} />
             <KV k="Users" v={company.users ?? 0} />
             <KV k="Plan" v={plan} />
+            <KV k="Primary contact" v={company.primary_contact || "—"} />
+            <KV k="Contact email" v={company.contact_email || "—"} />
             <KV
               k="Company ID"
               v={

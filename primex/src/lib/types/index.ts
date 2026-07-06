@@ -16,6 +16,10 @@ export interface Company {
   status: CompanyStatus
   sites?: number
   users?: number
+  primary_contact?: string | null
+  contact_email?: string | null
+  plan?: string | null
+  created_at?: string | null
 }
 
 export interface Site {
@@ -155,6 +159,7 @@ export interface Incident {
   guard_id: string | null
   started_at: string
   notes: string | null
+  guard_stage: string | null
 }
 
 export interface Report {
