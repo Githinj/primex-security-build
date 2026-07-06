@@ -18,7 +18,8 @@ import {
   Button,
 } from "@/components/ui";
 import { generateReportPdf } from "@/lib/data/actions/generate-report-pdf";
-import type { Report, Incident } from "@/lib/types";
+import { GenerateReportModal } from "@/components/reports/generate-report-modal";
+import type { Report, Incident, Company } from "@/lib/types";
 
 function reportTypeTone(type: string): "blue" | "green" | "amber" | "gray" {
   switch (type) {
@@ -42,16 +43,18 @@ function formatDate(iso: string): string {
 }
 
 interface CompanyReportsProps {
+  company: Company;
   reports: Report[];
   incidents: Incident[];
 }
 
 const PAGE_SIZE = 25;
 
-export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
+export function CompanyReports({ company, reports, incidents }: CompanyReportsProps) {
   const [isPending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   function handleDownload(report: Report) {
     setDownloadingId(report.id);
@@ -136,7 +139,7 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
         title="Reports"
         sub="Monthly summaries, response-time analytics, and site-level reports."
         actions={
-          <Button variant="primary" icon={Plus}>
+          <Button variant="primary" icon={Plus} onClick={() => setGenerateOpen(true)}>
             Generate report
           </Button>
         }
@@ -193,6 +196,12 @@ export function CompanyReports({ reports, incidents }: CompanyReportsProps) {
           pagination={{ page, pageSize: PAGE_SIZE, total: reports.length, onPageChange: setPage }}
         />
       </Card>
+
+      <GenerateReportModal
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        lockedCompany={company}
+      />
     </div>
   );
 }

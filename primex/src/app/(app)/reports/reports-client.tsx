@@ -22,7 +22,8 @@ import { SimpleBarChart } from "@/components/charts/bar-chart";
 import { HorizontalBarList } from "@/components/charts/horizontal-bars";
 
 import { generateReportPdf } from "@/lib/data/actions/generate-report-pdf";
-import type { Report } from "@/lib/types";
+import { GenerateReportModal } from "@/components/reports/generate-report-modal";
+import type { Report, Company } from "@/lib/types";
 
 // --- types -------------------------------------------------------------------
 
@@ -74,15 +75,26 @@ interface ReportsClientProps {
   reportStats: ReportStats;
   monthlyData: MonthlyDataPoint[];
   incidentTypes: IncidentTypeEntry[];
+  companies: Company[];
 }
 
 const PAGE_SIZE = 25;
 
-export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes }: ReportsClientProps) {
-  const [_dateRange, setDateRange] = useState("Last 6 months");
+export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes, companies }: ReportsClientProps) {
   const [isPending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [range, setRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
+
+  // Client-side filter of the reports list by report date.
+  const filteredReports = reports.filter((r) => {
+    const d = r.date.slice(0, 10);
+    if (range.start && d < range.start) return false;
+    if (range.end && d > range.end) return false;
+    return true;
+  });
 
   function handleDownload(report: Report) {
     setDownloadingId(report.id);
@@ -101,7 +113,7 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
     });
   }
 
-  const paginatedReports = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedReports = filteredReports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const reportRows = paginatedReports.map((report: Report) => [
     // Report name
@@ -160,16 +172,61 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
               variant="secondary"
               size="sm"
               icon={Calendar}
-              onClick={() => setDateRange("Custom")}
+              onClick={() => setRangeOpen((o) => !o)}
             >
               Date range
             </Button>
-            <Button variant="primary" size="sm" icon={Download}>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Download}
+              onClick={() => setGenerateOpen(true)}
+            >
               Generate new report
             </Button>
           </>
         }
       />
+
+      {/* Date-range filter for the reports list */}
+      {rangeOpen && (
+        <Card>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-ink-2 font-sans">From</span>
+              <input
+                type="date"
+                value={range.start}
+                max={range.end || undefined}
+                onChange={(e) => { setRange((r) => ({ ...r, start: e.target.value })); setPage(1); }}
+                className="px-3 py-2 text-sm font-sans bg-surface text-ink border border-border rounded-lg outline-none focus:border-p-blue"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-ink-2 font-sans">To</span>
+              <input
+                type="date"
+                value={range.end}
+                min={range.start || undefined}
+                onChange={(e) => { setRange((r) => ({ ...r, end: e.target.value })); setPage(1); }}
+                className="px-3 py-2 text-sm font-sans bg-surface text-ink border border-border rounded-lg outline-none focus:border-p-blue"
+              />
+            </div>
+            {(range.start || range.end) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setRange({ start: "", end: "" }); setPage(1); }}
+              >
+                Clear
+              </Button>
+            )}
+            <span className="text-xs text-ink-3 font-sans ml-auto">
+              Showing {filteredReports.length} of {reports.length} reports
+            </span>
+          </div>
+        </Card>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -251,9 +308,15 @@ export function ReportsClient({ reports, reportStats, monthlyData, incidentTypes
         <DataTable
           columns={["Report", "Scope", "Type", "Incidents", "Date", "Size", ""]}
           rows={reportRows}
-          pagination={{ page, pageSize: PAGE_SIZE, total: reports.length, onPageChange: setPage }}
+          pagination={{ page, pageSize: PAGE_SIZE, total: filteredReports.length, onPageChange: setPage }}
         />
       </Card>
+
+      <GenerateReportModal
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        companies={companies}
+      />
     </div>
   );
 }

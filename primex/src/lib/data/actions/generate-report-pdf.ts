@@ -25,10 +25,21 @@ export async function generateReportPdf({ reportId }: GenerateReportPdfParams): 
 
   const companyName = (report as any).companies?.name ?? 'Unknown'
 
-  // Fetch incidents for this company in the report's date range
-  const reportDate = new Date(report.date)
-  const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1).toISOString()
-  const monthEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59).toISOString()
+  // Determine the reporting window. Reports created with an explicit range
+  // (period_start/period_end, migration 009) use it verbatim; legacy rows fall
+  // back to the calendar month of `date`.
+  const periodStart = (report as any).period_start as string | null
+  const periodEnd = (report as any).period_end as string | null
+  let monthStart: string
+  let monthEnd: string
+  if (periodStart && periodEnd) {
+    monthStart = new Date(`${periodStart}T00:00:00`).toISOString()
+    monthEnd = new Date(`${periodEnd}T23:59:59`).toISOString()
+  } else {
+    const reportDate = new Date(report.date)
+    monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1).toISOString()
+    monthEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59).toISOString()
+  }
 
   // Scope strictly to the report's company via its site IDs.
   // RLS does NOT constrain super_admin/dispatcher (they can read every company's rows),

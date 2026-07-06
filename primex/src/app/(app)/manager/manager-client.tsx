@@ -273,7 +273,7 @@ export function ManagerClient({
             <CompanyTeam members={teamMembers} />
           )}
           {section === "reports" && (
-            <CompanyReports reports={reports} incidents={incidents} />
+            <CompanyReports company={company} reports={reports} incidents={incidents} />
           )}
         </div>
       </main>

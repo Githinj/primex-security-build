@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getReports } from "@/lib/data/reports";
+import { getCompanies } from "@/lib/data/companies";
 import { ReportsClient } from "./reports-client";
 
 export default async function ReportsPage() {
@@ -24,8 +25,9 @@ export default async function ReportsPage() {
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
   const supabaseForStats = await createServerSupabaseClient();
-  const [reports, { data: incidentsData }] = await Promise.all([
+  const [reports, companies, { data: incidentsData }] = await Promise.all([
     getReports(),
+    getCompanies(),
     supabaseForStats.from('incidents').select('*').gte('started_at', sixMonthsAgo.toISOString()).order('started_at', { ascending: false }).limit(1000),
   ]);
   const allIncidents = incidentsData ?? [];
@@ -120,6 +122,7 @@ export default async function ReportsPage() {
       reportStats={reportStats}
       monthlyData={monthlyData}
       incidentTypes={incidentTypes}
+      companies={companies}
     />
   );
 }
