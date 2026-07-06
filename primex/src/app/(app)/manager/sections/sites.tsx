@@ -12,6 +12,7 @@ import {
 import { PageTitle, Pill, Card, Button } from "@/components/ui";
 import { cameraTone } from "@/lib/utils";
 import { AddSiteModal } from "@/components/sites/add-site-modal";
+import { EditSiteModal } from "@/components/sites/edit-site-modal";
 import { CameraTile } from "@/components/sites/camera-tile";
 import type {
   Company,
@@ -64,6 +65,7 @@ export function CompanySites({
     sites[0]?.id ?? null
   );
   const [addSiteOpen, setAddSiteOpen] = useState(false);
+  const [editSiteOpen, setEditSiteOpen] = useState(false);
 
   const selectedSite = sites.find((s) => s.id === selectedSiteId) ?? null;
 
@@ -188,7 +190,11 @@ export function CompanySites({
                         {selectedSite.address}
                       </div>
                     </div>
-                    <Button variant="secondary" size="sm">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setEditSiteOpen(true)}
+                    >
                       Manage
                     </Button>
                   </div>
@@ -271,6 +277,11 @@ export function CompanySites({
         onClose={() => setAddSiteOpen(false)}
         lockedCompany={company}
         companies={[company]}
+      />
+      <EditSiteModal
+        open={editSiteOpen}
+        onClose={() => setEditSiteOpen(false)}
+        site={selectedSite}
       />
     </>
   );

@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Settings, ArrowLeft, Camera } from "lucide-react";
 import { Card, Pill, Button, Label } from "@/components/ui";
 import { CameraGrid } from "@/components/sites/camera-grid";
+import { EditSiteModal } from "@/components/sites/edit-site-modal";
 import type { Site, Company, Camera as CameraType, Alert, Incident, SiteRisk } from "@/lib/types";
 
 function riskTone(risk: SiteRisk): "red" | "amber" | "green" {
@@ -33,6 +35,7 @@ export function SiteDetailClient({
   incidents,
 }: SiteDetailClientProps) {
   const router = useRouter();
+  const [editOpen, setEditOpen] = useState(false);
 
   const openAlerts = alerts.filter(
     (a) => a.status !== "Closed"
@@ -69,10 +72,17 @@ export function SiteDetailClient({
           </div>
           <span className="text-xs text-ink-4 font-sans">{company.name}</span>
         </div>
-        <Button variant="secondary" icon={Settings} className="flex-shrink-0 mt-1">
+        <Button
+          variant="secondary"
+          icon={Settings}
+          className="flex-shrink-0 mt-1"
+          onClick={() => setEditOpen(true)}
+        >
           Manage site
         </Button>
       </div>
+
+      <EditSiteModal open={editOpen} onClose={() => setEditOpen(false)} site={site} />
 
       {/* Mini stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -45,6 +45,27 @@ export async function createSite(data: {
   return { inviteError }
 }
 
+export async function updateSite(
+  id: string,
+  data: { name: string; type: string; address: string; risk: string },
+) {
+  const caller = await requireRole('super_admin', 'company_manager')
+  await requireActiveCompany(caller)
+  const supabase = await createServerSupabaseClient()
+  // RLS (sites_access) already restricts company_manager to their own company's
+  // rows and lets super_admin edit any. We never touch company_id here, so a
+  // manager can't move a site to another company.
+  const { error } = await supabase
+    .from('sites')
+    .update({ name: data.name, type: data.type, address: data.address, risk: data.risk })
+    .eq('id', id)
+  if (error) throw error
+  logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Site updated', target: data.name, icon: 'MapPin', tone: 'gray' })
+  revalidatePath('/sites')
+  revalidatePath(`/sites/${id}`)
+  revalidatePath('/manager')
+}
+
 export async function toggleSiteStatus(id: string, newStatus: 'Active' | 'Inactive') {
   const caller = await requireRole('super_admin', 'company_manager')
   const supabase = await createServerSupabaseClient()

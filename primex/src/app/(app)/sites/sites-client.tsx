@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Eye, Power, Trash2 } from "lucide-react";
+import { Plus, Eye, Power, Trash2, Pencil } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   PageTitle,
@@ -13,6 +13,7 @@ import {
   FilterPills,
 } from "@/components/ui";
 import { AddSiteModal } from "@/components/sites/add-site-modal";
+import { EditSiteModal } from "@/components/sites/edit-site-modal";
 import { SiteToggleModal } from "@/components/sites/site-toggle-modal";
 import { DeleteSiteModal } from "@/components/sites/delete-site-modal";
 import type { Site, Company, SiteRisk, SiteStatus } from "@/lib/types";
@@ -65,6 +66,7 @@ export function SitesClient({ sites, total, page, pageSize, risk, companies }: S
   }
   const [toggleModal, setToggleModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
+  const [editModal, setEditModal] = useState<{ open: boolean; site: Site | null }>({ open: false, site: null });
 
   const rows = sites.map((site) => {
     const company = companies.find((c) => c.id === site.company_id);
@@ -109,6 +111,11 @@ export function SitesClient({ sites, total, page, pageSize, risk, companies }: S
             label: "View site",
             icon: Eye,
             onClick: () => router.push(`/sites/${site.id}`),
+          },
+          {
+            label: "Edit site",
+            icon: Pencil,
+            onClick: () => setEditModal({ open: true, site }),
           },
           { divider: true, label: "" },
           {
@@ -163,6 +170,11 @@ export function SitesClient({ sites, total, page, pageSize, risk, companies }: S
       </div>
 
       <AddSiteModal open={modalOpen} onClose={() => setModalOpen(false)} companies={companies} />
+      <EditSiteModal
+        open={editModal.open}
+        onClose={() => setEditModal({ open: false, site: null })}
+        site={editModal.site}
+      />
       <SiteToggleModal
         open={toggleModal.open}
         onClose={() => setToggleModal({ open: false, site: null })}
