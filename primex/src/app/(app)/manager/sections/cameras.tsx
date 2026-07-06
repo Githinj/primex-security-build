@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ChevronLeft, ChevronRight, Camera as CameraIcon } from "lucide-react";
-import { PageTitle, Button, Card } from "@/components/ui";
+import { Plus, ChevronLeft, ChevronRight, Camera as CameraIcon, Pencil, Trash2 } from "lucide-react";
+import { PageTitle, Button, Card, ActionMenu } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
+import { EditCameraModal } from "@/components/cameras/edit-camera-modal";
+import { RemoveCameraModal } from "@/components/cameras/remove-camera-modal";
 import type { Camera, Site, Company } from "@/lib/types";
 
 interface CompanyCamerasProps {
@@ -18,6 +20,8 @@ const PAGE_SIZE = 24;
 export function CompanyCameras({ company, cameras, sites }: CompanyCamerasProps) {
   const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
+  const [editModal, setEditModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
+  const [removeModal, setRemoveModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
   const totalPages = Math.ceil(cameras.length / PAGE_SIZE);
   const paginatedCameras = cameras.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -40,7 +44,20 @@ export function CompanyCameras({ company, cameras, sites }: CompanyCamerasProps)
               const site = sites.find((s) => s.id === camera.site_id);
               if (!site) return null;
               return (
-                <CameraTile key={camera.id} camera={camera} site={site} />
+                <CameraTile
+                  key={camera.id}
+                  camera={camera}
+                  site={site}
+                  menu={
+                    <ActionMenu
+                      actions={[
+                        { label: "Edit camera", icon: Pencil, onClick: () => setEditModal({ open: true, camera }) },
+                        { divider: true, label: "" },
+                        { label: "Remove camera", icon: Trash2, tone: "danger", onClick: () => setRemoveModal({ open: true, camera }) },
+                      ]}
+                    />
+                  }
+                />
               );
             })}
           </div>
@@ -98,6 +115,16 @@ export function CompanyCameras({ company, cameras, sites }: CompanyCamerasProps)
         onClose={() => setAddOpen(false)}
         companies={[company]}
         sites={sites}
+      />
+      <EditCameraModal
+        open={editModal.open}
+        onClose={() => setEditModal({ open: false, camera: null })}
+        camera={editModal.camera}
+      />
+      <RemoveCameraModal
+        open={removeModal.open}
+        onClose={() => setRemoveModal({ open: false, camera: null })}
+        camera={removeModal.camera}
       />
     </>
   );

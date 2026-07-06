@@ -16,7 +16,10 @@ export async function createCamera(data: { site_id: string; name: string; locati
 }
 
 export async function updateCamera(id: string, data: { name?: string; location?: string; status?: string; stream_id?: string | null }) {
-  const caller = await requireRole('super_admin')
+  // Aligns with create/delete: company_manager may edit cameras within their own
+  // company (RLS on `cameras` scopes them to their sites); super_admin edits any.
+  const caller = await requireRole('super_admin', 'company_manager')
+  await requireActiveCompany(caller)
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('cameras').update(data).eq('id', id)
   if (error) throw error
