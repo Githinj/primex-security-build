@@ -3,7 +3,7 @@
 import { useState, useTransition, useCallback } from "react";
 import { Bell, ExternalLink, XCircle } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { updateAlertStatus } from "@/lib/data/actions/alerts";
+import { updateAlertStatus, getIncidentIdForAlert } from "@/lib/data/actions/alerts";
 import {
   PageTitle,
   Card,
@@ -82,6 +82,16 @@ export function AlertsClient({
     [router, pathname, searchParams]
   );
 
+  const openIncident = useCallback(
+    (alertId: string) => {
+      startTransition(async () => {
+        const incidentId = await getIncidentIdForAlert(alertId);
+        router.push(incidentId ? `/incidents/${incidentId}` : "/incidents");
+      });
+    },
+    [router]
+  );
+
   const rows = alerts.map((alert) => {
     const site = sites.find((s) => s.id === alert.site_id);
     const isAI = alert.source.includes("AI");
@@ -102,7 +112,7 @@ export function AlertsClient({
         key="actions"
         actions={[
           { label: "View alert", icon: Bell, onClick: () => router.push(`/alerts/${alert.id}`) },
-          { label: "Open incident", icon: ExternalLink, onClick: () => router.push(`/incidents`) },
+          { label: "Open incident", icon: ExternalLink, onClick: () => openIncident(alert.id) },
           { divider: true, label: "" },
           {
             label: "Close alert",

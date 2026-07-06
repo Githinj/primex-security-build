@@ -12,7 +12,7 @@ import {
   ActionMenu,
 } from "@/components/ui";
 import { CreateAlertModal } from "@/components/alerts/create-alert-modal";
-import { updateAlertStatus } from "@/lib/data/actions/alerts";
+import { updateAlertStatus, getIncidentIdForAlert } from "@/lib/data/actions/alerts";
 import { severityTone } from "@/lib/utils";
 import type { Company, Alert, Site, Camera } from "@/lib/types";
 
@@ -41,6 +41,13 @@ export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlerts
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [page, setPage] = useState(1);
+
+  function openIncident(alertId: string) {
+    startTransition(async () => {
+      const incidentId = await getIncidentIdForAlert(alertId);
+      router.push(incidentId ? `/incidents/${incidentId}` : "/incidents");
+    });
+  }
 
   const paginatedAlerts = alerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -82,7 +89,7 @@ export function CompanyAlerts({ company, alerts, sites, cameras }: CompanyAlerts
           {
             label: "Open incident",
             icon: ExternalLink,
-            onClick: () => router.push(`/incidents`),
+            onClick: () => openIncident(alert.id),
           },
           { divider: true, label: "" },
           {

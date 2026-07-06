@@ -29,6 +29,20 @@ export async function createAlert(data: { site_id: string; camera_id?: string | 
   revalidatePath('/incidents')
 }
 
+/** The incident auto-created for an alert (create_alert_with_incident), if any. */
+export async function getIncidentIdForAlert(alertId: string): Promise<string | null> {
+  await requireRole('super_admin', 'dispatcher', 'company_manager', 'client', 'guard')
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('incidents')
+    .select('id')
+    .eq('alert_id', alertId)
+    .order('started_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 export async function updateAlertStatus(id: string, status: string) {
   const caller = await requireRole('super_admin', 'dispatcher')
   const supabase = await createServerSupabaseClient()

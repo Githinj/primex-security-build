@@ -4,9 +4,14 @@ import { createClient } from '@supabase/supabase-js'
 const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-// Env vars: DO_SPACES_RECORDINGS_BUCKET=primex-recordings, DO_SPACES_ENDPOINT=sgp1.digitaloceanspaces.com
+// DO_SPACES_ENDPOINT may be set as a full URL (worker/boto3 style, e.g.
+// https://sgp1.digitaloceanspaces.com) or a bare host — normalize to a bare host
+// so this webhook builds a valid virtual-hosted URL either way.
+const DO_SPACES_HOST = (process.env.DO_SPACES_ENDPOINT ?? 'sgp1.digitaloceanspaces.com')
+  .replace(/^https?:\/\//, '')
+  .replace(/\/+$/, '')
 const DO_SPACES_ENDPOINT = process.env.DO_SPACES_RECORDINGS_BUCKET
-  ? `https://${process.env.DO_SPACES_RECORDINGS_BUCKET}.${process.env.DO_SPACES_ENDPOINT ?? 'sgp1.digitaloceanspaces.com'}`
+  ? `https://${process.env.DO_SPACES_RECORDINGS_BUCKET}.${DO_SPACES_HOST}`
   : ''
 
 export async function POST(req: NextRequest) {
