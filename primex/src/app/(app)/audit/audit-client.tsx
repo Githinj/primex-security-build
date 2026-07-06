@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   Activity,
   Users,
   AlertTriangle,
   Cpu,
-  Filter,
   Download,
   Eye,
   Settings,
@@ -31,6 +30,7 @@ import {
   SearchInput,
 } from "@/components/ui";
 import { usePagination } from "@/lib/hooks/use-pagination";
+import { exportAuditLog } from "@/lib/data/actions/audit";
 import type { ActivityItem } from "@/lib/types";
 
 type TimeFilter = "All" | "Today" | "This week" | "This month";
@@ -46,6 +46,28 @@ function formatWhen(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function matchesFilters(item: ActivityItem, cutoff: Date | null, search: string): boolean {
+  if (cutoff && new Date(item.created_at) < cutoff) return false;
+  if (!search) return true;
+  const q = search.toLowerCase();
+  return (
+    item.who.toLowerCase().includes(q) ||
+    item.action.toLowerCase().includes(q) ||
+    item.target.toLowerCase().includes(q)
+  );
+}
+
+function toCsv(rows: ActivityItem[]): string {
+  const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const header = ["When", "Actor", "Action", "Target", "Severity"];
+  const lines = rows.map((r) =>
+    [new Date(r.created_at).toISOString(), r.who, r.action, r.target, r.tone]
+      .map((v) => esc(String(v)))
+      .join(",")
+  );
+  return [header.map(esc).join(","), ...lines].join("\n");
 }
 
 function getTimeFilterDate(filter: TimeFilter): Date | null {
@@ -130,22 +152,35 @@ interface AuditClientProps {
 export function AuditClient({ activity, total, page, pageSize, auditStats }: AuditClientProps) {
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("All");
+  const [exporting, startExport] = useTransition();
   const { setPage } = usePagination({ defaultPageSize: pageSize });
 
   const totalPages = Math.ceil(total / pageSize);
 
   // Apply client-side filters (search + time) on the current page of data
   const cutoff = getTimeFilterDate(timeFilter);
-  const filtered = activity.filter((item) => {
-    if (cutoff && new Date(item.created_at) < cutoff) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      item.who.toLowerCase().includes(q) ||
-      item.action.toLowerCase().includes(q) ||
-      item.target.toLowerCase().includes(q)
-    );
-  });
+  const filtered = activity.filter((item) => matchesFilters(item, cutoff, search));
+
+  function handleExport() {
+    startExport(async () => {
+      try {
+        // Export the whole log (not just the current page), honoring the active
+        // search + time filters so the CSV matches what the user is looking at.
+        const all = await exportAuditLog();
+        const rows = all.filter((item) => matchesFilters(item, cutoff, search));
+        const csv = toCsv(rows);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Audit export failed:", err);
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6 font-sans px-4 sm:px-9 py-6 sm:py-8">
@@ -153,14 +188,14 @@ export function AuditClient({ activity, total, page, pageSize, auditStats }: Aud
         title="Audit log"
         sub="Every action across the platform - who did what, when. Tamper-evident, retained for 12 months."
         actions={
-          <>
-            <Button variant="secondary" icon={Filter}>
-              Filter
-            </Button>
-            <Button variant="secondary" icon={Download}>
-              Export CSV
-            </Button>
-          </>
+          <Button
+            variant="secondary"
+            icon={Download}
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? "Exporting…" : "Export CSV"}
+          </Button>
         }
       />
 
