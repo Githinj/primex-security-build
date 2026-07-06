@@ -31,7 +31,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 ### Next.js 15 with App Router
 
 - **Auth proxy**: `src/middleware.ts` (NOT middleware.ts) — Supabase session refresh + route protection + role-based redirects
-- **Route groups**: `(app)` for authenticated routes, `(auth)` for login/reset
+- **Route groups**: `(app)` for authenticated routes, `(auth)` for login / reset-password / request-access
 - **Role-based dashboards**: Each role has its own route and UI:
   - `super_admin` → `/dashboard` (home) + shared top-level routes (`/alerts`, `/incidents`, `/sites`, `/cameras`, `/guards`, `/companies`, `/reports`, `/audit`, `/settings`, `/team`)
   - `dispatcher` → `/dispatcher` (queue, incidents, dispatch board, guards, activity)
@@ -49,7 +49,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 
 ### Supabase & RLS
 
-- 6 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix)
+- 7 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences)
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
@@ -70,6 +70,13 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 
 - `ProfileProvider` — current user profile, available in all `(app)` routes
 - `ScopeProvider` — company scope filtering for super_admin
+
+### Email Notifications
+
+- `lib/notifications/email.ts` — thin `resend` wrapper. Sends are **logged no-ops** when `RESEND_API_KEY` is unset, so the app never breaks without it (`isEmailConfigured()` gates this)
+- `lib/notifications/notify.ts` — event senders (e.g. `notifyCriticalAlert()`). Uses the service-role client to resolve recipients across users, honoring `notification_preferences` (missing row = enabled, opt-out model). All errors are caught/logged so notification failures never break the triggering mutation
+- Preferences: `notification_preferences` table (migration 007), managed via `lib/data/actions/notification-preferences.ts` and the Settings page
+- Env: `RESEND_API_KEY`, `NOTIFICATIONS_FROM_EMAIL`, `NEXT_PUBLIC_SITE_URL`
 
 ### AI Detection Layer
 
