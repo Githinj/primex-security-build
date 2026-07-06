@@ -1,4 +1,4 @@
-import { getIncidentById } from "@/lib/data/incidents";
+import { getIncidentById, getIncidentUpdates } from "@/lib/data/incidents";
 import { getSiteById } from "@/lib/data/sites";
 import { getGuardById } from "@/lib/data/guards";
 import { getAlertById } from "@/lib/data/alerts";
@@ -14,10 +14,11 @@ export default async function IncidentDetailPage({
   const incident = await getIncidentById(id);
   if (!incident) notFound();
 
-  const [site, guard, alert] = await Promise.all([
+  const [site, guard, alert, updates] = await Promise.all([
     getSiteById(incident.site_id),
     incident.guard_id ? getGuardById(incident.guard_id) : Promise.resolve(null),
     getAlertById(incident.alert_id),
+    getIncidentUpdates(incident.id),
   ]);
 
   if (!site) notFound();
@@ -29,6 +30,7 @@ export default async function IncidentDetailPage({
       site={site}
       guard={guard}
       alert={alert}
+      updates={updates}
     />
   );
 }

@@ -4,7 +4,7 @@ import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Pill, Label, LiveDot } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
-import { updateIncidentStatus } from '@/lib/data/actions/incidents'
+import { updateIncidentStatus, uploadIncidentPhoto, addIncidentUpdate } from '@/lib/data/actions/incidents'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Incident, Site, Profile } from '@/lib/types'
 import {
@@ -138,13 +138,22 @@ export function GuardClient({ profile, incidents, sites }: Props) {
     setSelectedIncident(null)
   }
 
-  function advanceStatus() {
+  function advanceStatus(note: string, photoUrl: string | null) {
     if (!selectedIncident || status === 'resolved') return
     const step = nextStep[status]
     const newStatus = step.next
     const incidentStatus = guardStatusToIncidentStatus(newStatus)
 
     startTransition(async () => {
+      // Persist any on-scene note/photo alongside the status change so it isn't lost.
+      if (note.trim() || photoUrl) {
+        await addIncidentUpdate({
+          incidentId: selectedIncident.id,
+          note,
+          photoUrl: photoUrl ?? undefined,
+          status: incidentStatus,
+        })
+      }
       await updateIncidentStatus(selectedIncident.id, incidentStatus)
       setStatus(newStatus)
       if (newStatus === 'resolved') {
@@ -295,11 +304,61 @@ function DetailView({
   isPending: boolean
   resolvedTime: string | null
   onBack: () => void
-  onAdvance: () => void
+  onAdvance: (note: string, photoUrl: string | null) => void
 }) {
   const tone = severityTone(incident.severity)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [attachedFile, setAttachedFile] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [savingNote, startSaveNote] = useTransition()
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFeedback(null)
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('incidentId', incident.id)
+    fd.append('file', file)
+    uploadIncidentPhoto(fd)
+      .then((res) => {
+        if (res.success && res.url) setPhotoUrl(res.url)
+        else setFeedback(res.error ?? "Couldn't upload photo.")
+      })
+      .finally(() => {
+        setUploading(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      })
+  }
+
+  function handleSaveNote() {
+    if (!note.trim() && !photoUrl) return
+    setFeedback(null)
+    startSaveNote(async () => {
+      const res = await addIncidentUpdate({
+        incidentId: incident.id,
+        note,
+        photoUrl: photoUrl ?? undefined,
+        status: guardStatusToIncidentStatus(status),
+      })
+      if (res.success) {
+        setNote('')
+        setPhotoUrl(null)
+        setFeedback('Saved to incident log.')
+      } else {
+        setFeedback(res.error ?? "Couldn't save note.")
+      }
+    })
+  }
+
+  function handleAdvance() {
+    onAdvance(note, photoUrl)
+    setNote('')
+    setPhotoUrl(null)
+    setFeedback(null)
+  }
 
   if (status === 'resolved') {
     return (
@@ -414,28 +473,51 @@ function DetailView({
       <div className="border border-border rounded-xl p-4 bg-surface mb-5">
         <Label>Your notes</Label>
         <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
           placeholder="Add notes..."
           className="w-full mt-2 px-3 py-2 text-sm font-sans bg-surface text-ink border border-border rounded-lg placeholder:text-ink-4 outline-none focus:border-p-blue transition-colors duration-150 min-h-[70px] resize-y"
         />
-        <div className="mt-2 flex items-center gap-2">
+
+        {photoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoUrl}
+            alt="Attached evidence"
+            className="mt-2 w-full max-h-40 object-cover rounded-lg border border-border"
+          />
+        )}
+
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) setAttachedFile(file.name)
-            }}
+            onChange={handleFile}
           />
-          <Button variant="secondary" size="sm" icon={Upload} onClick={() => fileInputRef.current?.click()}>
-            Attach photo
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Upload}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? 'Uploading…' : photoUrl ? 'Replace photo' : 'Attach photo'}
           </Button>
-          {attachedFile && (
-            <span className="text-xs text-ink-3 font-sans truncate max-w-[150px]">{attachedFile}</span>
-          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSaveNote}
+            disabled={savingNote || uploading || (!note.trim() && !photoUrl)}
+          >
+            {savingNote ? 'Saving…' : 'Save note'}
+          </Button>
         </div>
+        {feedback && (
+          <p className="text-xs text-ink-3 font-sans mt-2">{feedback}</p>
+        )}
       </div>
 
       {/* Primary action button */}
@@ -444,8 +526,8 @@ function DetailView({
         size="lg"
         full
         icon={StepIcon}
-        onClick={onAdvance}
-        disabled={isPending}
+        onClick={handleAdvance}
+        disabled={isPending || uploading}
       >
         {isPending ? 'Updating...' : step.label}
       </Button>

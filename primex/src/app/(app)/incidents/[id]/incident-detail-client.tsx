@@ -15,13 +15,24 @@ import {
 import { Timeline } from "@/components/incidents/timeline";
 import { severityTone, incidentTone } from "@/lib/utils";
 import { updateIncidentStatus } from "@/lib/data/actions/incidents";
-import type { Incident, Site, Profile, Alert } from "@/lib/types";
+import type { Incident, Site, Profile, Alert, IncidentUpdate } from "@/lib/types";
 
 interface IncidentDetailClientProps {
   incident: Incident;
   site: Site;
   guard: Profile | null;
   alert: Alert;
+  updates: IncidentUpdate[];
+}
+
+function formatUpdateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function IncidentDetailClient({
@@ -29,6 +40,7 @@ export function IncidentDetailClient({
   site,
   guard,
   alert,
+  updates,
 }: IncidentDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -162,6 +174,46 @@ export function IncidentDetailClient({
               <Timeline events={timelineEvents} />
             </div>
           </div>
+
+          {/* On-scene log (guard notes + photo evidence) */}
+          {updates.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <Label>On-scene log</Label>
+              <div className="flex flex-col gap-3 mt-1">
+                {updates.map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex flex-col gap-2 border border-border rounded-lg p-3 bg-surface-subtle"
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-ink font-sans">
+                        {u.author_name}
+                      </span>
+                      <span className="text-[11px] text-ink-3 font-sans tabular-nums">
+                        {formatUpdateTime(u.created_at)}
+                        {u.status ? ` · ${u.status}` : ""}
+                      </span>
+                    </div>
+                    {u.note && (
+                      <p className="text-sm text-ink-2 font-sans leading-relaxed">
+                        {u.note}
+                      </p>
+                    )}
+                    {u.photo_url && (
+                      <a href={u.photo_url} target="_blank" rel="noopener noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={u.photo_url}
+                          alt="On-scene evidence"
+                          className="w-full max-h-64 object-cover rounded-lg border border-border"
+                        />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Right card: actions + details */}

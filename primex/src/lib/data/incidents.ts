@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { applyPagination, toPaginatedResult } from './pagination'
 import type { PaginationParams, PaginatedResult } from './pagination'
-import type { Incident } from '@/lib/types'
+import type { Incident, IncidentUpdate } from '@/lib/types'
 
 export async function getIncidents(siteId?: string): Promise<Incident[]>
 export async function getIncidents(siteId: string | undefined, pagination: PaginationParams): Promise<PaginatedResult<Incident>>
@@ -36,4 +36,21 @@ export async function getIncidentById(id: string): Promise<Incident | null> {
     .single()
   if (error) return null
   return data
+}
+
+// Defensive: returns [] on any error (e.g. before the 010 migration is applied)
+// so incident pages never fail to render.
+export async function getIncidentUpdates(incidentId: string): Promise<IncidentUpdate[]> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from('incident_updates')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .order('created_at', { ascending: true })
+    if (error) return []
+    return data ?? []
+  } catch {
+    return []
+  }
 }

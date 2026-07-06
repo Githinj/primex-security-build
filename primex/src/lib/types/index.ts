@@ -118,6 +118,17 @@ export interface Profile {
   avatar_url: string | null
 }
 
+export interface IncidentUpdate {
+  id: string
+  incident_id: string
+  author_id: string | null
+  author_name: string
+  note: string | null
+  photo_url: string | null
+  status: string | null
+  created_at: string
+}
+
 export interface Alert {
   id: string
   title: string
