@@ -23,7 +23,7 @@ function sha256Hex(data: string): string {
 }
 
 // RFC 3986 encoding (encodeURIComponent leaves ! ' ( ) * unescaped).
-function encodeRfc3986(str: string): string {
+export function encodeRfc3986(str: string): string {
   return encodeURIComponent(str).replace(
     /[!'()*]/g,
     (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase(),
@@ -31,7 +31,7 @@ function encodeRfc3986(str: string): string {
 }
 
 // Encode an object key, preserving "/" between path segments.
-function encodeKeyPath(key: string): string {
+export function encodeKeyPath(key: string): string {
   return key.split('/').map(encodeRfc3986).join('/')
 }
 

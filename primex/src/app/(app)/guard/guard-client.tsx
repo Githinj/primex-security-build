@@ -6,6 +6,12 @@ import { Button, Pill, Label, LiveDot } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { updateIncidentStatus, uploadIncidentPhoto, addIncidentUpdate } from '@/lib/data/actions/incidents'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import {
+  type GuardStatus,
+  guardStatusToIncidentStatus,
+  guardStageValue,
+  mapIncidentToGuard,
+} from '@/lib/guard-lifecycle'
 import type { Incident, Site, Profile } from '@/lib/types'
 import {
   MapPin,
@@ -17,55 +23,6 @@ import {
   Phone,
   LogOut,
 } from 'lucide-react'
-
-type GuardStatus = 'assigned' | 'accepted' | 'enroute' | 'arrived' | 'resolved'
-
-// Accepted / En Route / Arrived all map to the "In Progress" incident status, so
-// the finer stage is preserved in incidents.guard_stage. Reading back prefers
-// that stage when present.
-function mapIncidentToGuard(incident: Incident): GuardStatus {
-  switch (incident.status) {
-    case 'Dispatched':
-      return 'assigned'
-    case 'Resolved':
-    case 'Closed':
-      return 'resolved'
-    case 'In Progress':
-      if (incident.guard_stage === 'En Route') return 'enroute'
-      if (incident.guard_stage === 'Arrived') return 'arrived'
-      return 'accepted'
-    default:
-      return 'assigned'
-  }
-}
-
-function guardStatusToIncidentStatus(gs: GuardStatus): string {
-  switch (gs) {
-    case 'assigned':
-      return 'Dispatched'
-    case 'accepted':
-    case 'enroute':
-    case 'arrived':
-      return 'In Progress'
-    case 'resolved':
-      return 'Resolved'
-  }
-}
-
-// The persisted guard_stage label for a given guard status (null when the stage
-// is fully captured by the incident status itself).
-function guardStageValue(gs: GuardStatus): string | null {
-  switch (gs) {
-    case 'accepted':
-      return 'Accepted'
-    case 'enroute':
-      return 'En Route'
-    case 'arrived':
-      return 'Arrived'
-    default:
-      return null
-  }
-}
 
 function statusTone(s: GuardStatus): 'amber' | 'blue' | 'green' {
   switch (s) {

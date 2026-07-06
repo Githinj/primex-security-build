@@ -11,6 +11,11 @@ npm run build        # Production build
 npm run lint         # ESLint (flat config, eslint.config.mjs)
 npm start            # Start production server
 
+# Unit tests (Vitest, node env — pure logic in src/**/*.test.ts)
+npm test                   # Run the Vitest suite once
+npm run test:watch         # Watch mode
+npx vitest run src/lib/utils.test.ts   # Run a single test file
+
 # E2E tests (Playwright, requires dev server running)
 npm run test:e2e           # Run all E2E tests (headless)
 npm run test:e2e:headed    # Run E2E tests with browser visible
@@ -24,7 +29,7 @@ supabase db reset    # Reset DB and re-run migrations + seed
 cd ai_worker && pip install -r requirements.txt && python main.py
 ```
 
-E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI worker has unit tests in `ai_worker/tests/`.
+Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic only (`vitest.config.ts` aliases `@/` and stubs `server-only`). E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI worker has unit tests in `ai_worker/tests/`.
 
 ## Architecture
 
