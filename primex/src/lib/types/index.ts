@@ -114,6 +114,8 @@ export interface Profile {
   shifts: string | null
   guard_status: GuardStatus | null
   last_active: string | null
+  timezone: string | null
+  avatar_url: string | null
 }
 
 export interface Alert {

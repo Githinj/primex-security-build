@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   UserIcon,
   Lock,
@@ -12,6 +12,7 @@ import {
   Phone,
   Cctv,
   Pencil,
+  Camera,
 } from "lucide-react";
 import {
   PageTitle,
@@ -25,12 +26,23 @@ import {
   TextInput,
   Select,
   Toggle,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  InfoBox,
 } from "@/components/ui";
 import type { Profile } from "@/lib/types";
 import {
   updateNotificationPreference,
   type NotificationPrefs,
 } from "@/lib/data/actions/notification-preferences";
+import {
+  updateMyProfile,
+  updateMyEmail,
+  changeMyPassword,
+  uploadMyAvatar,
+} from "@/lib/data/actions/account";
 
 // ---------------------------------------------------------------------------
 // ROLES_PERMS (inline constant, previously from mock-data)
@@ -82,6 +94,14 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 // Profile tab
 // ---------------------------------------------------------------------------
 
+const TIMEZONE_OPTIONS = [
+  { value: "Australia/Sydney", label: "Australia/Sydney (AEST)" },
+  { value: "Australia/Melbourne", label: "Australia/Melbourne (AEST)" },
+  { value: "Australia/Brisbane", label: "Australia/Brisbane (AEST)" },
+  { value: "Australia/Perth", label: "Australia/Perth (AWST)" },
+  { value: "UTC", label: "UTC" },
+];
+
 function ProfileTab({ profile }: { profile: Profile }) {
   const profileInitials = profile.full_name
     .split(" ")
@@ -90,20 +110,88 @@ function ProfileTab({ profile }: { profile: Profile }) {
     .toUpperCase()
     .slice(0, 2);
 
-  const [form, setForm] = useState({
+  const [baseline, setBaseline] = useState({
     name: profile.full_name,
     email: profile.email,
     phone: profile.phone ?? "",
-    timezone: "Australia/Sydney",
+    timezone: profile.timezone ?? "Australia/Sydney",
   });
+  const [form, setForm] = useState(baseline);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
+  const [feedback, setFeedback] = useState<{ tone: "green" | "amber"; msg: string } | null>(null);
+  const [saving, startSave] = useTransition();
+  const [uploading, setUploading] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const timezoneOptions = [
-    { value: "Australia/Sydney", label: "Australia/Sydney (AEST)" },
-    { value: "Australia/Melbourne", label: "Australia/Melbourne (AEST)" },
-    { value: "Australia/Brisbane", label: "Australia/Brisbane (AEST)" },
-    { value: "Australia/Perth", label: "Australia/Perth (AWST)" },
-    { value: "UTC", label: "UTC" },
-  ];
+  const dirty =
+    form.name !== baseline.name ||
+    form.email.trim().toLowerCase() !== baseline.email.toLowerCase() ||
+    form.phone !== baseline.phone ||
+    form.timezone !== baseline.timezone;
+
+  function handleCancel() {
+    setForm(baseline);
+    setFeedback(null);
+  }
+
+  function handleSave() {
+    setFeedback(null);
+    const emailChanged =
+      form.email.trim().toLowerCase() !== baseline.email.toLowerCase();
+
+    startSave(async () => {
+      const res = await updateMyProfile({
+        full_name: form.name,
+        phone: form.phone,
+        timezone: form.timezone,
+      });
+      if (!res.success) {
+        setFeedback({ tone: "amber", msg: res.error ?? "Couldn't save changes." });
+        return;
+      }
+
+      let msg = "Profile updated.";
+      if (emailChanged) {
+        const er = await updateMyEmail(form.email);
+        if (!er.success) {
+          setFeedback({
+            tone: "amber",
+            msg: er.error ?? "Profile saved, but the email change failed.",
+          });
+          // Keep the confirmed fields as the new baseline even if email failed.
+          setBaseline((b) => ({ ...b, name: form.name, phone: form.phone, timezone: form.timezone }));
+          return;
+        }
+        msg = `Profile updated. Check ${form.email.trim()} for a link to confirm your new email address.`;
+      }
+
+      setBaseline({ ...form, email: form.email.trim() });
+      setFeedback({ tone: "green", msg });
+    });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFeedback(null);
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    uploadMyAvatar(fd)
+      .then((res) => {
+        if (res.success && res.url) {
+          setAvatarUrl(res.url);
+          setFeedback({ tone: "green", msg: "Profile photo updated." });
+        } else {
+          setFeedback({ tone: "amber", msg: res.error ?? "Couldn't upload photo." });
+        }
+      })
+      .finally(() => {
+        setUploading(false);
+        if (fileRef.current) fileRef.current.value = "";
+      });
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -117,13 +205,37 @@ function ProfileTab({ profile }: { profile: Profile }) {
             </p>
           </div>
 
+          {feedback && <InfoBox tone={feedback.tone}>{feedback.msg}</InfoBox>}
+
           {/* Avatar row */}
           <div className="flex items-center gap-4">
-            <span className="w-14 h-14 rounded-full bg-navy flex items-center justify-center text-white text-lg font-semibold font-sans flex-shrink-0">
-              {profileInitials}
-            </span>
-            <Button variant="secondary" size="sm">
-              Upload photo
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt={profile.full_name}
+                className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <span className="w-14 h-14 rounded-full bg-navy flex items-center justify-center text-white text-lg font-semibold font-sans flex-shrink-0">
+                {profileInitials}
+              </span>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Camera}
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading…" : "Upload photo"}
             </Button>
           </div>
 
@@ -135,7 +247,10 @@ function ProfileTab({ profile }: { profile: Profile }) {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </Field>
-            <Field label="Email address">
+            <Field
+              label="Email address"
+              hint="Changing this sends a confirmation link to the new address."
+            >
               <TextInput
                 type="email"
                 value={form.email}
@@ -153,14 +268,18 @@ function ProfileTab({ profile }: { profile: Profile }) {
               <Select
                 value={form.timezone}
                 onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-                options={timezoneOptions}
+                options={TIMEZONE_OPTIONS}
               />
             </Field>
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="secondary">Cancel</Button>
-            <Button variant="primary">Save changes</Button>
+            <Button variant="secondary" onClick={handleCancel} disabled={!dirty || saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSave} disabled={!dirty || saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
           </div>
         </div>
       </Card>
@@ -175,7 +294,7 @@ function ProfileTab({ profile }: { profile: Profile }) {
             <KV
               k="Password"
               v={
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" onClick={() => setPwOpen(true)}>
                   Change password
                 </Button>
               }
@@ -190,7 +309,120 @@ function ProfileTab({ profile }: { profile: Profile }) {
           </div>
         </div>
       </Card>
+
+      <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Change password modal
+// ---------------------------------------------------------------------------
+
+function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [saving, startSave] = useTransition();
+
+  function handleClose() {
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+    setError(null);
+    setDone(false);
+    onClose();
+  }
+
+  function handleSubmit() {
+    setError(null);
+    if (!current) {
+      setError("Enter your current password.");
+      return;
+    }
+    if (next.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("New passwords don't match.");
+      return;
+    }
+    startSave(async () => {
+      const res = await changeMyPassword(current, next);
+      if (!res.success) {
+        setError(res.error ?? "Couldn't change password.");
+        return;
+      }
+      setDone(true);
+    });
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} width="max-w-md">
+      {done ? (
+        <>
+          <ModalHeader title="Password changed" onClose={handleClose} />
+          <ModalBody>
+            <InfoBox tone="green">
+              Your password has been updated. Use it the next time you sign in.
+            </InfoBox>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="primary" onClick={handleClose}>
+              Done
+            </Button>
+          </ModalFooter>
+        </>
+      ) : (
+        <>
+          <ModalHeader
+            title="Change password"
+            sub="Enter your current password, then choose a new one."
+            onClose={handleClose}
+          />
+          <ModalBody>
+            <div className="flex flex-col gap-4">
+              <Field label="Current password" required>
+                <TextInput
+                  type="password"
+                  value={current}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrent(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
+              <Field label="New password" required hint="At least 8 characters.">
+                <TextInput
+                  type="password"
+                  value={next}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNext(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
+              <Field label="Confirm new password" required>
+                <TextInput
+                  type="password"
+                  value={confirm}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirm(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
+              {error && <InfoBox tone="amber">{error}</InfoBox>}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="secondary" onClick={handleClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSubmit} disabled={saving}>
+              {saving ? "Saving…" : "Change password"}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </Modal>
   );
 }
 

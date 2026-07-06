@@ -49,7 +49,7 @@ E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI w
 
 ### Supabase & RLS
 
-- 7 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences)
+- 8 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences, 008 profile self-service — timezone/avatar columns, avatars bucket, email-sync trigger)
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
