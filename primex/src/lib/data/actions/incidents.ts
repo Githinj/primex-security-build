@@ -32,7 +32,7 @@ export async function assignGuard(incidentId: string, guardId: string) {
   revalidatePath('/incidents')
 }
 
-export async function updateIncidentStatus(id: string, status: string) {
+export async function updateIncidentStatus(id: string, status: string, guardStage?: string | null) {
   const caller = await requireRole('super_admin', 'dispatcher', 'guard', 'company_manager')
   const supabase = await createServerSupabaseClient()
 
@@ -42,8 +42,14 @@ export async function updateIncidentStatus(id: string, status: string) {
       p_status: status,
     })
     if (error) throw error
+    // Clear the guard's transient stage once the incident is resolved.
+    await supabase.from('incidents').update({ guard_stage: null }).eq('id', id)
   } else {
-    const { error } = await supabase.from('incidents').update({ status }).eq('id', id)
+    const update: Record<string, unknown> = { status }
+    // Persist the finer guard lifecycle stage (Accepted/En Route/Arrived) that
+    // the incident status enum can't represent.
+    if (guardStage !== undefined) update.guard_stage = guardStage
+    const { error } = await supabase.from('incidents').update(update).eq('id', id)
     if (error) throw error
   }
 

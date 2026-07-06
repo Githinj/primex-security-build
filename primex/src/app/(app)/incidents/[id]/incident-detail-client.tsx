@@ -263,6 +263,16 @@ export function IncidentDetailClient({
                   )
                 }
               />
+              {incident.guard_stage && (
+                <KV
+                  k="Guard stage"
+                  v={
+                    <Pill tone="blue" size="sm">
+                      {incident.guard_stage}
+                    </Pill>
+                  }
+                />
+              )}
               <KV k="Site" v={site.name} />
               <KV
                 k="Alert ID"

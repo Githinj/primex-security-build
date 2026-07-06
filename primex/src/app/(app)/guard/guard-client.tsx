@@ -20,14 +20,20 @@ import {
 
 type GuardStatus = 'assigned' | 'accepted' | 'enroute' | 'arrived' | 'resolved'
 
-function mapIncidentStatusToGuard(status: string): GuardStatus {
-  switch (status) {
+// Accepted / En Route / Arrived all map to the "In Progress" incident status, so
+// the finer stage is preserved in incidents.guard_stage. Reading back prefers
+// that stage when present.
+function mapIncidentToGuard(incident: Incident): GuardStatus {
+  switch (incident.status) {
     case 'Dispatched':
       return 'assigned'
-    case 'In Progress':
-      return 'accepted'
     case 'Resolved':
+    case 'Closed':
       return 'resolved'
+    case 'In Progress':
+      if (incident.guard_stage === 'En Route') return 'enroute'
+      if (incident.guard_stage === 'Arrived') return 'arrived'
+      return 'accepted'
     default:
       return 'assigned'
   }
@@ -43,6 +49,21 @@ function guardStatusToIncidentStatus(gs: GuardStatus): string {
       return 'In Progress'
     case 'resolved':
       return 'Resolved'
+  }
+}
+
+// The persisted guard_stage label for a given guard status (null when the stage
+// is fully captured by the incident status itself).
+function guardStageValue(gs: GuardStatus): string | null {
+  switch (gs) {
+    case 'accepted':
+      return 'Accepted'
+    case 'enroute':
+      return 'En Route'
+    case 'arrived':
+      return 'Arrived'
+    default:
+      return null
   }
 }
 
@@ -128,7 +149,7 @@ export function GuardClient({ profile, incidents, sites }: Props) {
 
   function openDetail(incident: Incident) {
     setSelectedIncident(incident)
-    setStatus(mapIncidentStatusToGuard(incident.status))
+    setStatus(mapIncidentToGuard(incident))
     setResolvedTime(null)
     setView('detail')
   }
@@ -143,6 +164,7 @@ export function GuardClient({ profile, incidents, sites }: Props) {
     const step = nextStep[status]
     const newStatus = step.next
     const incidentStatus = guardStatusToIncidentStatus(newStatus)
+    const guardStage = guardStageValue(newStatus)
 
     startTransition(async () => {
       // Persist any on-scene note/photo alongside the status change so it isn't lost.
@@ -154,7 +176,7 @@ export function GuardClient({ profile, incidents, sites }: Props) {
           status: incidentStatus,
         })
       }
-      await updateIncidentStatus(selectedIncident.id, incidentStatus)
+      await updateIncidentStatus(selectedIncident.id, incidentStatus, guardStage)
       setStatus(newStatus)
       if (newStatus === 'resolved') {
         setResolvedTime(
