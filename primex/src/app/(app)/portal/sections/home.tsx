@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import {
   Shield,
   Camera,
@@ -11,9 +12,13 @@ import {
 } from 'lucide-react'
 import { PageTitle, Card, StatCard, Button, KV } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
+import { DISPATCH_PHONE_DISPLAY, DISPATCH_PHONE_TEL } from '@/lib/support'
+import { generateReportPdf } from '@/lib/data/actions/generate-report-pdf'
+import { ReportIssueModal } from '../report-issue-modal'
 import type { Camera as CameraType, Alert, Incident, Report } from '@/lib/types'
 
 interface ClientHomeProps {
+  siteId: string
   cameras: CameraType[]
   alerts: Alert[]
   incidents: Incident[]
@@ -33,7 +38,34 @@ function formatTime(dateStr: string): string {
   return `${diffD}d ago`
 }
 
-export function ClientHome({ cameras, alerts, incidents, reports }: ClientHomeProps) {
+export function ClientHome({ siteId, cameras, alerts, incidents, reports }: ClientHomeProps) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const [downloading, startDownload] = useTransition()
+  const [downloadError, setDownloadError] = useState(false)
+
+  const latestReport = reports[0] ?? null
+
+  function handleCallDispatch() {
+    window.location.href = `tel:${DISPATCH_PHONE_TEL}`
+  }
+
+  function handleDownloadReport() {
+    if (!latestReport) return
+    setDownloadError(false)
+    startDownload(async () => {
+      try {
+        const dataUri = await generateReportPdf({ reportId: latestReport.id })
+        const link = document.createElement('a')
+        link.href = dataUri
+        link.download = `${latestReport.name.replace(/\s+/g, '-').toLowerCase()}.pdf`
+        link.click()
+      } catch (err) {
+        console.error('PDF generation failed:', err)
+        setDownloadError(true)
+      }
+    })
+  }
+
   const camerasOnline = cameras.filter((c) => c.status === 'Online').length
   const totalCameras = cameras.length
 
@@ -234,13 +266,22 @@ export function ClientHome({ cameras, alerts, incidents, reports }: ClientHomePr
               Need help?
             </h3>
             <p className="text-sm text-ink-3 font-sans mb-4">
-              Our dispatch team is available around the clock.
+              Our dispatch team is available around the clock at{' '}
+              <span className="text-ink font-medium whitespace-nowrap">
+                {DISPATCH_PHONE_DISPLAY}
+              </span>
+              .
             </p>
             <div className="flex flex-col gap-2">
-              <Button variant="primary" icon={Phone} full>
+              <Button variant="primary" icon={Phone} full onClick={handleCallDispatch}>
                 Call dispatch
               </Button>
-              <Button variant="secondary" icon={AlertTriangle} full>
+              <Button
+                variant="secondary"
+                icon={AlertTriangle}
+                full
+                onClick={() => setReportOpen(true)}
+              >
                 Report an issue
               </Button>
             </div>
@@ -257,13 +298,36 @@ export function ClientHome({ cameras, alerts, incidents, reports }: ClientHomePr
               <KV k="Reports" v={reports.length} />
             </div>
             <div className="mt-4 pt-3 border-t border-border">
-              <Button variant="link" icon={Download} size="sm">
-                Download monthly report
-              </Button>
+              {latestReport ? (
+                <Button
+                  variant="link"
+                  icon={Download}
+                  size="sm"
+                  onClick={handleDownloadReport}
+                  disabled={downloading}
+                >
+                  {downloading ? 'Preparing…' : 'Download monthly report'}
+                </Button>
+              ) : (
+                <p className="text-xs text-ink-3 font-sans">
+                  No report available to download yet.
+                </p>
+              )}
+              {downloadError && (
+                <p className="text-xs text-p-red font-sans mt-1.5">
+                  Couldn&apos;t generate the report. Please try again.
+                </p>
+              )}
             </div>
           </Card>
         </div>
       </div>
+
+      <ReportIssueModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        siteId={siteId}
+      />
     </div>
   )
 }
