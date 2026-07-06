@@ -1,5 +1,6 @@
 'use server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
 import { logActivity } from './activity'
@@ -20,7 +21,7 @@ export async function createSite(data: {
 
   // Separate the optional business-client fields — they are not columns on `sites`.
   const { client_name, client_email, ...siteData } = data
-  const { error } = await supabase.from('sites').insert(siteData)
+  const { data: site, error } = await supabase.from('sites').insert(siteData).select('id').single()
   if (error) throw error
   logActivity({ actorId: caller.userId, actorName: caller.fullName, action: 'Site created', target: siteData.name, icon: 'MapPin', tone: 'blue' })
 
@@ -30,12 +31,21 @@ export async function createSite(data: {
   let inviteError: string | null = null
   if (client_email?.trim() && client_name?.trim()) {
     try {
-      await inviteUser({
+      const invited = await inviteUser({
         email: client_email.trim(),
         full_name: client_name.trim(),
         role: 'client',
         company_id: siteData.company_id,
       })
+      // Scope the client to THIS site only (SEC-147). Uses the service role so
+      // the mapping is created regardless of the caller's write policies.
+      const admin = createAdminSupabaseClient()
+      const { error: mapError } = await admin
+        .from('client_sites')
+        .insert({ user_id: invited.userId, site_id: site.id })
+      if (mapError) {
+        inviteError = `Client invited, but linking them to this site failed: ${mapError.message}`
+      }
     } catch (e) {
       inviteError = e instanceof Error ? e.message : 'Failed to send the client invite.'
     }
