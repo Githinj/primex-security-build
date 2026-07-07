@@ -1,4 +1,5 @@
-.claude/
+.claude/*
+!.claude/settings.json
 .mcp.json
 
 # Supabase CLI scratch state at repo root (real project lives in primex/supabase/)
