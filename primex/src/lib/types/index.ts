@@ -8,6 +8,17 @@ export type IncidentStatus = 'Open' | 'In Progress' | 'Dispatched' | 'Resolved' 
 export type GuardStatus = 'Available' | 'On Incident' | 'Off-duty'
 export type UserRole = 'super_admin' | 'company_manager' | 'dispatcher' | 'guard' | 'client'
 export type DetectionEventType = 'motion_afterhours' | 'person_lingering' | 'concealment_behavior' | 'door_event' | 'vehicle_detection'
+export type PlanTier = 'starter' | 'professional' | 'enterprise'
+// Mirrors Stripe subscription statuses.
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'unpaid'
+  | 'paused'
 
 export interface Company {
   id: string
@@ -20,6 +31,20 @@ export interface Company {
   contact_email?: string | null
   plan?: string | null
   created_at?: string | null
+}
+
+export interface Subscription {
+  id: string
+  company_id: string
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  plan_tier: PlanTier | null
+  status: SubscriptionStatus | null
+  current_period_end: string | null
+  trial_end: string | null
+  cancel_at_period_end: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export interface Site {

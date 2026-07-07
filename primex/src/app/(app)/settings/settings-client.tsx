@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   UserIcon,
   Lock,
@@ -13,6 +13,7 @@ import {
   Cctv,
   Pencil,
   Camera,
+  Check,
 } from "lucide-react";
 import {
   PageTitle,
@@ -32,7 +33,7 @@ import {
   ModalFooter,
   InfoBox,
 } from "@/components/ui";
-import type { Profile } from "@/lib/types";
+import type { Profile, Subscription, PlanTier, SubscriptionStatus } from "@/lib/types";
 import {
   updateNotificationPreference,
   type NotificationPrefs,
@@ -43,6 +44,8 @@ import {
   changeMyPassword,
   uploadMyAvatar,
 } from "@/lib/data/actions/account";
+import { createCheckoutSession, createPortalSession } from "@/lib/data/actions/billing";
+import { PLAN_TIERS, planTier } from "@/lib/billing/plans";
 
 // ---------------------------------------------------------------------------
 // ROLES_PERMS (inline constant, previously from mock-data)
@@ -611,7 +614,14 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-function IntegrationsTab() {
+function IntegrationsTab({ billingConfigured }: { billingConfigured: boolean }) {
+  // Stripe reflects real config: connected once STRIPE_* env is set.
+  const integrations = INTEGRATIONS.map((intg) =>
+    intg.name === "Stripe"
+      ? { ...intg, connected: billingConfigured, phase: billingConfigured ? undefined : intg.phase }
+      : intg
+  );
+
   return (
     <Card>
       <div className="flex flex-col gap-[18px]">
@@ -623,7 +633,7 @@ function IntegrationsTab() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {INTEGRATIONS.map((intg) => {
+          {integrations.map((intg) => {
             const Icon = intg.icon;
             return (
               <div
@@ -674,7 +684,219 @@ function IntegrationsTab() {
 // Billing tab
 // ---------------------------------------------------------------------------
 
-function BillingTab() {
+function statusTone(
+  status: SubscriptionStatus | null
+): "green" | "amber" | "red" | "blue" | "gray" {
+  switch (status) {
+    case "active":
+      return "green";
+    case "trialing":
+      return "blue";
+    case "past_due":
+    case "unpaid":
+      return "amber";
+    case "canceled":
+    case "incomplete_expired":
+      return "red";
+    default:
+      return "gray";
+  }
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function CurrentPlan({
+  subscription,
+  busy,
+  onManage,
+}: {
+  subscription: Subscription;
+  busy: string | null;
+  onManage: () => void;
+}) {
+  const cfg = subscription.plan_tier ? planTier(subscription.plan_tier) : undefined;
+  const isTrial = subscription.status === "trialing";
+
+  return (
+    <>
+      <div className="p-[18px] bg-bg rounded-lg flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <p className="font-serif text-[22px] font-bold text-ink">
+              {cfg?.name ?? subscription.plan_tier ?? "Subscription"}
+            </p>
+            <Pill tone={statusTone(subscription.status)} dot>
+              {subscription.status ?? "unknown"}
+            </Pill>
+          </div>
+          <p className="text-[12.5px] text-ink-3">
+            {isTrial
+              ? `Trial ends ${fmtDate(subscription.trial_end)}`
+              : `Renews ${fmtDate(subscription.current_period_end)}`}
+            {subscription.cancel_at_period_end && " · cancels at period end"}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {cfg?.amount != null && (
+            <div className="flex items-baseline gap-1">
+              <span className="font-serif text-[26px] font-bold text-ink">
+                ${cfg.amount.toLocaleString()}
+              </span>
+              <span className="text-[13px] text-ink-3">/mo</span>
+            </div>
+          )}
+          <Button variant="secondary" size="sm" onClick={onManage} disabled={busy !== null}>
+            {busy === "portal" ? "Opening…" : "Manage billing"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <hr className="border-border" />
+        <KV
+          k={isTrial ? "Trial ends" : "Next invoice"}
+          v={fmtDate(isTrial ? subscription.trial_end : subscription.current_period_end)}
+        />
+        <hr className="border-border" />
+        <KV
+          k="Payment method"
+          v={
+            <Button variant="link" size="sm" onClick={onManage} disabled={busy !== null}>
+              Update in portal
+            </Button>
+          }
+        />
+      </div>
+    </>
+  );
+}
+
+function PlanPicker({
+  busy,
+  onChoose,
+}: {
+  busy: string | null;
+  onChoose: (tier: PlanTier) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[13px] text-ink-2">
+        Choose a plan to start your 14-day trial. Change or cancel anytime.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {PLAN_TIERS.map((p) => (
+          <div key={p.tier} className="p-4 border border-border rounded-lg flex flex-col gap-3">
+            <div>
+              <p className="font-serif text-[17px] font-bold text-ink">{p.name}</p>
+              <p className="text-[11.5px] text-ink-3 mt-0.5">{p.tagline}</p>
+            </div>
+            <div className="flex items-baseline gap-1">
+              {p.amount != null ? (
+                <>
+                  <span className="font-serif text-[24px] font-bold text-ink">
+                    ${p.amount.toLocaleString()}
+                  </span>
+                  <span className="text-[12px] text-ink-3">/mo</span>
+                </>
+              ) : (
+                <span className="font-serif text-[20px] font-bold text-ink">Custom</span>
+              )}
+            </div>
+            <ul className="flex flex-col gap-1.5 flex-1">
+              {p.features.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-[12px] text-ink-2">
+                  <Check size={13} strokeWidth={2.5} className="text-p-green flex-shrink-0 mt-0.5" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            {p.contactSales ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                full
+                onClick={() => {
+                  window.location.href =
+                    "mailto:sales@primexsecurity.com.au?subject=Enterprise%20plan%20enquiry";
+                }}
+              >
+                Talk to sales
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                full
+                onClick={() => onChoose(p.tier)}
+                disabled={busy !== null}
+              >
+                {busy === p.tier ? "Redirecting…" : "Start 14-day trial"}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BillingTab({
+  subscription,
+  billingConfigured,
+}: {
+  subscription: Subscription | null;
+  billingConfigured: boolean;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "green" | "amber"; msg: string } | null>(null);
+
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("billing");
+    if (param === "success") {
+      setNotice({ tone: "green", msg: "Subscription started — your 14-day trial is active." });
+    } else if (param === "cancelled") {
+      setNotice({ tone: "amber", msg: "Checkout cancelled. No changes were made." });
+    }
+    // Strip the query param so a refresh doesn't re-show the banner.
+    if (param) window.history.replaceState({}, "", "/settings");
+  }, []);
+
+  async function startCheckout(tier: PlanTier) {
+    setError(null);
+    setBusy(tier);
+    const res = await createCheckoutSession(tier);
+    if (res.success && res.url) {
+      window.location.href = res.url;
+      return;
+    }
+    setError(res.error ?? "Could not start checkout.");
+    setBusy(null);
+  }
+
+  async function openPortal() {
+    setError(null);
+    setBusy("portal");
+    const res = await createPortalSession();
+    if (res.success && res.url) {
+      window.location.href = res.url;
+      return;
+    }
+    setError(res.error ?? "Could not open the billing portal.");
+    setBusy(null);
+  }
+
+  const hasActiveSub =
+    subscription?.status != null &&
+    !["canceled", "incomplete_expired"].includes(subscription.status);
+
   return (
     <Card>
       <div className="flex flex-col gap-[18px]">
@@ -685,53 +907,19 @@ function BillingTab() {
           </p>
         </div>
 
-        {/* Plan banner */}
-        <div className="p-[18px] bg-bg rounded-lg flex items-start justify-between gap-4 mb-4">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <p className="font-serif text-[22px] font-bold text-ink">
-                Professional
-              </p>
-              <PhaseTag>Stripe billing &middot; Phase 2</PhaseTag>
-            </div>
-            <p className="text-[12.5px] text-ink-3">
-              23 active sites &middot; 86 cameras &middot; unlimited users
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-baseline gap-1">
-              <span className="font-serif text-[26px] font-bold text-ink">
-                $1,840
-              </span>
-              <span className="text-[13px] text-ink-3">/mo</span>
-            </div>
-            <Button variant="secondary" size="sm">
-              Upgrade plan
-            </Button>
-          </div>
-        </div>
+        {notice && <InfoBox tone={notice.tone}>{notice.msg}</InfoBox>}
+        {error && <InfoBox tone="amber">{error}</InfoBox>}
 
-        {/* KV rows */}
-        <div className="flex flex-col gap-4">
-          <hr className="border-border" />
-          <KV k="Next invoice" v="June 1, 2026" />
-          <hr className="border-border" />
-          <KV
-            k="Payment method"
-            v={
-              <span className="flex items-center gap-2">
-                <span>Visa &bull;&bull;&bull;&bull; 4242</span>
-                <Button variant="link" size="sm">
-                  Update
-                </Button>
-              </span>
-            }
-          />
-          <hr className="border-border" />
-          <KV k="Billing email" v="billing@primexsecurity.com.au" />
-          <hr className="border-border" />
-          <KV k="Tax ID" v="—" />
-        </div>
+        {!billingConfigured ? (
+          <InfoBox tone="amber">
+            Billing isn&apos;t configured on this environment yet. Once Stripe keys are set,
+            you&apos;ll be able to subscribe and manage your plan here.
+          </InfoBox>
+        ) : hasActiveSub && subscription ? (
+          <CurrentPlan subscription={subscription} busy={busy} onManage={openPortal} />
+        ) : (
+          <PlanPicker busy={busy} onChoose={startCheckout} />
+        )}
       </div>
     </Card>
   );
@@ -744,17 +932,24 @@ function BillingTab() {
 interface SettingsClientProps {
   profile: Profile;
   notificationPrefs: NotificationPrefs;
+  subscription: Subscription | null;
+  billingConfigured: boolean;
 }
 
-export function SettingsClient({ profile, notificationPrefs }: SettingsClientProps) {
+export function SettingsClient({
+  profile,
+  notificationPrefs,
+  subscription,
+  billingConfigured,
+}: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
   const tabContent: Record<Tab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} />,
     roles: <RolesTab />,
     notifications: <NotificationsTab prefs={notificationPrefs} />,
-    integrations: <IntegrationsTab />,
-    billing: <BillingTab />,
+    integrations: <IntegrationsTab billingConfigured={billingConfigured} />,
+    billing: <BillingTab subscription={subscription} billingConfigured={billingConfigured} />,
   };
 
   return (

@@ -1092,7 +1092,7 @@ function PricingSection() {
 
         <Reveal delay={350}>
           <p className="text-center text-[10px] sm:text-xs text-ink-4 mt-8 sm:mt-10 tracking-wide px-4">
-            All plans include a 14-day free trial · No credit card required · Cancel anytime
+            All plans include a 14-day free trial · Cancel anytime · No setup fees
           </p>
         </Reveal>
       </div>

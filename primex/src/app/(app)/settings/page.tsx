@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getProfile } from "@/lib/data/profiles";
 import { getNotificationPreferences } from "@/lib/data/actions/notification-preferences";
+import { getCompanySubscription } from "@/lib/data/subscriptions";
+import { isBillingConfigured } from "@/lib/billing/stripe";
 import { SettingsClient } from "./settings-client";
 import { redirect } from "next/navigation";
 
@@ -17,6 +19,14 @@ export default async function SettingsPage() {
   }
 
   const notificationPrefs = await getNotificationPreferences();
+  const subscription = await getCompanySubscription(profile.company_id);
 
-  return <SettingsClient profile={profile} notificationPrefs={notificationPrefs} />;
+  return (
+    <SettingsClient
+      profile={profile}
+      notificationPrefs={notificationPrefs}
+      subscription={subscription}
+      billingConfigured={isBillingConfigured()}
+    />
+  );
 }
