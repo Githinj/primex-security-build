@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Shield,
   LayoutDashboard,
@@ -167,6 +168,17 @@ export function ManagerClient({
                 </button>
               );
             })}
+
+            {/* Settings/Billing lives at the shared /settings route (not a section
+                of this SPA), but managers are the paying customer and need a way
+                to reach it. Render it as a route link styled like the nav. */}
+            <Link
+              href="/settings"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 lg:w-full text-left whitespace-nowrap text-ink-2 hover:bg-surface-subtle hover:text-ink font-medium"
+            >
+              <Settings2 size={15} strokeWidth={2} className="text-ink-3" />
+              <span className="flex-1 truncate">Settings</span>
+            </Link>
           </nav>
         </div>
 
@@ -195,11 +207,13 @@ export function ManagerClient({
                 {roleLabel(userRole)}
               </span>
             </div>
-            <Settings2
-              size={15}
-              className="text-ink-4 hover:text-ink-2 transition-colors duration-150 flex-shrink-0 cursor-pointer"
-              strokeWidth={2}
-            />
+            <Link href="/settings" aria-label="Settings" className="flex-shrink-0">
+              <Settings2
+                size={15}
+                className="text-ink-4 hover:text-ink-2 transition-colors duration-150 cursor-pointer"
+                strokeWidth={2}
+              />
+            </Link>
           </div>
         </div>
       </aside>
