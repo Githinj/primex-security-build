@@ -63,3 +63,14 @@ CREATE TABLE IF NOT EXISTS billing_events (
 -- RLS on with no policy = no access for normal users; only the service-role
 -- webhook (which bypasses RLS) reads/writes this table.
 ALTER TABLE billing_events ENABLE ROW LEVEL SECURITY;
+
+-- ---------- 4. Table grants ----------
+-- This project grants API-role table privileges PER MIGRATION — there is no
+-- default-privilege auto-grant (see the "TABLE GRANTS" block in 001, which only
+-- covers tables existing at that time). RLS above is what scopes row access;
+-- these grants just make the tables reachable through PostgREST. Without them,
+-- every service-role write (webhook + checkout action) and authenticated read
+-- fails with "permission denied for table" — silently, since those writes are
+-- not error-checked. GRANT is idempotent, matching this migration's convention.
+GRANT SELECT, INSERT, UPDATE, DELETE ON subscriptions  TO authenticated, anon, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON billing_events TO service_role;

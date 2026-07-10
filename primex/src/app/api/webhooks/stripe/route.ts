@@ -18,6 +18,11 @@ type SubLike = {
   customer: string | { id: string }
   metadata?: Record<string, string>
   cancel_at_period_end?: boolean
+  // A portal/API cancellation is often modelled as a scheduled cancel via these two
+  // fields (cancel_at = when it ends, canceled_at = when it was requested) rather
+  // than by flipping cancel_at_period_end. We must treat either as "will cancel".
+  cancel_at?: number | null
+  canceled_at?: number | null
   trial_end?: number | null
   current_period_end?: number | null
   items?: { data?: Array<{ price?: { id?: string }; current_period_end?: number | null }> }
@@ -55,6 +60,10 @@ async function upsertFromSubscription(admin: Admin, sub: SubLike): Promise<void>
   const item = sub.items?.data?.[0]
   const periodEnd = sub.current_period_end ?? item?.current_period_end ?? null
 
+  // "Will cancel" is true if the flag is set OR a scheduled cancellation exists.
+  const willCancel =
+    sub.cancel_at_period_end === true || sub.cancel_at != null || sub.canceled_at != null
+
   await admin.from('subscriptions').upsert(
     {
       company_id: companyId,
@@ -64,7 +73,7 @@ async function upsertFromSubscription(admin: Admin, sub: SubLike): Promise<void>
       status: sub.status,
       current_period_end: toIso(periodEnd),
       trial_end: toIso(sub.trial_end),
-      cancel_at_period_end: sub.cancel_at_period_end ?? false,
+      cancel_at_period_end: willCancel,
     },
     { onConflict: 'company_id' }
   )

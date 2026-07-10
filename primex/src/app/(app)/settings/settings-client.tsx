@@ -758,6 +758,22 @@ function CurrentPlan({
         </div>
       </div>
 
+      {cfg?.features?.length ? (
+        <div className="flex flex-col gap-2.5">
+          <p className="text-[11.5px] font-semibold text-ink-3 uppercase tracking-wide">
+            What&apos;s included in {cfg.name}
+          </p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {cfg.features.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-[12.5px] text-ink-2">
+                <Check size={13} strokeWidth={2.5} className="text-p-green flex-shrink-0 mt-0.5" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-4">
         <hr className="border-border" />
         <KV
