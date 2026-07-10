@@ -430,3 +430,11 @@ INSERT INTO site_business_hours (site_id, timezone, hours) VALUES
    '{"mon":{"open":"09:00","close":"17:00"},"tue":{"open":"09:00","close":"17:00"},"wed":{"open":"09:00","close":"17:00"},"thu":{"open":"09:00","close":"17:00"},"fri":{"open":"09:00","close":"17:00"},"sat":{"open":"10:00","close":"14:00"}}'),
   ('00000000-0000-0000-0000-00000000b003', 'Australia/Sydney',
    '{"mon":{"open":"06:00","close":"22:00"},"tue":{"open":"06:00","close":"22:00"},"wed":{"open":"06:00","close":"22:00"},"thu":{"open":"06:00","close":"22:00"},"fri":{"open":"06:00","close":"22:00"},"sat":{"open":"06:00","close":"22:00"},"sun":{"open":"06:00","close":"22:00"}}');
+
+-- Client → site scoping (migration 013). Without a client_sites row a client's
+-- portal shows "No site found for your account", so map the demo client (Brett,
+-- Nexus Logistics) to his company's sites.
+INSERT INTO client_sites (user_id, site_id) VALUES
+  ('00000000-0000-0000-0000-00000000aa09', '00000000-0000-0000-0000-00000000b003'),
+  ('00000000-0000-0000-0000-00000000aa09', '00000000-0000-0000-0000-00000000b004')
+ON CONFLICT (user_id, site_id) DO NOTHING;
