@@ -121,6 +121,7 @@ class Supervisor:
                 confidence_threshold=self.config.confidence_threshold,
                 antmedia_url=os.environ.get("ANTMEDIA_URL", ""),
                 antmedia_token=os.environ.get("ANTMEDIA_TOKEN", ""),
+                antmedia_app=os.environ.get("ANTMEDIA_APP", "LiveApp"),
             )
             self._tasks[cam_id] = asyncio.create_task(task.run())
             logger.info(f"Started camera task: {cam_id}")

@@ -32,6 +32,7 @@ class CameraTask:
         confidence_threshold: float = 0.7,
         antmedia_url: str = "",
         antmedia_token: str = "",
+        antmedia_app: str = "LiveApp",
     ):
         self.camera_id = camera_id
         self.site_id = site_id
@@ -43,6 +44,9 @@ class CameraTask:
         self.confidence_threshold = confidence_threshold
         self.antmedia_url = antmedia_url
         self.antmedia_token = antmedia_token
+        self.antmedia_app = antmedia_app
+        # Persistent OpenCV capture for the Community-Edition HLS strategy.
+        self._hls_cap = None
         self._consecutive_failures = 0
 
         self.tracker = BehaviorTracker(
@@ -98,6 +102,7 @@ class CameraTask:
 
             except asyncio.CancelledError:
                 logger.info(f"Camera task cancelled: {self.camera_id}")
+                self._release_hls()
                 raise
             except Exception as e:
                 logger.error(f"Unexpected error in camera task {self.camera_id}: {e}")
@@ -105,7 +110,20 @@ class CameraTask:
             await asyncio.sleep(self.snapshot_interval_s)
 
     async def _fetch_snapshot(self) -> bytes | None:
-        url = f"{self.antmedia_url}/WebRTCAppEE/rest/v2/broadcasts/{self.stream_id}/snapshot"
+        """Grab one JPEG frame. Two strategies, mirroring the front-end's
+        Enterprise-vs-Community split (src/lib/data/actions/streaming.ts):
+
+        - Enterprise (antmedia_token set): the REST snapshot API, using the
+          configured ANTMEDIA_APP (not a hard-coded WebRTCAppEE path).
+        - Community (no token): the snapshot REST API doesn't exist, so pull a
+          frame off the HLS playlist with OpenCV.
+        """
+        if self.antmedia_token:
+            return await self._fetch_snapshot_rest()
+        return await self._fetch_snapshot_hls()
+
+    async def _fetch_snapshot_rest(self) -> bytes | None:
+        url = f"{self.antmedia_url}/{self.antmedia_app}/rest/v2/broadcasts/{self.stream_id}/snapshot"
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.get(
@@ -119,6 +137,48 @@ class CameraTask:
         except Exception as e:
             logger.warning(f"Snapshot fetch failed for {self.camera_id}: {e}")
             return None
+
+    async def _fetch_snapshot_hls(self) -> bytes | None:
+        # OpenCV capture is blocking; keep it off the event loop.
+        return await asyncio.to_thread(self._grab_hls_frame)
+
+    def _grab_hls_frame(self) -> bytes | None:
+        import cv2
+
+        hls_url = f"{self.antmedia_url}/{self.antmedia_app}/streams/{self.stream_id}.m3u8"
+        cap = self._hls_cap
+        if cap is None or not cap.isOpened():
+            cap = cv2.VideoCapture(hls_url)
+            # Keep the buffer shallow so reads stay near the live edge.
+            try:
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            except Exception:
+                pass
+            self._hls_cap = cap
+
+        if not cap.isOpened():
+            self._release_hls()
+            return None
+
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            # Stream ended or connection dropped — drop the capture so the next
+            # poll reopens it (handles stream restarts).
+            self._release_hls()
+            return None
+
+        ok, buf = cv2.imencode(".jpg", frame)
+        if not ok:
+            return None
+        return buf.tobytes()
+
+    def _release_hls(self) -> None:
+        if self._hls_cap is not None:
+            try:
+                self._hls_cap.release()
+            except Exception:
+                pass
+            self._hls_cap = None
 
     @property
     def is_degraded(self) -> bool:

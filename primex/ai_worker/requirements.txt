@@ -1,4 +1,7 @@
 ultralytics>=8.0.0
+# Used directly by camera_task for the Community-Edition HLS frame grab (also a
+# transitive dependency of ultralytics).
+opencv-python>=4.8.0
 httpx>=0.25.0
 boto3>=1.28.0
 supabase>=2.0.0
