@@ -14,6 +14,9 @@ ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
 -- Each user manages only their own preferences. The notification dispatcher
 -- reads across users via the service-role client, which bypasses RLS.
+-- DROP-then-CREATE so the migration is idempotent on environments where the
+-- table/policy already exist but weren't tracked in migration history.
+DROP POLICY IF EXISTS notif_prefs_own ON notification_preferences;
 CREATE POLICY notif_prefs_own ON notification_preferences FOR ALL
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
