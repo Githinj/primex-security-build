@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Home,
   Bell,
@@ -8,7 +9,9 @@ import {
   FileText,
   HelpCircle,
   Shield,
+  LogOut,
 } from 'lucide-react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Profile, Site, Camera, Alert, Incident, Report } from '@/lib/types'
 import { ClientHome } from './sections/home'
 import { ClientAlerts } from './sections/alerts'
@@ -44,6 +47,14 @@ export function PortalClient({
   reports,
 }: PortalClientProps) {
   const [section, setSection] = useState<Section>('home')
+  const router = useRouter()
+
+  async function handleLogout() {
+    const supabase = createBrowserSupabaseClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   const activeAlertCount = alerts.filter(
     (a) => a.status === 'New' || a.status === 'Reviewing'
@@ -102,6 +113,16 @@ export function PortalClient({
               </button>
             )
           })}
+
+          {/* Mobile-only logout; desktop has it in the user card below. */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="lg:hidden flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-100 cursor-pointer text-left whitespace-nowrap text-ink-2 hover:bg-surface-subtle"
+          >
+            <LogOut size={16} strokeWidth={2} />
+            <span className="flex-1">Log out</span>
+          </button>
         </nav>
 
         {/* User info card */}
@@ -114,12 +135,20 @@ export function PortalClient({
                 .join('')
                 .slice(0, 2)}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm text-ink font-medium font-sans truncate">
                 {profile.full_name}
               </p>
               <p className="text-[11px] text-ink-3 font-sans">Business Owner</p>
             </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out"
+              className="flex-shrink-0 cursor-pointer text-ink-4 hover:text-ink-2 transition-colors"
+            >
+              <LogOut size={15} strokeWidth={2} />
+            </button>
           </div>
         </div>
       </aside>

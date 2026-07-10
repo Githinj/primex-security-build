@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Shield,
   LayoutDashboard,
@@ -13,8 +14,10 @@ import {
   BarChart3,
   Settings2,
   Building,
+  LogOut,
 } from "lucide-react";
 import { LiveDot } from "@/components/ui";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useProfile } from "@/components/providers/profile-provider";
 import type { Company, Site, Camera as CameraType, Alert, Incident, Profile, Report } from "@/lib/types";
 
@@ -67,6 +70,14 @@ export function ManagerClient({
 }: ManagerClientProps) {
   const [section, setSection] = useState<Section>("dashboard");
   const profile = useProfile();
+  const router = useRouter();
+
+  async function handleLogout() {
+    const supabase = createBrowserSupabaseClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   const userName = profile?.full_name ?? "User";
   const userRole = profile?.role ?? "company_manager";
@@ -179,6 +190,16 @@ export function ManagerClient({
               <Settings2 size={15} strokeWidth={2} className="text-ink-3" />
               <span className="flex-1 truncate">Settings</span>
             </Link>
+
+            {/* Mobile-only logout; desktop has it in the user row below. */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="lg:hidden flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 text-left whitespace-nowrap text-ink-2 hover:bg-surface-subtle hover:text-ink font-medium"
+            >
+              <LogOut size={15} strokeWidth={2} className="text-ink-3" />
+              <span className="flex-1 truncate">Log out</span>
+            </button>
           </nav>
         </div>
 
@@ -214,6 +235,19 @@ export function ManagerClient({
                 strokeWidth={2}
               />
             </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out"
+              className="flex-shrink-0 cursor-pointer"
+            >
+              <LogOut
+                size={15}
+                className="text-ink-4 hover:text-ink-2 transition-colors duration-150"
+                strokeWidth={2}
+              />
+            </button>
+            {/* user-row logout above is desktop-only; nav has a logout for mobile */}
           </div>
         </div>
       </aside>

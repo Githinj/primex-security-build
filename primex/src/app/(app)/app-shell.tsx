@@ -6,7 +6,9 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { PageStrip } from '@/components/layout/page-strip'
 import { useProfile } from '@/components/providers/profile-provider'
 
-const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard']
+// Roles whose page renders its own in-page nav (their SPA), so the global
+// sidebar is suppressed to avoid a redundant/empty second sidebar.
+const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard', 'client']
 
 interface AppShellProps {
   children: React.ReactNode

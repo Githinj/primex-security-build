@@ -1,14 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Bell,
   AlertTriangle,
   Radio,
   Users,
   ClipboardList,
+  LogOut,
 } from 'lucide-react'
 import { LiveDot } from '@/components/ui'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { DispatcherQueue } from './sections/queue'
 import { OpenIncidents } from './sections/incidents'
@@ -59,6 +62,14 @@ export function DispatcherClient({
     { key: 'activity', label: 'Activity log', icon: ClipboardList },
   ]
 
+  const router = useRouter()
+  async function handleLogout() {
+    const supabase = createBrowserSupabaseClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <div className="flex flex-col lg:flex-row h-full">
       {/* Dispatcher nav panel */}
@@ -103,6 +114,15 @@ export function DispatcherClient({
             </button>
           )
         })}
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-sans transition-colors duration-150 cursor-pointer lg:w-full text-left whitespace-nowrap text-ink-2 hover:bg-surface-subtle hover:text-ink font-medium lg:mt-auto"
+        >
+          <LogOut size={15} strokeWidth={2} className="text-ink-3" />
+          <span className="flex-1 truncate">Log out</span>
+        </button>
       </nav>
 
       {/* Main content area */}
