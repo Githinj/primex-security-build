@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   UserIcon,
   Lock,
@@ -14,7 +15,9 @@ import {
   Pencil,
   Camera,
   Check,
+  ArrowLeft,
 } from "lucide-react";
+import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import {
   PageTitle,
   Button,
@@ -970,6 +973,19 @@ export function SettingsClient({
 
   return (
     <div className="flex flex-col gap-6 font-sans px-4 sm:px-9 py-6 sm:py-8">
+      {/* Self-nav roles (e.g. company_manager) reach Settings as a standalone
+          route with no global sidebar, so give them a way back to their app.
+          super_admin keeps the sidebar and doesn't need it. */}
+      {profile.role !== "super_admin" && (
+        <Link
+          href={getRoleHomePath(profile.role)}
+          className="inline-flex items-center gap-1.5 w-fit text-[13px] font-medium text-ink-3 hover:text-ink transition-colors"
+        >
+          <ArrowLeft size={15} strokeWidth={2} />
+          Back to dashboard
+        </Link>
+      )}
+
       <PageTitle
         title="Settings"
         sub="Manage your platform configuration."
