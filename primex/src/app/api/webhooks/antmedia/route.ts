@@ -85,9 +85,23 @@ export async function POST(req: NextRequest) {
       const startTime = body.startTime as string ?? new Date().toISOString()
       const endTime = body.endTime as string ?? new Date().toISOString()
 
+      // Use startTime (not Date.now()) in the fallback name so a redelivered
+      // webhook resolves to the same file_url and stays idempotent.
       const fileUrl = vodName
         ? `${DO_SPACES_ENDPOINT}/recordings/${vodName}`
-        : `${DO_SPACES_ENDPOINT}/recordings/${streamId}_${Date.now()}.mp4`
+        : `${DO_SPACES_ENDPOINT}/recordings/${streamId}_${startTime}.mp4`
+
+      // Idempotency: Ant Media can redeliver vodReady. Without this guard a
+      // duplicate delivery inserts a second row and double-lists the recording.
+      const { data: existingRecording } = await supabase
+        .from('recordings')
+        .select('id')
+        .eq('file_url', fileUrl)
+        .maybeSingle()
+
+      if (existingRecording) {
+        return NextResponse.json({ ok: true, duplicate: true })
+      }
 
       await supabase.from('recordings').insert({
         camera_id: cameraId,
