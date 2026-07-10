@@ -15,7 +15,7 @@ export async function requireRole(...allowedRoles: string[]) {
     throw new Error('Unauthorized')
   }
 
-  return { userId: user.id, role: profile.role, companyId: profile.company_id, fullName: profile.full_name }
+  return { userId: user.id, email: user.email ?? null, role: profile.role, companyId: profile.company_id, fullName: profile.full_name }
 }
 
 export async function requireActiveCompany(caller: { role: string; companyId: string | null }) {

@@ -12,7 +12,7 @@ type Result = { success: boolean; error?: string; url?: string }
 // Reuse the company's existing Stripe customer, or create one. Writes go through
 // the service-role client (RLS-bypass) since subscriptions rows are managed by
 // billing infra, not the user session. The webhook later fills the rest.
-async function ensureCustomer(companyId: string): Promise<string> {
+async function ensureCustomer(companyId: string, email: string | null): Promise<string> {
   const admin = createAdminSupabaseClient()
 
   const { data: existing } = await admin
@@ -20,7 +20,18 @@ async function ensureCustomer(companyId: string): Promise<string> {
     .select('stripe_customer_id')
     .eq('company_id', companyId)
     .maybeSingle()
-  if (existing?.stripe_customer_id) return existing.stripe_customer_id
+  if (existing?.stripe_customer_id) {
+    // Keep the customer's email in sync with the signed-in user so Checkout
+    // prefills it and invoices/tracking reflect who actually subscribed.
+    if (email) {
+      try {
+        await stripe!.customers.update(existing.stripe_customer_id, { email })
+      } catch {
+        // Non-fatal: a failed email sync must not block checkout.
+      }
+    }
+    return existing.stripe_customer_id
+  }
 
   const { data: company } = await admin
     .from('companies')
@@ -30,7 +41,8 @@ async function ensureCustomer(companyId: string): Promise<string> {
 
   const customer = await stripe!.customers.create({
     name: company?.name ?? undefined,
-    email: company?.contact_email ?? undefined,
+    // Prefer the signed-in user's registered email; fall back to the company contact.
+    email: email ?? company?.contact_email ?? undefined,
     metadata: { company_id: companyId },
   })
 
@@ -57,7 +69,7 @@ export async function createCheckoutSession(tier: PlanTier): Promise<Result> {
       return { success: false, error: `The ${tier} plan isn't available for self-serve checkout.` }
     }
 
-    const customerId = await ensureCustomer(caller.companyId)
+    const customerId = await ensureCustomer(caller.companyId, caller.email)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
