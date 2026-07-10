@@ -22,6 +22,14 @@ export default async function SettingsPage() {
   const notificationPrefs = await getNotificationPreferences();
   const subscription = await getCompanySubscription(profile.company_id);
 
+  // Real per-role user counts (RLS-scoped: global for super_admin, company for a
+  // manager) — replaces the old hardcoded counts in the Roles tab.
+  const { data: roleRows } = await supabase.from("profiles").select("role");
+  const roleCounts: Record<string, number> = {};
+  for (const r of roleRows ?? []) {
+    roleCounts[r.role] = (roleCounts[r.role] ?? 0) + 1;
+  }
+
   return (
     <SettingsClient
       profile={profile}
@@ -29,6 +37,7 @@ export default async function SettingsPage() {
       subscription={subscription}
       billingConfigured={isBillingConfigured()}
       emailConfigured={isEmailConfigured()}
+      roleCounts={roleCounts}
     />
   );
 }

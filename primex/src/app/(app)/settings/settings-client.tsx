@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Phone,
   Cctv,
-  Pencil,
   Camera,
   Check,
   ArrowLeft,
@@ -56,30 +55,32 @@ import { PLAN_TIERS, planTier } from "@/lib/billing/plans";
 // ROLES_PERMS (inline constant, previously from mock-data)
 // ---------------------------------------------------------------------------
 
+// Primex's built-in roles. `key` matches the profiles.role enum so counts can be
+// resolved from real data. Permissions describe what each role's RLS grants.
 const ROLES_PERMS = [
   {
+    key: "super_admin",
     role: "Super Admin",
-    count: 2,
     perms: "Full platform access, company management, billing",
   },
   {
+    key: "company_manager",
     role: "Company Manager",
-    count: 4,
     perms: "Manage own company sites, users, alerts, incidents",
   },
   {
+    key: "dispatcher",
     role: "Dispatcher",
-    count: 6,
     perms: "View alerts, create/manage incidents, dispatch guards",
   },
   {
+    key: "guard",
     role: "Guard",
-    count: 12,
     perms: "View assigned incidents, update status, upload evidence",
   },
   {
+    key: "client",
     role: "Client",
-    count: 8,
     perms: "View own company dashboard, alerts, reports (read-only)",
   },
 ];
@@ -483,34 +484,41 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
 // Roles & permissions tab
 // ---------------------------------------------------------------------------
 
-function RolesTab() {
-  const rows = ROLES_PERMS.map((rp) => [
-    <span key="role" className="font-semibold text-ink">
-      {rp.role}
-    </span>,
-    <span key="users" className="text-ink-2">
-      {rp.count} users
-    </span>,
-    <span key="perms" className="text-ink-3 text-xs">
-      {rp.perms}
-    </span>,
-    <Button key="edit" variant="secondary" size="sm" icon={Pencil}>
-      Edit
-    </Button>,
-  ]);
+function RolesTab({ roleCounts }: { roleCounts: Record<string, number> }) {
+  const rows = ROLES_PERMS.map((rp) => {
+    const count = roleCounts[rp.key] ?? 0;
+    return [
+      <span key="role" className="font-semibold text-ink">
+        {rp.role}
+      </span>,
+      <span key="users" className="text-ink-2">
+        {count} {count === 1 ? "user" : "users"}
+      </span>,
+      <span key="perms" className="text-ink-3 text-xs">
+        {rp.perms}
+      </span>,
+    ];
+  });
 
   return (
     <div className="flex flex-col gap-4">
       <Card padding="p-0">
-        <DataTable
-          columns={["Role", "Users", "Permissions", ""]}
-          rows={rows}
-        />
+        <DataTable columns={["Role", "Users", "Permissions"]} rows={rows} />
       </Card>
+      {/* Built-in roles are fixed (enforced directly in RLS), so they aren't
+          editable. Custom roles need a dynamic-permission model — tracked as
+          Phase 2 (SEC-139); the control is disabled until then rather than being
+          a dead button. */}
       <div className="flex items-center gap-3">
-        <Button variant="secondary">Create custom role</Button>
+        <Button variant="secondary" disabled>
+          Create custom role
+        </Button>
         <PhaseTag>Custom roles - Phase 2</PhaseTag>
       </div>
+      <p className="text-[12px] text-ink-4">
+        These are Primex&apos;s built-in roles, enforced across the platform. User
+        counts reflect accounts you can see.
+      </p>
     </div>
   );
 }
@@ -1047,6 +1055,7 @@ interface SettingsClientProps {
   subscription: Subscription | null;
   billingConfigured: boolean;
   emailConfigured: boolean;
+  roleCounts: Record<string, number>;
 }
 
 export function SettingsClient({
@@ -1055,12 +1064,13 @@ export function SettingsClient({
   subscription,
   billingConfigured,
   emailConfigured,
+  roleCounts,
 }: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
   const tabContent: Record<Tab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} />,
-    roles: <RolesTab />,
+    roles: <RolesTab roleCounts={roleCounts} />,
     notifications: <NotificationsTab prefs={notificationPrefs} />,
     integrations: <IntegrationsTab billingConfigured={billingConfigured} emailConfigured={emailConfigured} />,
     billing: <BillingTab subscription={subscription} billingConfigured={billingConfigured} />,
