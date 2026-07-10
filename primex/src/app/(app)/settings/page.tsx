@@ -4,6 +4,7 @@ import { getProfile } from "@/lib/data/profiles";
 import { getNotificationPreferences } from "@/lib/data/actions/notification-preferences";
 import { getCompanySubscription } from "@/lib/data/subscriptions";
 import { isBillingConfigured } from "@/lib/billing/stripe";
+import { isEmailConfigured } from "@/lib/notifications/email";
 import { SettingsClient } from "./settings-client";
 import { redirect } from "next/navigation";
 
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
       notificationPrefs={notificationPrefs}
       subscription={subscription}
       billingConfigured={isBillingConfigured()}
+      emailConfigured={isEmailConfigured()}
     />
   );
 }

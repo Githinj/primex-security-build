@@ -48,6 +48,7 @@ import {
   uploadMyAvatar,
 } from "@/lib/data/actions/account";
 import { createCheckoutSession, createPortalSession } from "@/lib/data/actions/billing";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { PLAN_TIERS, planTier } from "@/lib/billing/plans";
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,29 @@ function ProfileTab({ profile }: { profile: Profile }) {
   const [uploading, setUploading] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Real account security facts (was hardcoded "Enabled" / "3 devices").
+  const [security, setSecurity] = useState<
+    { twoFactor: boolean; lastSignIn: string | null } | null
+  >(null);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const supabase = createBrowserSupabaseClient();
+      const { data: userData } = await supabase.auth.getUser();
+      let twoFactor = false;
+      try {
+        const { data: mfa } = await supabase.auth.mfa.listFactors();
+        twoFactor = Boolean(mfa?.all?.some((f) => f.status === "verified"));
+      } catch {
+        // MFA API unavailable — treat as not enabled.
+      }
+      if (active) {
+        setSecurity({ twoFactor, lastSignIn: userData.user?.last_sign_in_at ?? null });
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const dirty =
     form.name !== baseline.name ||
@@ -308,10 +332,32 @@ function ProfileTab({ profile }: { profile: Profile }) {
             <hr className="border-border" />
             <KV
               k="Two-factor authentication"
-              v={<Pill tone="green" dot>Enabled</Pill>}
+              v={
+                security === null ? (
+                  <span className="text-ink-4 text-sm">—</span>
+                ) : (
+                  <Pill tone={security.twoFactor ? "green" : "gray"} dot>
+                    {security.twoFactor ? "Enabled" : "Not enabled"}
+                  </Pill>
+                )
+              }
             />
             <hr className="border-border" />
-            <KV k="Active sessions" v="3 devices" />
+            <KV
+              k="Last sign-in"
+              v={
+                security?.lastSignIn
+                  ? new Date(security.lastSignIn).toLocaleString("en-AU", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })
+                  : "—"
+              }
+            />
           </div>
         </div>
       </Card>
@@ -578,15 +624,16 @@ interface Integration {
 const INTEGRATIONS: Integration[] = [
   {
     icon: Mail,
-    name: "SendGrid",
+    name: "Resend",
     description: "Transactional emails for alerts and reports",
-    connected: true,
+    connected: false, // overridden by emailConfigured (RESEND_API_KEY present)
   },
   {
     icon: MessageSquare,
     name: "Slack",
     description: "Real-time alerts to your team channels",
-    connected: true,
+    connected: false,
+    phase: "Phase 2",
   },
   {
     icon: Phone,
@@ -617,13 +664,24 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-function IntegrationsTab({ billingConfigured }: { billingConfigured: boolean }) {
-  // Stripe reflects real config: connected once STRIPE_* env is set.
-  const integrations = INTEGRATIONS.map((intg) =>
-    intg.name === "Stripe"
-      ? { ...intg, connected: billingConfigured, phase: billingConfigured ? undefined : intg.phase }
-      : intg
-  );
+function IntegrationsTab({
+  billingConfigured,
+  emailConfigured,
+}: {
+  billingConfigured: boolean;
+  emailConfigured: boolean;
+}) {
+  // Reflect real config instead of hardcoded pills: an integration is "Connected"
+  // only when its env is actually set (Resend → RESEND_API_KEY, Stripe → STRIPE_*).
+  const integrations = INTEGRATIONS.map((intg) => {
+    if (intg.name === "Resend") {
+      return { ...intg, connected: emailConfigured, phase: emailConfigured ? undefined : intg.phase };
+    }
+    if (intg.name === "Stripe") {
+      return { ...intg, connected: billingConfigured, phase: billingConfigured ? undefined : intg.phase };
+    }
+    return intg;
+  });
 
   return (
     <Card>
@@ -953,6 +1011,7 @@ interface SettingsClientProps {
   notificationPrefs: NotificationPrefs;
   subscription: Subscription | null;
   billingConfigured: boolean;
+  emailConfigured: boolean;
 }
 
 export function SettingsClient({
@@ -960,6 +1019,7 @@ export function SettingsClient({
   notificationPrefs,
   subscription,
   billingConfigured,
+  emailConfigured,
 }: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
@@ -967,7 +1027,7 @@ export function SettingsClient({
     profile: <ProfileTab profile={profile} />,
     roles: <RolesTab />,
     notifications: <NotificationsTab prefs={notificationPrefs} />,
-    integrations: <IntegrationsTab billingConfigured={billingConfigured} />,
+    integrations: <IntegrationsTab billingConfigured={billingConfigured} emailConfigured={emailConfigured} />,
     billing: <BillingTab subscription={subscription} billingConfigured={billingConfigured} />,
   };
 
