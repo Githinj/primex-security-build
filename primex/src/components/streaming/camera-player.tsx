@@ -85,13 +85,17 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
         // it against a non-LL origin causes stalls + extra manifest fetches.
         const hls = new Hls({ enableWorker: true })
         let mediaRecoveries = 0
+        let networkRetries = 0
         hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}) })
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return // hls.js self-heals non-fatal errors
-          // Recovery ladder before giving up (hls.js best practice).
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            console.warn('HLS network error — reloading')
-            hls.startLoad()
+          // Recovery ladder before giving up (hls.js best practice). Both branches
+          // are bounded so a persistently-broken source (e.g. 404 manifest) can't
+          // loop forever — it surfaces the error UI (with a Retry button) instead.
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries < 3) {
+            networkRetries++
+            console.warn(`HLS network error — reloading (${networkRetries})`)
+            setTimeout(() => { if (!cancelled) hls.startLoad() }, 1000 * networkRetries)
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
             mediaRecoveries++
             console.warn(`HLS media error — recovering (${mediaRecoveries})`)
