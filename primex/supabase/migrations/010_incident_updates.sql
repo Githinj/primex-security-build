@@ -70,3 +70,10 @@ ON CONFLICT (id) DO NOTHING;
 DROP POLICY IF EXISTS incident_evidence_public_read ON storage.objects;
 CREATE POLICY incident_evidence_public_read ON storage.objects
   FOR SELECT USING (bucket_id = 'incident-evidence');
+
+-- Table grants. This project grants API-role privileges per migration — there is
+-- no default-privilege auto-grant (001's TABLE GRANTS block only covered tables
+-- existing then). Without this, the guard's on-scene note INSERT and the timeline
+-- SELECT (both run as the authenticated session) fail with "permission denied for
+-- table". RLS above still scopes rows; GRANT is idempotent. (SEC-154)
+GRANT SELECT, INSERT, UPDATE, DELETE ON incident_updates TO authenticated, anon, service_role;

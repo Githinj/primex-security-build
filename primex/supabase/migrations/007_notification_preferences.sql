@@ -17,3 +17,10 @@ ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 CREATE POLICY notif_prefs_own ON notification_preferences FOR ALL
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
+
+-- Table grants. This project grants API-role privileges per migration — there is
+-- no default-privilege auto-grant (001's TABLE GRANTS block only covered tables
+-- existing then). Without this, the authenticated session's reads/writes fail with
+-- "permission denied for table" and preference saves silently do not persist. RLS
+-- above still scopes rows; GRANT is idempotent. (SEC-154)
+GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO authenticated, anon, service_role;

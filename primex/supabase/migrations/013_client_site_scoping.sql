@@ -130,3 +130,10 @@ CREATE POLICY incident_updates_client_select ON incident_updates
     get_user_role() = 'client'
     AND incident_id IN (SELECT id FROM incidents WHERE site_id IN (SELECT get_client_site_ids()))
   );
+
+-- Table grants. This project grants API-role privileges per migration — there is
+-- no default-privilege auto-grant (001's TABLE GRANTS block only covered tables
+-- existing then). Client READ scoping works via get_client_site_ids() (SECURITY
+-- DEFINER), but the direct client_sites write path (sites.ts) fails without this.
+-- RLS above still scopes rows; GRANT is idempotent. (SEC-154)
+GRANT SELECT, INSERT, UPDATE, DELETE ON client_sites TO authenticated, anon, service_role;
