@@ -36,104 +36,159 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
   }, [isLoading, tokenError])
 
   useEffect(() => {
-    if (!token || !videoRef.current) return
+    const video = videoRef.current
+    if (!token || !video) return
 
     setPlayerState('connecting_webrtc')
+
+    let cancelled = false
+    let established = false // true once real frames render (WebRTC or HLS)
     let timeoutId: ReturnType<typeof setTimeout>
-    let adaptor: any = null
+    const active: { protocol: 'WebRTC' | 'HLS' | null } = { protocol: null }
+
+    const cleanupWebrtc = () => {
+      if (webrtcRef.current) {
+        try { webrtcRef.current.stop(token.streamId) } catch {}
+        webrtcRef.current = null
+      }
+    }
+    const cleanupHls = () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+
+    // Source-agnostic "live" detection. The adaptor auto-attaches the remote
+    // MediaStream to this element (srcObject), and hls.js pipes MSE into it, so a
+    // real `playing` event is the one reliable signal that frames are rendering —
+    // regardless of which adaptor callback strings a given version emits.
+    const onPlaying = () => {
+      if (cancelled) return
+      established = true
+      clearTimeout(timeoutId)
+      setPlayerState('live')
+      if (active.protocol) setProtocol(active.protocol)
+    }
+    video.addEventListener('playing', onPlaying)
+
+    const fallbackToHls = () => {
+      if (cancelled) return
+      cleanupWebrtc()
+      if (!token.hlsUrl) { setPlayerState('error'); return }
+
+      setPlayerState('fallback_hls')
+      active.protocol = 'HLS'
+
+      if (Hls.isSupported()) {
+        // lowLatencyMode removed: Ant Media standard HLS isn't LL-HLS, and enabling
+        // it against a non-LL origin causes stalls + extra manifest fetches.
+        const hls = new Hls({ enableWorker: true })
+        let mediaRecoveries = 0
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}) })
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (!data.fatal) return // hls.js self-heals non-fatal errors
+          // Recovery ladder before giving up (hls.js best practice).
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            console.warn('HLS network error — reloading')
+            hls.startLoad()
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
+            mediaRecoveries++
+            console.warn(`HLS media error — recovering (${mediaRecoveries})`)
+            hls.recoverMediaError()
+          } else {
+            console.error('HLS fatal error, unrecoverable:', data)
+            cleanupHls()
+            setPlayerState('error')
+          }
+        })
+        hls.loadSource(token.hlsUrl)
+        hls.attachMedia(video)
+        hlsRef.current = hls
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS (Safari); `onPlaying` flips us to live.
+        video.src = token.hlsUrl
+        video.play().catch(() => {})
+      } else {
+        setPlayerState('error')
+      }
+    }
 
     const initWebRTC = async () => {
       try {
         const { WebRTCAdaptor } = await import('@antmedia/webrtc_adaptor')
+        if (cancelled) return
+        active.protocol = 'WebRTC'
 
-        adaptor = new WebRTCAdaptor({
+        const adaptor = new WebRTCAdaptor({
           websocket_url: token.webrtcUrl,
           mediaConstraints: { video: false, audio: false },
           sdp_constraints: { OfferToReceiveAudio: false, OfferToReceiveVideo: true },
-          remoteVideoElement: videoRef.current,
+          remoteVideoElement: video,
           callback: (info: string) => {
+            if (cancelled) return
             if (info === 'initialized') {
               adaptor.play(token.streamId, token.token ?? undefined)
-            }
-            if (info === 'play_started') {
-              setPlayerState('live')
-              setProtocol('WebRTC')
+            } else if (
+              info === 'play_started' ||
+              info === 'newStreamAvailable' ||
+              info === 'newTrackAvailable'
+            ) {
+              // Stream/track arrived — nudge playback; `onPlaying` confirms live.
               clearTimeout(timeoutId)
+              video.play?.().catch(() => {})
+            } else if (info === 'play_finished' || info === 'closed') {
+              if (established) {
+                // Live session dropped. Let the adaptor's built-in reconnection
+                // (reconnectIfRequiredFlag) retry rather than downgrading to HLS;
+                // show the reconnecting state until `onPlaying` fires again.
+                setPlayerState('connecting_webrtc')
+              } else {
+                fallbackToHls()
+              }
             }
           },
           callbackError: (error: string) => {
-            console.warn('WebRTC error, falling back to HLS:', error)
-            fallbackToHls()
+            if (cancelled) return
+            if (established) {
+              // Transient error on a live WebRTC session — the adaptor reconnects;
+              // don't tear it down and downgrade to HLS.
+              console.warn('WebRTC transient error (live), awaiting reconnect:', error)
+            } else {
+              console.warn('WebRTC error, falling back to HLS:', error)
+              fallbackToHls()
+            }
           },
         })
 
         webrtcRef.current = adaptor
 
         timeoutId = setTimeout(() => {
+          if (cancelled || established) return
           console.warn('WebRTC timeout, falling back to HLS')
           fallbackToHls()
         }, 10000)
       } catch (err) {
+        if (cancelled) return
         console.warn('WebRTC init failed, falling back to HLS:', err)
         fallbackToHls()
-      }
-    }
-
-    const fallbackToHls = () => {
-      if (webrtcRef.current) {
-        try { webrtcRef.current.stop(token.streamId) } catch {}
-        webrtcRef.current = null
-      }
-
-      if (!videoRef.current || !token.hlsUrl) {
-        setPlayerState('error')
-        return
-      }
-
-      setPlayerState('fallback_hls')
-
-      if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: true })
-        hls.loadSource(token.hlsUrl)
-        hls.attachMedia(videoRef.current)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoRef.current?.play().catch(() => {})
-          setPlayerState('live')
-          setProtocol('HLS')
-        })
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            console.error('HLS fatal error:', data)
-            setPlayerState('error')
-          }
-        })
-        hlsRef.current = hls
-      } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = token.hlsUrl
-        videoRef.current.addEventListener('loadedmetadata', () => {
-          videoRef.current?.play().catch(() => {})
-          setPlayerState('live')
-          setProtocol('HLS')
-        })
-      } else {
-        setPlayerState('error')
       }
     }
 
     initWebRTC()
 
     return () => {
+      cancelled = true
       clearTimeout(timeoutId)
-      if (webrtcRef.current) {
-        try { webrtcRef.current.stop(token.streamId) } catch {}
-        webrtcRef.current = null
-      }
-      if (hlsRef.current) {
-        hlsRef.current.destroy()
-        hlsRef.current = null
-      }
+      video.removeEventListener('playing', onPlaying)
+      cleanupWebrtc()
+      cleanupHls()
     }
-  }, [token])
+    // Keyed on the actual connection inputs, not the token object identity, so a
+    // token refresh with unchanged URLs/token (e.g. Community Edition, token=null)
+    // doesn't needlessly tear down and rebuild a healthy stream.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token?.streamId, token?.webrtcUrl, token?.hlsUrl, token?.token])
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return
