@@ -88,23 +88,25 @@ Toggle **Test mode** ON first.
 ## Migration gap (checked 2026-07-09)
 
 The remote Supabase project (`yolalpykdguctbusbgbe`, used by the Vercel deploy) is
-behind. As of the last deploy-state check, **migrations `008`–`014` were never pushed
+behind. As of the last deploy-state check, **migrations `008`–`015` were never pushed
 to remote** — it's still at `007`.
 
 - Migration `014` (subscriptions + billing_events) is the one billing needs.
 - **Dependency check (static): clean.** `014` only references objects from `001`
   (`companies`, `get_user_role()`, `get_user_company()`, `update_updated_at()`), so
-  `008`–`014` apply cleanly in numeric order on top of the remote's current `001`–`007`.
-- `010`, `013`, `014` are idempotent (IF [NOT] EXISTS / DROP POLICY IF EXISTS).
+  `008`–`015` apply cleanly in numeric order on top of the remote's current `001`–`007`.
+- `010`, `013`, `014`, `015` are idempotent (IF [NOT] EXISTS / DROP POLICY IF EXISTS / GRANT).
 - ⚠️ `013` is also a **security fix** (per-site client isolation, SEC-147) — worth
   pushing the whole batch, not just `014`.
+- `015` re-grants API-role table privileges idempotently (SEC-154). Needed because the
+  grant fix in the already-applied `007` won't re-run on remote; `015` catches it up.
 
 Apply (from a machine with the Supabase CLI + login + DB password — **this dev machine
 has none**):
 ```bash
 cd primex
 supabase link --project-ref yolalpykdguctbusbgbe   # if not linked
-supabase db push                                    # applies 008–014 in order
+supabase db push                                    # applies 008–015 in order
 ```
 
 Seed accounts (`testpass123`) only exist where `supabase db reset` ran, so the deployed
