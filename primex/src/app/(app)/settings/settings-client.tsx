@@ -49,6 +49,7 @@ import {
 } from "@/lib/data/actions/account";
 import { createCheckoutSession, createPortalSession } from "@/lib/data/actions/billing";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { subscribeToPush, isPushSupported } from "@/lib/push/subscribe";
 import { PLAN_TIERS, planTier } from "@/lib/billing/plans";
 
 // ---------------------------------------------------------------------------
@@ -542,29 +543,47 @@ const NOTIF_ROWS: NotifRow[] = [
 ];
 
 function NotificationsTab({ prefs }: { prefs: NotificationPrefs }) {
-  const [states, setStates] = useState<boolean[]>(
-    NOTIF_ROWS.map((r) => prefs[r.key]?.email ?? r.on)
+  const [emailStates, setEmailStates] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(NOTIF_ROWS.map((r) => [r.key, prefs[r.key]?.email ?? r.on]))
   );
+  const [pushStates, setPushStates] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(NOTIF_ROWS.map((r) => [r.key, prefs[r.key]?.push ?? r.on]))
+  );
+  const [pushAvailable, setPushAvailable] = useState(true);
+  const [pushError, setPushError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function handleToggle(i: number, val: boolean) {
-    const previous = states[i];
-    setStates((s) => {
-      const next = [...s];
-      next[i] = val;
-      return next;
-    });
+  useEffect(() => {
+    setPushAvailable(isPushSupported() && Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY));
+  }, []);
+
+  function persist(key: string, channel: "email" | "push", val: boolean, revert: () => void) {
     startTransition(async () => {
-      const res = await updateNotificationPreference(NOTIF_ROWS[i].key, val);
-      if (!res.success) {
-        // Revert on failure
-        setStates((s) => {
-          const next = [...s];
-          next[i] = previous;
-          return next;
-        });
-      }
+      const res = await updateNotificationPreference(key, channel, val);
+      if (!res.success) revert();
     });
+  }
+
+  function toggleEmail(key: string, val: boolean) {
+    const prev = emailStates[key];
+    setEmailStates((s) => ({ ...s, [key]: val }));
+    persist(key, "email", val, () => setEmailStates((s) => ({ ...s, [key]: prev })));
+  }
+
+  async function togglePush(key: string, val: boolean) {
+    const prev = pushStates[key];
+    setPushError(null);
+    setPushStates((s) => ({ ...s, [key]: val }));
+    // Enabling push needs a live browser subscription (permission + PushManager).
+    if (val) {
+      const sub = await subscribeToPush();
+      if (!sub.ok) {
+        setPushError(sub.error ?? "Could not enable push notifications.");
+        setPushStates((s) => ({ ...s, [key]: prev }));
+        return;
+      }
+    }
+    persist(key, "push", val, () => setPushStates((s) => ({ ...s, [key]: prev })));
   }
 
   return (
@@ -577,32 +596,48 @@ function NotificationsTab({ prefs }: { prefs: NotificationPrefs }) {
           </p>
         </div>
 
+        {pushError && <InfoBox tone="amber">{pushError}</InfoBox>}
+        {!pushAvailable && (
+          <InfoBox tone="blue">
+            Push notifications aren&apos;t available in this browser (or aren&apos;t configured on
+            this environment). Email still works.
+          </InfoBox>
+        )}
+
         <div className="flex flex-col">
-          {NOTIF_ROWS.map((row, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between gap-4 border-b border-border last:border-b-0"
-              style={{ padding: "14px 0" }}
-            >
-              <div className="flex flex-col gap-2">
+          {NOTIF_ROWS.map((row) => {
+            const hasEmail = row.channels.includes("Email");
+            const hasPush = row.channels.includes("Push");
+            return (
+              <div
+                key={row.key}
+                className="flex items-center justify-between gap-4 border-b border-border last:border-b-0"
+                style={{ padding: "14px 0" }}
+              >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[13.5px] font-medium text-ink">{row.event}</span>
                   {row.phase && <PhaseTag>{row.phase}</PhaseTag>}
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {row.channels.map((ch) => (
-                    <Pill key={ch} tone="gray" size="sm">
-                      {ch}
-                    </Pill>
-                  ))}
+                <div className="flex items-center gap-5 flex-shrink-0">
+                  {hasEmail && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-ink-3 font-sans">Email</span>
+                      <Toggle on={emailStates[row.key]} onChange={(v) => toggleEmail(row.key, v)} />
+                    </div>
+                  )}
+                  {hasPush && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-ink-3 font-sans">Push</span>
+                      <Toggle
+                        on={pushAvailable && pushStates[row.key]}
+                        onChange={(v) => pushAvailable && togglePush(row.key, v)}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-              <Toggle
-                on={states[i]}
-                onChange={(val) => handleToggle(i, val)}
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </Card>

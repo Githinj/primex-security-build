@@ -32,9 +32,14 @@ export async function getNotificationPreferences(): Promise<NotificationPrefs> {
   }
 }
 
-/** Upsert the current user's preference for one event. */
+/**
+ * Upsert one channel of the current user's preference for an event, preserving
+ * the other channel. Missing row defaults to enabled (opt-out model), matching
+ * how the notify layer resolves recipients.
+ */
 export async function updateNotificationPreference(
   eventKey: string,
+  channel: 'email' | 'push',
   enabled: boolean,
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -42,12 +47,20 @@ export async function updateNotificationPreference(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    // Single toggle drives both channels for now (email-first; push mirrors it
-    // until per-channel controls ship with web push).
+    const { data: existing } = await supabase
+      .from('notification_preferences')
+      .select('email, push')
+      .eq('user_id', user.id)
+      .eq('event_key', eventKey)
+      .maybeSingle()
+
+    const next = { email: existing?.email ?? true, push: existing?.push ?? true }
+    next[channel] = enabled
+
     const { error } = await supabase
       .from('notification_preferences')
       .upsert(
-        { user_id: user.id, event_key: eventKey, email: enabled, push: enabled, updated_at: new Date().toISOString() },
+        { user_id: user.id, event_key: eventKey, email: next.email, push: next.push, updated_at: new Date().toISOString() },
         { onConflict: 'user_id,event_key' },
       )
     if (error) return { success: false, error: error.message }

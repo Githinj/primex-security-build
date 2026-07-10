@@ -1,8 +1,56 @@
 import 'server-only'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { sendEmail } from './email'
+import { sendPush, isPushConfigured, type PushPayload } from './push'
 
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://primex-security-build.vercel.app'
+
+// Fan out web push to a company's users for `eventKey`, honoring each user's
+// `push` preference (missing row = enabled, opt-out model). Dead subscriptions
+// (404/410 from the push service) are pruned. No-op when VAPID isn't configured.
+async function deliverPush(
+  companyId: string,
+  roles: string[],
+  eventKey: string,
+  payload: PushPayload,
+): Promise<void> {
+  if (!isPushConfigured()) return
+  const admin = createAdminSupabaseClient()
+
+  const { data: profiles } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('status', 'Active')
+    .in('role', roles)
+  const ids = (profiles ?? []).map((p: { id: string }) => p.id)
+  if (ids.length === 0) return
+
+  const { data: prefs } = await admin
+    .from('notification_preferences')
+    .select('user_id, push')
+    .eq('event_key', eventKey)
+    .in('user_id', ids)
+  const optedOut = new Set(
+    (prefs ?? []).filter((r: { push: boolean }) => r.push === false).map((r: { user_id: string }) => r.user_id),
+  )
+  const targetIds = ids.filter((id: string) => !optedOut.has(id))
+  if (targetIds.length === 0) return
+
+  const { data: subs } = await admin
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+    .in('user_id', targetIds)
+  if (!subs || subs.length === 0) return
+
+  const results = await Promise.all(subs.map((s: { endpoint: string; p256dh: string; auth: string }) => sendPush(s, payload)))
+  const gone = subs
+    .filter((_: unknown, i: number) => !results[i].ok && (results[i] as { gone?: boolean }).gone)
+    .map((s: { endpoint: string }) => s.endpoint)
+  if (gone.length > 0) {
+    await admin.from('push_subscriptions').delete().in('endpoint', gone)
+  }
+}
 
 interface Recipient {
   id: string
@@ -102,6 +150,16 @@ export async function notifyCriticalAlert(params: {
     const html = layout('Critical alert', body, { label: 'Open in Primex', href: `${APP_URL}/alerts` })
 
     await Promise.all(recipients.map((r) => sendEmail({ to: r.email, subject, html })))
+
+    // Web push to the same audience (honors the per-user `push` preference).
+    await deliverPush(site.company_id, ['company_manager', 'client'], 'critical_alert', {
+      title: `🚨 Critical alert: ${params.title}`,
+      body: params.description
+        ? `${site.name} — ${params.description}`
+        : `A critical alert was raised at ${site.name}.`,
+      url: `${APP_URL}/alerts`,
+      tag: 'critical_alert',
+    })
   } catch (e) {
     console.error('[notifications] notifyCriticalAlert failed:', e)
   }
