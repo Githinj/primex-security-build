@@ -54,7 +54,8 @@ Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic
 
 ### Supabase & RLS
 
-- 13 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences, 008 profile self-service — timezone/avatar columns, avatars bucket, email-sync trigger, 009 report period_start/period_end range, 010 incident_updates — guard on-scene notes/photo evidence + incident-evidence bucket, 011 company contact/plan fields, 012 incidents.guard_stage, 013 per-site client scoping — client_sites mapping + get_client_site_ids() + re-scoped client RLS)
+- 14 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences, 008 profile self-service — timezone/avatar columns, avatars bucket, email-sync trigger, 009 report period_start/period_end range, 010 incident_updates — guard on-scene notes/photo evidence + incident-evidence bucket, 011 company contact/plan fields, 012 incidents.guard_stage, 013 per-site client scoping — client_sites mapping + get_client_site_ids() + re-scoped client RLS, 014 subscriptions + billing_events for Stripe billing)
+- Migrations are written idempotent (`IF [NOT] EXISTS` / `DROP POLICY IF EXISTS`) so they can be re-applied safely
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
 - Seed data: `supabase/seed.sql` — 9 test users (password: `testpass123`), key accounts: `jordan@primexsecurity.com.au` (super_admin), `claire@apexretail.com.au` (company_manager), `samira@` (dispatcher), `marcus@` (guard), `brett@nexuslogistics.com.au` (client)
@@ -83,6 +84,20 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - Preferences: `notification_preferences` table (migration 007), managed via `lib/data/actions/notification-preferences.ts` and the Settings page
 - Env: `RESEND_API_KEY`, `NOTIFICATIONS_FROM_EMAIL`, `NEXT_PUBLIC_SITE_URL`
 
+### Billing (Stripe, SEC-129)
+
+- Per-company subscriptions. `lib/billing/stripe.ts` — env-gated client: unset `STRIPE_SECRET_KEY` makes billing a graceful no-op (`isBillingConfigured()`), the same pattern as the email/presign layers. `apiVersion` is intentionally omitted (SDK pins its own)
+- `lib/billing/plans.ts` — `PLAN_TIERS` is the single source of truth for tiers (`starter` / `professional` / `enterprise`). Display fields are client-safe; Stripe Price ids resolve lazily from env vars (`priceIdForTier`, reverse `tierForPriceId` for the webhook)
+- `lib/data/actions/billing.ts` — `createCheckoutSession()` (14-day trial) and `createPortalSession()` server actions; both use the service-role client to manage `subscriptions` rows
+- Webhook: `app/api/webhooks/stripe/route.ts` — service-role writes (RLS-bypass) sync Stripe state into `subscriptions`; `billing_events.stripe_event_id UNIQUE` is the idempotency key (duplicate delivery fails the insert and is skipped), mirroring the antmedia `stream_events` pattern
+- `subscriptions` is authoritative subscription state; `companies.plan` (migration 011) is only an admin label, not touched by billing
+- UI lives in the Settings page; env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PROFESSIONAL`
+
+### SEO (public pages)
+
+- Per-route `metadata` / `generateMetadata` on public pages (landing, `(auth)` routes). `app/robots.ts` + `app/sitemap.ts` derive allow/disallow from the protected prefixes; `SITE_URL` comes from `lib/site-url.ts`
+- Protected app areas are `disallow`ed in robots and excluded from the sitemap; `/reset-password` stays crawlable but carries a `noindex` meta
+
 ### AI Detection Layer
 
 - Python worker in `ai_worker/` — runs independently, posts events to `supabase/functions/ai-event-ingest/` edge function
@@ -104,6 +119,7 @@ Required in `.env.local`:
 - `ANTMEDIA_API_KEY` (optional — only needed for Enterprise Edition)
 - `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
 - `DO_SPACES_KEY`, `DO_SPACES_SECRET`, `DO_SPACES_REGION` (optional — only needed to presign recording playback for a private recordings bucket; without them the stored public URL is served as-is). Signing lives in `lib/storage/presign.ts` (hand-rolled SigV4, no AWS SDK)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PROFESSIONAL` (optional — billing no-ops when unset)
 
 ### Key Conventions
 
@@ -113,6 +129,7 @@ Required in `.env.local`:
 - Drag-and-drop: `@dnd-kit` (dispatch board)
 - PDF generation: `jspdf` + `jspdf-autotable` (server actions)
 - Multi-table writes use Postgres functions (`004_transactional_functions.sql`) instead of sequential inserts
+- Server actions gate access with `requireRole(...roles)` (`lib/auth/require-role.ts`), which returns the caller's `{ companyId, ... }` — RLS is the backstop, not the only check
 - `primex/AGENTS.md` contains Next.js agent rules — read `node_modules/next/dist/docs/` before using unfamiliar Next.js APIs
 
 ### Repo Layout
