@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, Check, Radio } from "lucide-react";
+import { Copy, Check, Radio, Video, Unplug } from "lucide-react";
 import { updateCamera } from "@/lib/data/actions/cameras";
-import { createBroadcast } from "@/lib/data/actions/streaming";
+import { createBroadcast, createStreamSource, stopStreamSource } from "@/lib/data/actions/streaming";
 import {
   Modal,
   ModalHeader,
@@ -29,6 +29,7 @@ interface FormState {
   location: string;
   status: string;
   stream_id: string;
+  source_url: string;
 }
 
 export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps) {
@@ -37,12 +38,15 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
     location: camera?.location ?? "",
     status: camera?.status ?? "",
     stream_id: camera?.stream_id ?? "",
+    source_url: camera?.source_url ?? "",
   });
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [ingestUrl, setIngestUrl] = useState<string | null>(camera?.stream_url ?? null);
   const [copied, setCopied] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [sourceConnected, setSourceConnected] = useState<boolean>(!!camera?.source_url);
+  const [sourceError, setSourceError] = useState<string | null>(null);
 
   // Reset form when camera changes
   if (camera && form.name === "" && camera.name !== "") {
@@ -51,8 +55,10 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
       location: camera.location,
       status: camera.status,
       stream_id: camera.stream_id ?? "",
+      source_url: camera.source_url ?? "",
     });
     setIngestUrl(camera.stream_url ?? null);
+    setSourceConnected(!!camera.source_url);
   }
 
   function handleChange(field: keyof FormState) {
@@ -97,6 +103,43 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
     });
   }
 
+  function handleConnectSource() {
+    if (!camera || !form.stream_id.trim() || !form.source_url.trim()) return;
+    setSourceError(null);
+    startTransition(async () => {
+      try {
+        const result = await createStreamSource(
+          camera.id,
+          form.name,
+          form.stream_id.trim(),
+          form.source_url.trim(),
+        );
+        if (result.success) {
+          setSourceConnected(true);
+        } else {
+          setSourceError(result.error ?? "Failed to connect the RTSP source.");
+        }
+      } catch (err) {
+        setSourceError("Failed to connect the RTSP source.");
+        console.error(err);
+      }
+    });
+  }
+
+  function handleDisconnectSource() {
+    if (!camera || !form.stream_id.trim()) return;
+    setSourceError(null);
+    startTransition(async () => {
+      try {
+        await stopStreamSource(camera.id, form.stream_id.trim());
+        setSourceConnected(false);
+      } catch (err) {
+        setSourceError("Failed to disconnect the RTSP source.");
+        console.error(err);
+      }
+    });
+  }
+
   function handleCopy() {
     if (!ingestUrl) return;
     navigator.clipboard.writeText(ingestUrl);
@@ -105,11 +148,13 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
   }
 
   function handleClose() {
-    setForm({ name: "", location: "", status: "", stream_id: "" });
+    setForm({ name: "", location: "", status: "", stream_id: "", source_url: "" });
     setSuccess(false);
     setIngestUrl(null);
     setCopied(false);
     setBroadcastError(null);
+    setSourceConnected(false);
+    setSourceError(null);
     onClose();
   }
 
@@ -226,6 +271,56 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
                     </InfoBox>
                   </div>
                 )}
+
+                {/* RTSP pull source — Ant Media connects OUT to the camera */}
+                <div className="border-t border-border/60 pt-4 flex flex-col gap-3">
+                  <p className="text-xs text-ink-3 font-sans font-medium">
+                    Or pull from an RTSP source
+                  </p>
+                  <Field
+                    label="RTSP source URL"
+                    hint="Ant Media connects to this camera and republishes it under the Stream ID above. Requires a Stream ID."
+                  >
+                    <TextInput
+                      value={form.source_url}
+                      onChange={handleChange("source_url")}
+                      placeholder="rtsp://user:pass@192.168.1.20:554/Streaming/channels/101"
+                    />
+                  </Field>
+
+                  {sourceConnected ? (
+                    <>
+                      <InfoBox tone="green">
+                        RTSP source connected. Ant Media is pulling the feed — it will appear
+                        in the live player once frames arrive.
+                      </InfoBox>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        icon={Unplug}
+                        onClick={handleDisconnectSource}
+                        disabled={isPending}
+                      >
+                        {isPending ? "Disconnecting…" : "Disconnect source"}
+                      </Button>
+                    </>
+                  ) : (
+                    form.source_url.trim() &&
+                    form.stream_id.trim() && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        icon={Video}
+                        onClick={handleConnectSource}
+                        disabled={isPending}
+                      >
+                        {isPending ? "Connecting…" : "Connect RTSP source"}
+                      </Button>
+                    )
+                  )}
+
+                  {sourceError && <InfoBox tone="amber">{sourceError}</InfoBox>}
+                </div>
 
                 {!form.stream_id.trim() && (
                   <InfoBox tone="amber">

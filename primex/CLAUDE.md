@@ -54,7 +54,8 @@ Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic
 
 ### Supabase & RLS
 
-- 14 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences, 008 profile self-service — timezone/avatar columns, avatars bucket, email-sync trigger, 009 report period_start/period_end range, 010 incident_updates — guard on-scene notes/photo evidence + incident-evidence bucket, 011 company contact/plan fields, 012 incidents.guard_stage, 013 per-site client scoping — client_sites mapping + get_client_site_ids() + re-scoped client RLS, 014 subscriptions + billing_events for Stripe billing)
+- 17 migration files in `supabase/migrations/` define the full schema (001 initial, 002 AI detection, 003 streaming, 004 transactional functions, 005 recording retention cron, 006 dispatcher profile RLS fix, 007 notification preferences, 008 profile self-service — timezone/avatar columns, avatars bucket, email-sync trigger, 009 report period_start/period_end range, 010 incident_updates — guard on-scene notes/photo evidence + incident-evidence bucket, 011 company contact/plan fields, 012 incidents.guard_stage, 013 per-site client scoping — client_sites mapping + get_client_site_ids() + re-scoped client RLS, 014 subscriptions + billing_events for Stripe billing, 015 catch-up API-role table grants — re-applies grants for 007/010/013/014 tables on already-migrated DBs, 016 push_subscriptions for web push, 017 cameras.source_url — RTSP pull-ingest source)
+- **Every migration that creates a public table MUST `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated, anon, service_role`** — this repo has no default-privilege auto-grant, so a missing grant silently breaks the table over PostgREST even with correct RLS (SEC-154, see migration 015). RLS scopes rows; GRANT makes the table reachable at all.
 - Migrations are written idempotent (`IF [NOT] EXISTS` / `DROP POLICY IF EXISTS`) so they can be re-applied safely
 - RLS uses CASE-based policies to avoid recursion; `get_user_role()` reads from `auth.users` metadata
 - `handle_new_user` trigger auto-creates profiles on signup
@@ -77,12 +78,14 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - `ProfileProvider` — current user profile, available in all `(app)` routes
 - `ScopeProvider` — company scope filtering for super_admin
 
-### Email Notifications
+### Notifications (email + web push)
 
 - `lib/notifications/email.ts` — thin `resend` wrapper. Sends are **logged no-ops** when `RESEND_API_KEY` is unset, so the app never breaks without it (`isEmailConfigured()` gates this)
-- `lib/notifications/notify.ts` — event senders (e.g. `notifyCriticalAlert()`). Uses the service-role client to resolve recipients across users, honoring `notification_preferences` (missing row = enabled, opt-out model). All errors are caught/logged so notification failures never break the triggering mutation
+- `lib/notifications/push.ts` — `web-push` wrapper, same graceful-degradation pattern: logged no-op unless a VAPID keypair is set (`isPushConfigured()`). `sendPush()` returns a `gone` flag on 404/410 so the caller can prune dead subscription rows
+- `lib/notifications/notify.ts` — event senders (e.g. `notifyCriticalAlert()`). Uses the service-role client to resolve recipients across users, honoring `notification_preferences` (missing row = enabled, opt-out model), and fans out to both email and every stored push subscription. All errors are caught/logged so notification failures never break the triggering mutation
+- Web push (SEC-148): `push_subscriptions` table (migration 016, one row per browser), client subscribe/unsubscribe in `lib/push/subscribe.ts` + `lib/data/actions/push-subscriptions.ts`, service worker + `NEXT_PUBLIC_VAPID_PUBLIC_KEY` on the client
 - Preferences: `notification_preferences` table (migration 007), managed via `lib/data/actions/notification-preferences.ts` and the Settings page
-- Env: `RESEND_API_KEY`, `NOTIFICATIONS_FROM_EMAIL`, `NEXT_PUBLIC_SITE_URL`
+- Env: `RESEND_API_KEY`, `NOTIFICATIONS_FROM_EMAIL`, `NEXT_PUBLIC_SITE_URL`; for push `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (optional — push no-ops when unset)
 
 ### Billing (Stripe, SEC-129)
 
@@ -110,6 +113,9 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - Components: `components/streaming/` (CameraPlayer, RecordingTimeline, RecordingPlayer)
 - Webhook: `app/api/webhooks/antmedia/` handles stream lifecycle + recording events
 - Recordings stored in DO Spaces, timeline scrubber with 1h/6h/12h/24h presets
+- **Two ingest modes** (`lib/data/actions/streaming.ts`, both super_admin-only, keyed on `stream_id` so playback/webhooks are identical):
+  - **RTMP push** — `createBroadcast()` creates a `type: 'liveStream'` broadcast and returns an `rtmp://` ingest URL the camera publishes *into* (stored in `cameras.stream_url`)
+  - **RTSP pull** — `createStreamSource()` creates a `type: 'streamSource'` broadcast with `streamUrl` set to the camera's RTSP URL; Ant Media connects *out* and republishes it. The RTSP URL is stored in `cameras.source_url` (migration 017, distinct from `stream_url`) for restart/rotation; `stopStreamSource()` halts the pull without clearing it. AMS must be network-routable to the camera (LAN cameras need AMS on-net or a tunnel)
 
 ### Env Vars
 
@@ -120,6 +126,7 @@ Required in `.env.local`:
 - `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
 - `DO_SPACES_KEY`, `DO_SPACES_SECRET`, `DO_SPACES_REGION` (optional — only needed to presign recording playback for a private recordings bucket; without them the stored public URL is served as-is). Signing lives in `lib/storage/presign.ts` (hand-rolled SigV4, no AWS SDK)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PROFESSIONAL` (optional — billing no-ops when unset)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (optional — web push no-ops when unset)
 
 ### Key Conventions
 

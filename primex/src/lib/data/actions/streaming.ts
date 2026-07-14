@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import type { StreamToken } from '@/lib/types'
@@ -104,6 +105,107 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
     .eq('id', cameraId)
 
   return { success: true, ingestUrl }
+}
+
+// RTSP pull ingest: Ant Media connects OUT to an RTSP camera (type "streamSource")
+// and republishes it under `streamId` as WebRTC/HLS — the pull counterpart to
+// createBroadcast()'s RTMP push flow. Playback (getStreamToken) and the webhook are
+// keyed on stream_id, so both work unchanged once the source is republishing.
+export async function createStreamSource(
+  cameraId: string,
+  cameraName: string,
+  streamId: string,
+  sourceUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+  await requireRole('super_admin')
+
+  const trimmedUrl = sourceUrl.trim()
+  if (!/^rtsps?:\/\//i.test(trimmedUrl)) {
+    return { success: false, error: 'Source URL must be an rtsp:// or rtsps:// address.' }
+  }
+  const trimmedId = streamId.trim()
+  if (!trimmedId) {
+    return { success: false, error: 'A stream ID is required to connect a source.' }
+  }
+
+  const base = `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts`
+  const sourcePayload = {
+    streamId: trimmedId,
+    name: cameraName,
+    type: 'streamSource',
+    streamUrl: trimmedUrl,
+  }
+
+  const createRes = await fetch(base, {
+    method: 'POST',
+    headers: antmediaHeaders('application/json'),
+    body: JSON.stringify(sourcePayload),
+  })
+
+  // 409 = a broadcast with this streamId already exists. Update it with the latest
+  // source URL (e.g. rotated credentials) rather than failing, then (re)start below.
+  if (createRes.status === 409) {
+    await fetch(`${base}/${trimmedId}`, {
+      method: 'PUT',
+      headers: antmediaHeaders('application/json'),
+      body: JSON.stringify(sourcePayload),
+    })
+  } else if (!createRes.ok) {
+    console.error(`Failed to create stream source: ${createRes.status}`)
+    return { success: false, error: 'Ant Media rejected the stream source.' }
+  }
+
+  // Stream sources are not fetched until started (unless the server has auto-start
+  // enabled), so kick it explicitly. A non-OK here usually means it is already
+  // pulling, which is fine — the webhook flips the camera Online when frames arrive.
+  const startRes = await fetch(`${base}/${trimmedId}/start`, {
+    method: 'POST',
+    headers: antmediaHeaders(),
+  })
+  if (!startRes.ok) {
+    console.warn(`Stream source start returned ${startRes.status} (may already be running)`)
+  }
+
+  // Persist stream_id (play id) + source_url (for restart/rotation). RLS scopes the
+  // row; super_admin may update any camera.
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase
+    .from('cameras')
+    .update({ stream_id: trimmedId, source_url: trimmedUrl })
+    .eq('id', cameraId)
+  if (error) {
+    console.error('Failed to persist stream source on camera:', error)
+    return { success: false, error: 'Connected in Ant Media but failed to save on the camera.' }
+  }
+
+  revalidatePath('/cameras')
+  revalidatePath(`/cameras/${cameraId}`)
+  return { success: true }
+}
+
+// Stops Ant Media from pulling the RTSP source but keeps source_url so it can be
+// reconnected later. The webhook also flips status on liveStreamEnded; we set it
+// optimistically so the UI reflects the change immediately.
+export async function stopStreamSource(
+  cameraId: string,
+  streamId: string,
+): Promise<{ success: boolean }> {
+  await requireRole('super_admin')
+
+  const res = await fetch(
+    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${streamId.trim()}/stop`,
+    { method: 'POST', headers: antmediaHeaders() },
+  )
+  if (!res.ok) {
+    console.warn(`Stream source stop returned ${res.status} (may already be stopped)`)
+  }
+
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('cameras').update({ status: 'Offline' }).eq('id', cameraId)
+
+  revalidatePath('/cameras')
+  revalidatePath(`/cameras/${cameraId}`)
+  return { success: true }
 }
 
 export async function getRecordingsAction(

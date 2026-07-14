@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, Check, Radio } from "lucide-react";
+import { Copy, Check, Radio, Video } from "lucide-react";
 import { createCamera } from "@/lib/data/actions/cameras";
-import { createBroadcast } from "@/lib/data/actions/streaming";
+import { createBroadcast, createStreamSource } from "@/lib/data/actions/streaming";
 import {
   Modal,
   ModalHeader,
@@ -32,6 +32,7 @@ interface FormState {
   location: string;
   status: string;
   stream_id: string;
+  source_url: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -41,6 +42,7 @@ const INITIAL_FORM: FormState = {
   location: "",
   status: "",
   stream_id: "",
+  source_url: "",
 };
 
 export function AddCameraModal({ open, onClose, companies, sites: allSites }: AddCameraModalProps) {
@@ -52,6 +54,8 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
   const [ingestUrl, setIngestUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [sourceConnected, setSourceConnected] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
 
   const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
@@ -111,6 +115,28 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
     });
   }
 
+  function handleConnectSource() {
+    if (!createdCameraId || !form.stream_id.trim() || !form.source_url.trim()) return;
+    setSourceError(null);
+    startTransition(async () => {
+      try {
+        const result = await createStreamSource(
+          createdCameraId,
+          form.name,
+          form.stream_id.trim(),
+          form.source_url.trim(),
+        );
+        if (result.success) {
+          setSourceConnected(true);
+        } else {
+          setSourceError(result.error ?? "Failed to connect the RTSP source.");
+        }
+      } catch {
+        setSourceError("Failed to connect the RTSP source.");
+      }
+    });
+  }
+
   function handleCopy() {
     if (!ingestUrl) return;
     navigator.clipboard.writeText(ingestUrl);
@@ -126,6 +152,8 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
     setIngestUrl(null);
     setCopied(false);
     setBroadcastError(null);
+    setSourceConnected(false);
+    setSourceError(null);
     onClose();
   }
 
@@ -157,6 +185,29 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
               {broadcastError && (
                 <InfoBox tone="amber">{broadcastError}</InfoBox>
               )}
+            </div>
+          )}
+
+          {/* Offer RTSP pull connect if a source URL + stream_id were provided */}
+          {form.source_url.trim() && form.stream_id.trim() && createdCameraId && (
+            <div className="px-6 pb-6 -mt-2 flex flex-col gap-3">
+              {sourceConnected ? (
+                <InfoBox tone="green">
+                  RTSP source connected. Ant Media is pulling the feed — it will appear in the
+                  live player once frames arrive.
+                </InfoBox>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  icon={Video}
+                  onClick={handleConnectSource}
+                  disabled={isPending}
+                >
+                  {isPending ? "Connecting…" : "Connect RTSP source"}
+                </Button>
+              )}
+              {sourceError && <InfoBox tone="amber">{sourceError}</InfoBox>}
             </div>
           )}
 
@@ -258,6 +309,17 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
                     value={form.stream_id}
                     onChange={handleChange("stream_id")}
                     placeholder="e.g. cam-01-westfield"
+                  />
+                </Field>
+
+                <Field
+                  label="RTSP source URL"
+                  hint="Optional. Ant Media pulls this camera and republishes it under the Stream ID. Connect it on the next step."
+                >
+                  <TextInput
+                    value={form.source_url}
+                    onChange={handleChange("source_url")}
+                    placeholder="rtsp://user:pass@192.168.1.20:554/Streaming/channels/101"
                   />
                 </Field>
 
