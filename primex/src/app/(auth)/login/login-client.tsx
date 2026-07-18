@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import { Button, TextInput, LiveDot, Label } from "@/components/ui";
 import { ForgotPasswordModal } from "./forgot-password-modal";
 
 export function LoginClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -46,8 +45,11 @@ export function LoginClient() {
         return;
       }
 
-      router.push(result.redirectTo ?? "/dashboard");
-      router.refresh();
+      // Hard navigation, not router.push(): the auth cookie was just set on the
+      // fetch response, and a soft client navigation races cookie propagation —
+      // middleware bounces it back to /login. A full-page load sends the fresh
+      // cookie so middleware routes to the role's home.
+      window.location.assign(result.redirectTo ?? "/dashboard");
       return;
     } catch {
       // JS fetch failed — submit as native HTML form (no JS needed)
