@@ -68,6 +68,7 @@ export interface Camera {
   warning: string | null
   stream_id: string | null
   stream_url: string | null
+  source_url: string | null
   recording_enabled: boolean
   last_frame_at: string | null
 }
