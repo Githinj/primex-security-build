@@ -73,8 +73,10 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
 
   const ingestUrl = `rtmp://${new URL(ANTMEDIA_URL).hostname}/${ANTMEDIA_APP}/${streamId}`
 
+  // Ant Media's create resource is /broadcasts/create — POSTing to /broadcasts
+  // itself is 405 (that path only lists). Keep the /create suffix.
   const res = await fetch(
-    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts`,
+    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/create`,
     {
       method: 'POST',
       headers: antmediaHeaders('application/json'),
@@ -136,7 +138,9 @@ export async function createStreamSource(
     streamUrl: trimmedUrl,
   }
 
-  const createRes = await fetch(base, {
+  // Create goes to /broadcasts/create (POST /broadcasts is 405); the PUT-update
+  // and /start below correctly hit the /broadcasts/{id} collection paths.
+  const createRes = await fetch(`${base}/create`, {
     method: 'POST',
     headers: antmediaHeaders('application/json'),
     body: JSON.stringify(sourcePayload),
