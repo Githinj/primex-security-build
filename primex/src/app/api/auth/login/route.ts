@@ -21,6 +21,11 @@ export async function POST(request: NextRequest) {
     password = formData.get('password') as string
   }
 
+  // Trim stray whitespace from the email (common with copy-paste / autofill) so a
+  // trailing space doesn't cause a spurious "Invalid email or password". Password is
+  // left as-is — leading/trailing spaces can be legitimate password characters.
+  email = (email ?? '').trim()
+
   if (!email || !password) {
     if (contentType.includes('application/json')) {
       return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
