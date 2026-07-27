@@ -7,14 +7,15 @@ import type { StreamToken } from '@/lib/types'
 
 const ANTMEDIA_URL = process.env.ANTMEDIA_URL!
 const ANTMEDIA_APP = process.env.ANTMEDIA_APP || 'LiveApp'
-const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY // optional for Community Edition
+const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY // EE REST JWT; unset on Community Edition
 const ANTMEDIA_WS_URL = process.env.ANTMEDIA_WS_URL!
 const TOKEN_DURATION_MS = 60 * 60 * 1000 // 1 hour
 
 function antmediaHeaders(contentType?: string): Record<string, string> {
   const headers: Record<string, string> = {}
   if (contentType) headers['Content-Type'] = contentType
-  if (ANTMEDIA_API_KEY) headers['Authorization'] = `Bearer ${ANTMEDIA_API_KEY}`
+  // Ant Media EE's JWT filter reads the raw token from Authorization — no "Bearer " prefix.
+  if (ANTMEDIA_API_KEY) headers['Authorization'] = ANTMEDIA_API_KEY
   return headers
 }
 

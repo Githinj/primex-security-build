@@ -4,19 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+> This repo is developed on Windows (PowerShell is the primary shell). The command blocks below use POSIX/bash syntax — run them via the Bash tool, or translate to PowerShell equivalents.
+
 ```bash
 # All commands run from the primex/ directory
 npm run dev          # Start dev server (next dev)
 npm run build        # Production build
 npm run lint         # ESLint (flat config, eslint.config.mjs)
 npm start            # Start production server
+npx tsc --noEmit     # Typecheck — there is no npm script for this; faster than a full build
 
 # Unit tests (Vitest, node env — pure logic in src/**/*.test.ts)
 npm test                   # Run the Vitest suite once
 npm run test:watch         # Watch mode
 npx vitest run src/lib/utils.test.ts   # Run a single test file
 
-# E2E tests (Playwright, requires dev server running)
+# E2E tests (Playwright) — WARNING: globalSetup runs `supabase db reset`, wiping the local DB
 npm run test:e2e           # Run all E2E tests (headless)
 npm run test:e2e:headed    # Run E2E tests with browser visible
 npx playwright test e2e/auth.spec.ts  # Run a single test file
@@ -29,7 +32,12 @@ supabase db reset    # Reset DB and re-run migrations + seed
 cd ai_worker && pip install -r requirements.txt && python main.py
 ```
 
-Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic only (`vitest.config.ts` aliases `@/` and stubs `server-only`). E2E tests live in `e2e/` (Playwright, Chromium only, serial execution). The AI worker has unit tests in `ai_worker/tests/`.
+Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic only (`vitest.config.ts` aliases `@/` and stubs `server-only`). The AI worker has unit tests in `ai_worker/tests/`.
+
+E2E tests live in `e2e/` (Playwright, Chromium only, `workers: 1` + `fullyParallel: false` — they share one database, so they must stay serial). Before running them:
+- `e2e/global-setup.ts` runs `npx supabase db reset` (up to 3 attempts) before the suite. **This destroys local DB state** and re-seeds from `supabase/seed.sql` — the specs assume exactly those seed rows.
+- `e2e/helpers/auth.ts` `loginAs(page, role)` logs in through the real UI once per role and caches cookies to `e2e/.auth/<role>.json`, falling back to a fresh UI login when the cache is stale. Its `USERS` map duplicates the role→home-path mapping; keep it in sync with `getRoleHomePath()` (see Auth Flow below).
+- `webServer` uses `reuseExistingServer: true`, so an already-running `npm run dev` is reused rather than a second one started.
 
 ## Architecture
 
@@ -45,12 +53,30 @@ Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic
   - `client` → `/portal` (alerts, incidents, reports, help)
 - **Params/cookies are async**: `await params`, `await cookies()` — Next.js 15 requirement
 
+### Auth Flow
+
+Sign-in deliberately does **not** go through a server action. `POST /api/auth/login` (`app/api/auth/login/route.ts`) is the entry point, and the pieces fit together like this:
+
+- The route accepts **both** JSON (from `fetch`) and form-encoded bodies (no-JS form post), and branches its response shape on `content-type` — JSON callers get JSON, form callers get a redirect. Change one branch, change the other.
+- It creates its own `createServerClient` so the Supabase auth cookies are written onto the outgoing `NextResponse`. A server action can't reliably do this here.
+- The client then **hard-navigates** (`window.location`) rather than using the router, so the middleware re-runs against the freshly-set cookies (SEC-165). A soft push lands the user back on `/login`.
+- The email is `.trim()`ed, the password is not — leading/trailing spaces can be legitimate password characters (SEC-164).
+- `lib/auth/role-redirect.ts` `getRoleHomePath(role)` is the single source of truth for role → landing path. It is consumed by this route and `src/middleware.ts`; `e2e/helpers/auth.ts` keeps its own copy. Adding a role means touching all three.
+- `/api/auth/test-login` exists alongside it for automated login; `/api/auth/forgot-password` handles reset requests.
+- Authorization inside the app is separate: server actions call `requireRole(...roles)` (see Key Conventions), while `src/middleware.ts` handles session refresh and coarse route protection.
+
 ### Data Layer
 
 - **Queries**: `lib/data/*.ts` — read-only server functions (e.g., `getAlerts()`, `getSites()`)
 - **Mutations**: `lib/data/actions/*.ts` — `"use server"` actions (e.g., `updateIncidentStatus()`, `inviteUser()`)
 - **Supabase clients**: `lib/supabase/client.ts` (browser), `server.ts` (server components/actions), `admin.ts` (service-role for admin ops)
 - **Types**: `lib/types/index.ts` — all domain types and enums
+- **Pagination**: `lib/data/pagination.ts` — `applyPagination()` must be chained *after* `.order()`, and the query must `select('*', { count: 'exact' })` or the total comes back null. `toPaginatedResult()` wraps the response into `{ data, total, page, pageSize, totalPages }`. Colocated tests in `pagination.test.ts`
+
+### Pure Domain Logic
+
+- `lib/guard-lifecycle.ts` — the guard incident state machine (`assigned → accepted → enroute → arrived → resolved`), shared by the guard UI and tests. The `incident_status` enum can't distinguish Accepted/En Route/Arrived (all "In Progress"), so the finer stage is carried in `incidents.guard_stage` (migration 012); this module maps between the two. Colocated tests in `guard-lifecycle.test.ts`
+- `lib/support.ts` — single source of truth for dispatch/support contact details, so the portal home and Get-help page never drift
 
 ### Supabase & RLS
 
@@ -96,6 +122,11 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - `subscriptions` is authoritative subscription state; `companies.plan` (migration 011) is only an admin label, not touched by billing
 - UI lives in the Settings page; env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PROFESSIONAL`
 
+### Scheduled Work
+
+- `vercel.json` declares one cron: `GET /api/cron/keep-alive` daily at 06:00 UTC. It pings Supabase `/auth/v1/health` purely to keep a free-tier project from being paused for inactivity — it is an edge-runtime route and intentionally returns 200 with a `status` field rather than failing loudly
+- Recording retention runs inside Postgres via pg_cron (migration 005), not Vercel
+
 ### SEO (public pages)
 
 - Per-route `metadata` / `generateMetadata` on public pages (landing, `(auth)` routes). `app/robots.ts` + `app/sitemap.ts` derive allow/disallow from the protected prefixes; `SITE_URL` comes from `lib/site-url.ts`
@@ -121,8 +152,9 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 
 Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTMEDIA_URL`, `ANTMEDIA_APP` (default: `LiveApp`), `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
-- `ANTMEDIA_API_KEY` (optional — only needed for Enterprise Edition)
+- `ANTMEDIA_URL`, `ANTMEDIA_APP`, `ANTMEDIA_WS_URL`, `ANTMEDIA_WEBHOOK_SECRET`
+  - **Prod runs Ant Media Enterprise Edition** → `ANTMEDIA_APP=WebRTCAppEE` and URLs go over SSL (`https://…:5443`, `wss://…:5443/WebRTCAppEE/websocket`). The app is served over `https`, so AMS **must** be `https`/`wss` or the browser blocks it as mixed content — live video won't play otherwise. Code default is `LiveApp` (Community/local Docker on `:5080`)
+- `ANTMEDIA_API_KEY` — the EE REST JWT, sent **raw** in the `Authorization` header (no `Bearer ` prefix; `streaming.ts`). Required in prod: it also switches `getStreamToken()` from tokenless URLs to real per-stream play tokens. Unset on Community Edition. Note: prod REST may instead be gated by IP allowlist rather than JWT — see the Ant Media REST IP allowlist memory
 - `DO_SPACES_RECORDINGS_BUCKET`, `DO_SPACES_ENDPOINT`
 - `DO_SPACES_KEY`, `DO_SPACES_SECRET`, `DO_SPACES_REGION` (optional — only needed to presign recording playback for a private recordings bucket; without them the stored public URL is served as-is). Signing lives in `lib/storage/presign.ts` (hand-rolled SigV4, no AWS SDK)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PROFESSIONAL` (optional — billing no-ops when unset)
