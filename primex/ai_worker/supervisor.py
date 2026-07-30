@@ -120,7 +120,7 @@ class Supervisor:
                 door_open_threshold_s=self.config.door_open_threshold_s,
                 confidence_threshold=self.config.confidence_threshold,
                 antmedia_url=os.environ.get("ANTMEDIA_URL", ""),
-                antmedia_token=os.environ.get("ANTMEDIA_TOKEN", ""),
+                antmedia_secret=os.environ.get("ANTMEDIA_API_KEY", ""),
                 antmedia_app=os.environ.get("ANTMEDIA_APP", "LiveApp"),
             )
             self._tasks[cam_id] = asyncio.create_task(task.run())

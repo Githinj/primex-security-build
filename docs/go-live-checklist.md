@@ -49,7 +49,7 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 | `ANTMEDIA_APP` | ⚙️ | `LiveApp` (Community) / `WebRTCAppEE` (Enterprise) |
 | `ANTMEDIA_WS_URL` | ⚙️ | WebRTC signalling ws URL |
 | `ANTMEDIA_WEBHOOK_SECRET` | 🔑⚙️ | Shared secret for `/api/webhooks/antmedia` |
-| `ANTMEDIA_API_KEY` | 🔑💤 | Enterprise only (per-stream tokens + REST snapshot) |
+| `ANTMEDIA_API_KEY` | 🔑💤 | Enterprise only — HS256 **signing secret** (AMS `jwtSecretKey`), not a token; app signs a 60s JWT per REST call. Same value in `ai_worker` env (per-stream tokens + REST snapshot) |
 
 ### Recordings (DigitalOcean Spaces)
 | Var | | Notes |

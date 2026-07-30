@@ -1,6 +1,10 @@
 """Per-camera async task loop: poll -> detect -> track -> alert."""
 
 import asyncio
+import base64
+import hmac
+import hashlib
+import json
 import logging
 import time
 
@@ -12,6 +16,8 @@ from detector import Detector
 from event_poster import EventPoster
 
 logger = logging.getLogger(__name__)
+
+REST_JWT_TTL_S = 60  # short-lived: a fresh token is signed per request
 
 
 class CameraTask:
@@ -31,7 +37,7 @@ class CameraTask:
         door_open_threshold_s: int = 120,
         confidence_threshold: float = 0.7,
         antmedia_url: str = "",
-        antmedia_token: str = "",
+        antmedia_secret: str = "",
         antmedia_app: str = "LiveApp",
     ):
         self.camera_id = camera_id
@@ -43,7 +49,7 @@ class CameraTask:
         self.snapshot_interval_s = snapshot_interval_s
         self.confidence_threshold = confidence_threshold
         self.antmedia_url = antmedia_url
-        self.antmedia_token = antmedia_token
+        self.antmedia_secret = antmedia_secret
         self.antmedia_app = antmedia_app
         # Persistent OpenCV capture for the Community-Edition HLS strategy.
         self._hls_cap = None
@@ -113,14 +119,39 @@ class CameraTask:
         """Grab one JPEG frame. Two strategies, mirroring the front-end's
         Enterprise-vs-Community split (src/lib/data/actions/streaming.ts):
 
-        - Enterprise (antmedia_token set): the REST snapshot API, using the
+        - Enterprise (antmedia_secret set): the REST snapshot API, using the
           configured ANTMEDIA_APP (not a hard-coded WebRTCAppEE path).
-        - Community (no token): the snapshot REST API doesn't exist, so pull a
+        - Community (no secret): the snapshot REST API doesn't exist, so pull a
           frame off the HLS playlist with OpenCV.
         """
-        if self.antmedia_token:
+        if self.antmedia_secret:
             return await self._fetch_snapshot_rest()
         return await self._fetch_snapshot_hls()
+
+    def _sign_rest_jwt(self) -> str:
+        """Mint the per-request JWT Ant Media Enterprise's REST filter expects.
+
+        ANTMEDIA_API_KEY is the shared HS256 signing secret (AMS `jwtSecretKey`),
+        not a token — sending it verbatim gets a 403 "Invalid App JWT Token".
+        Must stay in step with signAntmediaRestJwt() in
+        src/lib/data/actions/streaming.ts: same claims, raw value, no "Bearer ".
+        """
+
+        def b64url(raw: bytes) -> str:
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+        # Compact separators so this serializes byte-identically to the TS side's
+        # JSON.stringify — keeps the two runtimes emitting the same token.
+        def compact(obj: dict) -> bytes:
+            return json.dumps(obj, separators=(",", ":")).encode()
+
+        header = b64url(compact({"alg": "HS256", "typ": "JWT"}))
+        payload = b64url(compact({"exp": int(time.time()) + REST_JWT_TTL_S}))
+        signing_input = f"{header}.{payload}".encode("ascii")
+        signature = b64url(
+            hmac.new(self.antmedia_secret.encode(), signing_input, hashlib.sha256).digest()
+        )
+        return f"{header}.{payload}.{signature}"
 
     async def _fetch_snapshot_rest(self) -> bytes | None:
         url = f"{self.antmedia_url}/{self.antmedia_app}/rest/v2/broadcasts/{self.stream_id}/snapshot"
@@ -128,7 +159,7 @@ class CameraTask:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.get(
                     url,
-                    headers={"Authorization": f"Bearer {self.antmedia_token}"},
+                    headers={"Authorization": self._sign_rest_jwt()},
                 )
                 if resp.status_code == 200:
                     return resp.content

@@ -1,5 +1,6 @@
 'use server'
 
+import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
@@ -7,14 +8,35 @@ import type { StreamToken } from '@/lib/types'
 
 const ANTMEDIA_URL = process.env.ANTMEDIA_URL!
 const ANTMEDIA_APP = process.env.ANTMEDIA_APP || 'LiveApp'
-const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY // optional for Community Edition
+// The EE JWT *signing secret* (AMS `jwtSecretKey`), not a token. Unset on Community Edition.
+const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY
 const ANTMEDIA_WS_URL = process.env.ANTMEDIA_WS_URL!
 const TOKEN_DURATION_MS = 60 * 60 * 1000 // 1 hour
+const REST_JWT_TTL_S = 60 // short-lived: a fresh token is signed per request
+
+// Mints the per-request JWT that Ant Media Enterprise's REST filter expects.
+// ANTMEDIA_API_KEY is the shared HS256 secret — sending it verbatim as the
+// Authorization value gets a 403 "Invalid App JWT Token"; it has to sign a
+// token. AMS only checks the signature and `exp`, so no other claims are set.
+function signAntmediaRestJwt(secret: string): string {
+  const b64url = (value: string) => Buffer.from(value, 'utf8').toString('base64url')
+  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const payload = b64url(
+    JSON.stringify({ exp: Math.floor(Date.now() / 1000) + REST_JWT_TTL_S }),
+  )
+  const signingInput = `${header}.${payload}`
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(signingInput, 'utf8')
+    .digest('base64url')
+  return `${signingInput}.${signature}`
+}
 
 function antmediaHeaders(contentType?: string): Record<string, string> {
   const headers: Record<string, string> = {}
   if (contentType) headers['Content-Type'] = contentType
-  if (ANTMEDIA_API_KEY) headers['Authorization'] = `Bearer ${ANTMEDIA_API_KEY}`
+  // Ant Media EE reads the raw compact JWT from Authorization — no "Bearer " prefix.
+  if (ANTMEDIA_API_KEY) headers['Authorization'] = signAntmediaRestJwt(ANTMEDIA_API_KEY)
   return headers
 }
 
