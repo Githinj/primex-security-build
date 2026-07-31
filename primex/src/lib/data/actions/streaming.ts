@@ -32,6 +32,27 @@ function signAntmediaRestJwt(secret: string): string {
   return `${signingInput}.${signature}`
 }
 
+// Ant Media answers a rejected write with {"success":false,"message":"…"} — the
+// message is the only thing that says *why*. Logging the bare status turns every
+// provisioning failure into an opaque "400", so pull the body out for the log.
+async function antmediaError(res: Response): Promise<string> {
+  let detail = ''
+  try {
+    const body = (await res.text()).trim()
+    if (body) {
+      try {
+        const parsed = JSON.parse(body)
+        detail = parsed.message || parsed.error || body
+      } catch {
+        detail = body // not JSON (e.g. a Tomcat HTML error page)
+      }
+    }
+  } catch {
+    // unreadable body — the status alone will have to do
+  }
+  return detail ? `${res.status} — ${detail.slice(0, 300)}` : `${res.status}`
+}
+
 function antmediaHeaders(contentType?: string): Record<string, string> {
   const headers: Record<string, string> = {}
   if (contentType) headers['Content-Type'] = contentType
@@ -75,7 +96,9 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
   )
 
   if (!res.ok) {
-    console.error(`Ant Media token request failed: ${res.status}`)
+    console.error(
+      `Ant Media token request failed for streamId "${streamId}": ${await antmediaError(res)}`,
+    )
     return null
   }
 
@@ -115,7 +138,9 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
   }
 
   if (!res.ok) {
-    console.error(`Failed to create broadcast: ${res.status}`)
+    console.error(
+      `Failed to create broadcast for streamId "${streamId}": ${await antmediaError(res)}`,
+    )
     return { success: false }
   }
 
@@ -171,13 +196,23 @@ export async function createStreamSource(
   // 409 = a broadcast with this streamId already exists. Update it with the latest
   // source URL (e.g. rotated credentials) rather than failing, then (re)start below.
   if (createRes.status === 409) {
-    await fetch(`${base}/${trimmedId}`, {
+    const updateRes = await fetch(`${base}/${trimmedId}`, {
       method: 'PUT',
       headers: antmediaHeaders('application/json'),
       body: JSON.stringify(sourcePayload),
     })
+    // A failed update means the broadcast keeps its OLD source URL while we go on
+    // to report success — so a credential rotation would silently not take effect.
+    if (!updateRes.ok) {
+      console.error(
+        `Failed to update existing stream source "${trimmedId}": ${await antmediaError(updateRes)}`,
+      )
+      return { success: false, error: 'Ant Media rejected the updated stream source.' }
+    }
   } else if (!createRes.ok) {
-    console.error(`Failed to create stream source: ${createRes.status}`)
+    console.error(
+      `Failed to create stream source for streamId "${trimmedId}": ${await antmediaError(createRes)}`,
+    )
     return { success: false, error: 'Ant Media rejected the stream source.' }
   }
 
@@ -189,7 +224,9 @@ export async function createStreamSource(
     headers: antmediaHeaders(),
   })
   if (!startRes.ok) {
-    console.warn(`Stream source start returned ${startRes.status} (may already be running)`)
+    console.warn(
+      `Stream source start for "${trimmedId}" returned ${await antmediaError(startRes)} (may already be running)`,
+    )
   }
 
   // Persist stream_id (play id) + source_url (for restart/rotation). RLS scopes the
@@ -223,7 +260,9 @@ export async function stopStreamSource(
     { method: 'POST', headers: antmediaHeaders() },
   )
   if (!res.ok) {
-    console.warn(`Stream source stop returned ${res.status} (may already be stopped)`)
+    console.warn(
+      `Stream source stop for "${streamId.trim()}" returned ${await antmediaError(res)} (may already be stopped)`,
+    )
   }
 
   const supabase = await createServerSupabaseClient()
