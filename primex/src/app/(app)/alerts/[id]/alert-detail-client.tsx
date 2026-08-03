@@ -29,9 +29,11 @@ interface AlertDetailClientProps {
   alert: Alert;
   site: Site;
   camera: CameraType | null;
+  /** Short-lived presigned URL for `alert.frame_url`, signed on the server. */
+  frameUrl: string | null;
 }
 
-export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProps) {
+export function AlertDetailClient({ alert, site, camera, frameUrl }: AlertDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -104,12 +106,12 @@ export function AlertDetailClient({ alert, site, camera }: AlertDetailClientProp
       </div>
 
       {/* AI frame snapshot or camera placeholder */}
-      {alert.frame_url ? (
+      {frameUrl ? (
         <div className="w-full max-w-lg rounded-xl overflow-hidden border border-border">
           <div className="relative" style={{ aspectRatio: "16/9" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={alert.frame_url}
+              src={frameUrl}
               alt={`AI detection frame — ${alert.title}`}
               className="w-full h-full object-cover"
             />

@@ -57,7 +57,7 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 | `DO_SPACES_RECORDINGS_BUCKET` | ⚙️ | Bucket name |
 | `DO_SPACES_ENDPOINT` | ⚙️ | e.g. `https://sgp1.digitaloceanspaces.com` |
 | `DO_SPACES_REGION` | 💤 | Presign region (default `sgp1`) |
-| `DO_SPACES_KEY` / `DO_SPACES_SECRET` | 🔑💤 | Only needed to presign a **private** recordings bucket |
+| `DO_SPACES_KEY` / `DO_SPACES_SECRET` | 🔑 | Presigns private-bucket reads. Optional for recordings (only if that bucket is private) but **required** for AI detection frames — that bucket is private by design, so without these every alert snapshot 403s |
 
 ### Email (Resend) — 💤 logged no-op if unset
 | Var | | |
