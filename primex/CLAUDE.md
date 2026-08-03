@@ -147,6 +147,8 @@ Python worker in `ai_worker/` (aiohttp app, separate runtime/deploy from Next.js
 - Worker config (`confidence_threshold`, `snapshot_interval_s`, `cooldown_s`, `dwell_threshold_s`, `door_open_threshold_s`) is a singleton row loaded at startup from `ai_worker_config` (`config.py`), not env vars.
 - **Env vars are named differently from the Next app for the same underlying resources** — don't assume they're shared: `ai_worker/.env` uses `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` (Next uses `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`) and `AI_WORKER_SECRET` (checked in `supabase/functions/ai-event-ingest`). It also writes frames to `DO_SPACES_BUCKET` — a separate bucket from the Next app's `DO_SPACES_RECORDINGS_BUCKET`.
 - Tests: `ai_worker/tests/` (pytest, `pyproject.toml` sets `pythonpath = ["."]` so tests import worker modules directly).
+- **Deployed separately from Vercel** — Docker on a DO droplet. `ai_worker/Dockerfile` + `docker-compose.yml`; full runbook in `docs/ai-worker-deploy.md` (root `docs/`). Inference is serialized through one model and one queue, so the throughput ceiling is `snapshot_interval_s ÷ inference_latency` cameras — watch `inference_queue_depth` on `/health`
+- `/health` (port `HEALTH_PORT`, default 8080) returns 503 when starting, when the camera roster is stale, or when every camera is failing; 200 otherwise
 
 ### Camera Streaming
 

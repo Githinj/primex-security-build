@@ -101,8 +101,15 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       (pairs with the DB retention cron from SEC-91).
 
 ### Ant Media / AI worker
-- [ ] Point `ANTMEDIA_*` at the live server; deploy the Python `ai_worker` separately
-      (its own env — Community Edition works after SEC-138; Enterprise needs `ANTMEDIA_API_KEY`).
+- [ ] Point `ANTMEDIA_*` at the live server.
+- [ ] Deploy the Python `ai_worker` separately — **see `docs/ai-worker-deploy.md`**
+      for the full runbook (Docker, sizing, first-light validation, troubleshooting).
+      Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`
+      byte-identical to the app's.
+- [ ] `supabase functions deploy ai-event-ingest` and set `AI_WORKER_SECRET` as a
+      Supabase secret — the worker's POSTs 401 without it.
+- [ ] Add the worker droplet's IP to the **Ant Media REST allowlist**, or every
+      Enterprise snapshot fetch 403s and the worker detects nothing while looking healthy.
 
 ---
 
