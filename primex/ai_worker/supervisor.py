@@ -98,6 +98,7 @@ class Supervisor:
             logger.info(f"Stopping camera task: {cam_id}")
             self._tasks[cam_id].cancel()
             del self._tasks[cam_id]
+            self.detector.forget_camera(cam_id)
             if cam_id in self._camera_info:
                 del self._camera_info[cam_id]
 

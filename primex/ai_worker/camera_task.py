@@ -78,7 +78,7 @@ class CameraTask:
                 self._consecutive_failures = 0
 
                 try:
-                    detections = await self.detector.submit(frame)
+                    detections = await self.detector.submit(frame, self.camera_id)
                 except Exception as e:
                     logger.error(f"Inference failed for {self.camera_id}: {e}")
                     await asyncio.sleep(self.snapshot_interval_s)
