@@ -53,6 +53,12 @@ class Detector:
     def stop(self):
         self._running = False
 
+    @property
+    def queue_depth(self) -> int:
+        """Frames waiting on inference. Sustained growth means the model can't
+        keep up with the poll interval across the active cameras."""
+        return self._queue.qsize()
+
     def forget_camera(self, camera_id: str) -> None:
         """Drop a stopped camera's tracker state.
 
