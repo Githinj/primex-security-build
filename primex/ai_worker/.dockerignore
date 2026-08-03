@@ -1,0 +1,18 @@
+# Secrets must never reach the image — env is injected at run time.
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ultralytics/
+
+# Runtime artifacts, not build inputs.
+missed_events.jsonl
+missed_events.jsonl.replayed
+*.pt
+
+Dockerfile
+.dockerignore
+docker-compose.yml

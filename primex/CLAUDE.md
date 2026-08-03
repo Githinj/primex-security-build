@@ -137,6 +137,8 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - Python worker in `ai_worker/` — runs independently, posts events to `supabase/functions/ai-event-ingest/` edge function
 - Detection types: `motion_afterhours`, `person_lingering`, `concealment_behavior`, `door_event`, `vehicle_detection`
 - Config tables: `camera_ai_config`, `site_business_hours`, `ai_worker_config`
+- **Deployed separately from Vercel** — Docker on a DO droplet. `ai_worker/Dockerfile` + `docker-compose.yml`; full runbook in `docs/ai-worker-deploy.md` (root `docs/`). Inference is serialized through one model and one queue, so the throughput ceiling is `snapshot_interval_s ÷ inference_latency` cameras — watch `inference_queue_depth` on `/health`
+- `/health` (port `HEALTH_PORT`, default 8080) returns 503 when starting, when the camera roster is stale, or when every camera is failing; 200 otherwise
 
 ### Camera Streaming
 
