@@ -3,6 +3,7 @@ import { getCompanyById } from "@/lib/data/companies";
 import { getCameras } from "@/lib/data/cameras";
 import { getAlerts } from "@/lib/data/alerts";
 import { getIncidents } from "@/lib/data/incidents";
+import { getSiteBusinessHours } from "@/lib/data/site-business-hours";
 import { SiteDetailClient } from "./site-detail-client";
 import { notFound } from "next/navigation";
 
@@ -15,11 +16,12 @@ export default async function SiteDetailPage({
   const site = await getSiteById(id);
   if (!site) notFound();
 
-  const [company, cameras, alerts, incidents] = await Promise.all([
+  const [company, cameras, alerts, incidents, businessHours] = await Promise.all([
     getCompanyById(site.company_id),
     getCameras(id),
     getAlerts(id),
     getIncidents(id),
+    getSiteBusinessHours(id),
   ]);
 
   if (!company) notFound();
@@ -31,6 +33,7 @@ export default async function SiteDetailPage({
       cameras={cameras}
       alerts={alerts}
       incidents={incidents}
+      businessHours={businessHours}
     />
   );
 }
