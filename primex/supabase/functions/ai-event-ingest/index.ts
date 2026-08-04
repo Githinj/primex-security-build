@@ -36,6 +36,19 @@ serve(async (req: Request) => {
 
   const authHeader = req.headers.get('Authorization')
   const workerSecret = Deno.env.get('AI_WORKER_SECRET')
+
+  // Fail closed. Without this guard an unset secret interpolates to the literal
+  // "Bearer undefined" below, which anyone could send — and since this function
+  // writes via the service role key, that is unauthenticated alert injection.
+  // A missing secret is a broken deployment, not a permissive one.
+  if (!workerSecret) {
+    console.error('AI_WORKER_SECRET is not set — rejecting all requests')
+    return new Response(
+      JSON.stringify({ error: 'Server misconfigured' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
   if (!authHeader || authHeader !== `Bearer ${workerSecret}`) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
