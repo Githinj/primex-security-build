@@ -10,6 +10,12 @@ class Detection:
     bbox: tuple[int, int, int, int]
     confidence: float
     track_id: str
+    # Dimensions of the frame `bbox` was measured in. Zones are stored as
+    # normalised 0–1 coordinates, so the tracker needs these to place a
+    # detection inside one. Zero means unknown, and zone matching is skipped
+    # rather than guessed at.
+    frame_w: int = 0
+    frame_h: int = 0
 
 
 @dataclass
@@ -82,9 +88,8 @@ class BehaviorTracker:
                 )
                 self._tracks[det.track_id] = track
 
-            center_x = (det.bbox[0] + det.bbox[2]) / 2
-            center_y = (det.bbox[1] + det.bbox[3]) / 2
-            track.zone = self._get_zone(center_x, center_y)
+            point = self._normalize(det)
+            track.zone = self._get_zone(point)
 
             if (is_person or is_vehicle) and self._is_after_hours(timestamp):
                 events.append(SecurityEvent(
@@ -110,7 +115,7 @@ class BehaviorTracker:
                 h = det.bbox[3] - det.bbox[1]
                 aspect_ratio = h / w if w > 0 else 1.0
                 is_crouching = aspect_ratio < 0.4
-                near_entry = self._is_near_zone_type(center_x, center_y, "entry")
+                near_entry = self._is_near_zone_type(point, "entry")
 
                 if is_crouching and near_entry:
                     if track.crouching_since is None:
@@ -125,7 +130,7 @@ class BehaviorTracker:
                 else:
                     track.crouching_since = None
 
-            if is_vehicle and self._is_near_zone_type(center_x, center_y, "restricted"):
+            if is_vehicle and self._is_near_zone_type(point, "restricted"):
                 events.append(SecurityEvent(
                     event_type="vehicle_detection",
                     confidence=det.confidence,
@@ -153,14 +158,36 @@ class BehaviorTracker:
 
         return events
 
-    def _get_zone(self, x: float, y: float) -> str | None:
+    @staticmethod
+    def _normalize(det: Detection) -> tuple[float, float] | None:
+        """Centre of a detection in 0–1 frame coordinates.
+
+        Zones are stored normalised so they survive a change in stream
+        resolution — a pixel rectangle drawn against a 640x480 snapshot silently
+        covers the wrong part of the scene once the camera publishes 1280x720.
+        Returns None when the frame size is unknown, so callers skip zone
+        matching instead of comparing pixels against fractions.
+        """
+        if det.frame_w <= 0 or det.frame_h <= 0:
+            return None
+        center_x = (det.bbox[0] + det.bbox[2]) / 2 / det.frame_w
+        center_y = (det.bbox[1] + det.bbox[3]) / 2 / det.frame_h
+        return center_x, center_y
+
+    def _get_zone(self, point: tuple[float, float] | None) -> str | None:
+        if point is None:
+            return None
+        x, y = point
         for zone in self.zones:
             c = zone["coords"]
             if c["x1"] <= x <= c["x2"] and c["y1"] <= y <= c["y2"]:
                 return zone["name"]
         return None
 
-    def _is_near_zone_type(self, x: float, y: float, zone_type: str) -> bool:
+    def _is_near_zone_type(self, point: tuple[float, float] | None, zone_type: str) -> bool:
+        if point is None:
+            return False
+        x, y = point
         for zone in self.zones:
             if zone["type"] != zone_type:
                 continue
