@@ -80,7 +80,10 @@ class Detector:
         img = self._decode(frame)
         if img is None:
             return []
-        return self._to_detections(self._track(img, camera_id))
+        # Zones are normalised 0–1, so the tracker needs the frame size the
+        # boxes were measured against. numpy shape is (height, width, channels).
+        height, width = img.shape[0], img.shape[1]
+        return self._to_detections(self._track(img, camera_id), width, height)
 
     def _decode(self, frame: bytes):
         import numpy as np
@@ -106,7 +109,7 @@ class Detector:
 
         return results
 
-    def _to_detections(self, results) -> list[Detection]:
+    def _to_detections(self, results, frame_w: int = 0, frame_h: int = 0) -> list[Detection]:
         detections: list[Detection] = []
         for result in results:
             if result.boxes is None:
@@ -123,6 +126,8 @@ class Detector:
                     bbox=(x1, y1, x2, y2),
                     confidence=conf,
                     track_id=track_id,
+                    frame_w=frame_w,
+                    frame_h=frame_h,
                 ))
 
         return detections
