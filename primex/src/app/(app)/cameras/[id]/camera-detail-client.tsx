@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, SquareDashedMousePointer } from "lucide-react";
 import { Card, KV, Button, Label, Pill } from "@/components/ui";
+import { ZoneEditorModal } from "@/components/cameras/zone-editor-modal";
 import { CameraPlayer } from "@/components/streaming/camera-player";
 import { RecordingTimeline } from "@/components/streaming/recording-timeline";
 import { RecordingPlayer } from "@/components/streaming/recording-player";
@@ -36,6 +37,7 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
   const [mode, setMode] = useState<'live' | 'playback'>('live');
   const [activeRecording, setActiveRecording] = useState<Recording | null>(null);
   const [seekTimestamp, setSeekTimestamp] = useState<Date | null>(null);
+  const [zonesOpen, setZonesOpen] = useState(false);
 
   const tone = cameraTone(camera.status);
 
@@ -161,6 +163,23 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
                 ))}
               </div>
             )}
+
+            <Button
+              variant="secondary"
+              icon={SquareDashedMousePointer}
+              onClick={() => setZonesOpen(true)}
+              className="w-fit"
+            >
+              {aiConfig?.zones?.length ? "Edit zones" : "Draw zones"}
+            </Button>
+
+            {!aiConfig?.zones?.length && (
+              <p className="text-xs text-ink-4 font-sans">
+                Without zones this camera can still detect loitering and after-hours
+                motion, but not concealment or vehicles in restricted areas.
+              </p>
+            )}
+
             {!aiConfig && (
               <p className="text-xs text-ink-4 font-sans">
                 No AI config. Detection will be enabled when the camera is assigned a stream.
@@ -192,6 +211,14 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
           </div>
         </Card>
       </div>
+
+      <ZoneEditorModal
+        open={zonesOpen}
+        onClose={() => setZonesOpen(false)}
+        cameraId={camera.id}
+        cameraName={camera.name}
+        zones={aiConfig?.zones ?? []}
+      />
     </div>
   );
 }

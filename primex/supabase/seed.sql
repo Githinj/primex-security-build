@@ -415,10 +415,10 @@ INSERT INTO activity_log (actor_id, actor_name, action, target, icon, tone, crea
 -- Camera AI configs (enable AI on first 4 cameras, with zones on CAM-01 and CAM-03)
 INSERT INTO camera_ai_config (camera_id, enabled, zones) VALUES
   ('00000000-0000-0000-0000-0000000ca001', true,
-   '[{"name":"Main Entry","type":"entry","coords":{"x1":0,"y1":0,"x2":320,"y2":480}},{"name":"Front Door","type":"door","coords":{"x1":280,"y1":100,"x2":360,"y2":400}}]'),
+   '[{"name":"Main Entry","type":"entry","coords":{"x1":0,"y1":0,"x2":0.5,"y2":1}},{"name":"Front Door","type":"door","coords":{"x1":0.44,"y1":0.21,"x2":0.56,"y2":0.83}}]'),
   ('00000000-0000-0000-0000-0000000ca002', true, '[]'),
   ('00000000-0000-0000-0000-0000000ca003', true,
-   '[{"name":"Loading Dock Gate","type":"door","coords":{"x1":100,"y1":50,"x2":540,"y2":400}},{"name":"Dock Restricted","type":"restricted","coords":{"x1":0,"y1":300,"x2":640,"y2":480}}]'),
+   '[{"name":"Loading Dock Gate","type":"door","coords":{"x1":0.16,"y1":0.1,"x2":0.84,"y2":0.83}},{"name":"Dock Restricted","type":"restricted","coords":{"x1":0,"y1":0.63,"x2":1,"y2":1}}]'),
   ('00000000-0000-0000-0000-0000000ca004', true, '[]'),
   ('00000000-0000-0000-0000-0000000ca005', false, '[]');
 

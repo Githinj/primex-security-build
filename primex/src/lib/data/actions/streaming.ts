@@ -113,6 +113,52 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
   }
 }
 
+/**
+ * Grab a still from the live stream, as a data URL, for the zone editor to draw
+ * over. Returns null rather than throwing on every failure path — a backdrop is
+ * a convenience, and the editor falls back to a plain grid.
+ *
+ * Expect null in several legitimate situations: the snapshot REST resource is
+ * Enterprise-only, production AMS may restrict REST to allowlisted IPs (so a
+ * Vercel function can be refused where a droplet isn't), and the camera may
+ * simply not be publishing.
+ */
+export async function getCameraSnapshot(cameraId: string): Promise<string | null> {
+  await requireRole('super_admin', 'company_manager')
+
+  const supabase = await createServerSupabaseClient()
+  const { data: camera, error } = await supabase
+    .from('cameras')
+    .select('stream_id')
+    .eq('id', cameraId)
+    .single()
+
+  if (error || !camera?.stream_id) return null
+  if (!ANTMEDIA_API_KEY) return null // Community Edition has no snapshot resource
+
+  try {
+    const res = await fetch(
+      `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${camera.stream_id}/snapshot`,
+      { method: 'GET', headers: antmediaHeaders(), cache: 'no-store' },
+    )
+    if (!res.ok) {
+      console.error(
+        `Ant Media snapshot failed for streamId "${camera.stream_id}": ${await antmediaError(res)}`,
+      )
+      return null
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.byteLength === 0) return null
+
+    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    return `data:${contentType};base64,${buffer.toString('base64')}`
+  } catch (err) {
+    console.error(`Ant Media snapshot request threw for camera "${cameraId}":`, err)
+    return null
+  }
+}
+
 export async function createBroadcast(cameraId: string, cameraName: string, streamId: string): Promise<{ success: boolean; ingestUrl?: string }> {
   await requireRole('super_admin')
 
