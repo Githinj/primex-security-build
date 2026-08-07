@@ -30,6 +30,7 @@ supabase db reset    # Reset DB and re-run migrations + seed
 
 # AI worker (Python, separate runtime)
 cd ai_worker && pip install -r requirements.txt && python main.py
+cd ai_worker && pytest             # Unit tests (behavior_tracker, cooldown)
 ```
 
 Unit tests are Vitest (node env), colocated as `src/**/*.test.ts` — pure logic only (`vitest.config.ts` aliases `@/` and stubs `server-only`). The AI worker has unit tests in `ai_worker/tests/`.
@@ -62,7 +63,7 @@ Sign-in deliberately does **not** go through a server action. `POST /api/auth/lo
 - The client then **hard-navigates** (`window.location`) rather than using the router, so the middleware re-runs against the freshly-set cookies (SEC-165). A soft push lands the user back on `/login`.
 - The email is `.trim()`ed, the password is not — leading/trailing spaces can be legitimate password characters (SEC-164).
 - `lib/auth/role-redirect.ts` `getRoleHomePath(role)` is the single source of truth for role → landing path. It is consumed by this route and `src/middleware.ts`; `e2e/helpers/auth.ts` keeps its own copy. Adding a role means touching all three.
-- `/api/auth/test-login` exists alongside it for automated login; `/api/auth/forgot-password` handles reset requests.
+- `/api/auth/test-login` (`POST`) exists alongside it for mobile/manual debugging — disabled by default (404s unless `TEST_LOGIN_SECRET` is set) and requires that secret on the `x-test-login-secret` header even when enabled; `/api/auth/forgot-password` handles reset requests.
 - Authorization inside the app is separate: server actions call `requireRole(...roles)` (see Key Conventions), while `src/middleware.ts` handles session refresh and coarse route protection.
 
 ### Data Layer
@@ -112,6 +113,7 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 - Web push (SEC-148): `push_subscriptions` table (migration 016, one row per browser), client subscribe/unsubscribe in `lib/push/subscribe.ts` + `lib/data/actions/push-subscriptions.ts`, service worker + `NEXT_PUBLIC_VAPID_PUBLIC_KEY` on the client
 - Preferences: `notification_preferences` table (migration 007), managed via `lib/data/actions/notification-preferences.ts` and the Settings page
 - Env: `RESEND_API_KEY`, `NOTIFICATIONS_FROM_EMAIL`, `NEXT_PUBLIC_SITE_URL`; for push `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (optional — push no-ops when unset)
+- A third, separate delivery path: `lib/hooks/use-realtime-alerts.ts` subscribes to Supabase Realtime `postgres_changes` INSERTs on `alerts` directly from the browser, fires a `Notification` for AI-sourced alerts, and calls `router.refresh()` so the visible list updates live. This bypasses `notify.ts`/`notification_preferences` entirely — it's tied to having the app open, not an opt-in preference.
 
 ### Billing (Stripe, SEC-129)
 
@@ -134,9 +136,17 @@ Custom design tokens defined via `@theme inline` in `globals.css`. Use the proje
 
 ### AI Detection Layer
 
-- Python worker in `ai_worker/` — runs independently, posts events to `supabase/functions/ai-event-ingest/` edge function
-- Detection types: `motion_afterhours`, `person_lingering`, `concealment_behavior`, `door_event`, `vehicle_detection`
-- Config tables: `camera_ai_config`, `site_business_hours`, `ai_worker_config`
+Python worker in `ai_worker/` (aiohttp app, separate runtime/deploy from Next.js). `main.py` starts a `Supervisor` on boot and exposes `GET /health` for the platform health check.
+
+- **`Supervisor`** (`supervisor.py`) polls the `cameras`/`camera_ai_config`/`site_business_hours` tables every 30s (`SYNC_INTERVAL_S`) for online, AI-enabled cameras, then diffs against its running set: cancels `CameraTask`s for cameras no longer active, starts one for each newly active camera. One shared `Detector` (YOLOv8, `ultralytics`) and `CooldownRegistry` are reused across all camera tasks.
+- **`CameraTask`** (`camera_task.py`) is a per-camera asyncio loop: fetch a snapshot → submit to the shared detector → run `BehaviorTracker.process()` → post any resulting events, then sleep `snapshot_interval_s`. Snapshot fetch has two strategies mirroring the front-end's Enterprise-vs-Community split (`src/lib/data/actions/streaming.ts`): Enterprise (`antmedia_secret` set) hits the REST snapshot API with a per-request signed JWT (`_sign_rest_jwt`, must stay byte-identical to `signAntmediaRestJwt()` on the TS side); Community pulls a frame off the HLS playlist via OpenCV (persistent capture, reopened on failure).
+- **`Detector`** (`detector.py`) wraps one YOLO model behind an async queue so all camera tasks share a single GPU-bound inference worker instead of loading the model per-camera.
+- **`BehaviorTracker`** (`behavior_tracker.py`) turns raw detections into the detection-type events: `motion_afterhours`, `person_lingering`, `concealment_behavior`, `door_event`, `vehicle_detection`.
+- **`CooldownRegistry`** (`cooldown.py`) dedupes repeated firings of the same event type on the same camera within `cooldown_s`.
+- **`EventPoster`** (`event_poster.py`) uploads the triggering frame to DO Spaces, then POSTs the event to the `ai-event-ingest` edge function with retry/backoff (`1s, 2s, 4s`); if all retries fail, the event is appended to `missed_events.jsonl` instead of being dropped. `replay_missed.py` re-sends that file's contents later.
+- Worker config (`confidence_threshold`, `snapshot_interval_s`, `cooldown_s`, `dwell_threshold_s`, `door_open_threshold_s`) is a singleton row loaded at startup from `ai_worker_config` (`config.py`), not env vars.
+- **Env vars are named differently from the Next app for the same underlying resources** — don't assume they're shared: `ai_worker/.env` uses `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` (Next uses `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`) and `AI_WORKER_SECRET` (checked in `supabase/functions/ai-event-ingest`). It also writes frames to `DO_SPACES_BUCKET` — a separate bucket from the Next app's `DO_SPACES_RECORDINGS_BUCKET`.
+- Tests: `ai_worker/tests/` (pytest, `pyproject.toml` sets `pythonpath = ["."]` so tests import worker modules directly).
 
 ### Camera Streaming
 
