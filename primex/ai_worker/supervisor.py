@@ -13,10 +13,14 @@ from cooldown import CooldownRegistry
 from config import WorkerConfig
 from detector import Detector
 from event_poster import EventPoster
+from stats import WorkerStats
 
 logger = logging.getLogger(__name__)
 
 SYNC_INTERVAL_S = 30
+# Missing three consecutive syncs means the supervisor loop is wedged or
+# Supabase is unreachable — the camera roster on file is no longer trustworthy.
+SYNC_STALE_AFTER_S = SYNC_INTERVAL_S * 3
 
 
 @dataclass
@@ -36,15 +40,11 @@ class Supervisor:
         self.cooldown = CooldownRegistry(cooldown_s=config.cooldown_s)
         self.poster = EventPoster()
         self._tasks: dict[str, asyncio.Task] = {}
+        self._camera_tasks: dict[str, CameraTask] = {}
         self._camera_info: dict[str, CameraInfo] = {}
+        self._last_sync_at: float | None = None
 
-        self.stats = {
-            "active_cameras": 0,
-            "frames_processed_last_min": 0,
-            "alerts_fired_last_min": 0,
-            "start_time": time.time(),
-            "gpu_errors": 0,
-        }
+        self.stats = WorkerStats()
 
         url = os.environ["SUPABASE_URL"]
         key = os.environ["SUPABASE_SERVICE_KEY"]
@@ -98,6 +98,8 @@ class Supervisor:
             logger.info(f"Stopping camera task: {cam_id}")
             self._tasks[cam_id].cancel()
             del self._tasks[cam_id]
+            self._camera_tasks.pop(cam_id, None)
+            self.detector.forget_camera(cam_id)
             if cam_id in self._camera_info:
                 del self._camera_info[cam_id]
 
@@ -122,17 +124,39 @@ class Supervisor:
                 antmedia_url=os.environ.get("ANTMEDIA_URL", ""),
                 antmedia_secret=os.environ.get("ANTMEDIA_API_KEY", ""),
                 antmedia_app=os.environ.get("ANTMEDIA_APP", "LiveApp"),
+                stats=self.stats,
             )
+            self._camera_tasks[cam_id] = task
             self._tasks[cam_id] = asyncio.create_task(task.run())
             logger.info(f"Started camera task: {cam_id}")
 
-        self.stats["active_cameras"] = len(self._tasks)
+        self._last_sync_at = time.time()
 
     def get_health(self) -> dict:
+        active = len(self._tasks)
+        degraded = sorted(
+            cam_id for cam_id, task in self._camera_tasks.items() if task.is_degraded
+        )
+
+        sync_age_s = (
+            None if self._last_sync_at is None else int(time.time() - self._last_sync_at)
+        )
+        sync_stale = sync_age_s is None or sync_age_s > SYNC_STALE_AFTER_S
+
+        # Degraded when the camera roster can't be trusted, or when every camera
+        # we're supposed to be watching is failing. A worker with zero cameras
+        # is idle, not broken — that's a legitimate configuration.
+        healthy = not sync_stale and not (active > 0 and len(degraded) == active)
+
         return {
-            "status": "healthy",
-            "active_cameras": self.stats["active_cameras"],
-            "frames_processed_last_min": self.stats["frames_processed_last_min"],
-            "alerts_fired_last_min": self.stats["alerts_fired_last_min"],
-            "uptime_s": int(time.time() - self.stats["start_time"]),
+            "status": "healthy" if healthy else "degraded",
+            "active_cameras": active,
+            "degraded_cameras": degraded,
+            "sync_age_s": sync_age_s,
+            "inference_queue_depth": self.detector.queue_depth,
+            "frames_processed_last_min": self.stats.frames.count(),
+            "alerts_fired_last_min": self.stats.alerts.count(),
+            "gpu_errors_last_min": self.stats.gpu_errors.count(),
+            "gpu_errors_total": self.stats.gpu_errors.total,
+            "uptime_s": self.stats.uptime_s(),
         }

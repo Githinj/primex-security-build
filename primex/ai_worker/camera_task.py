@@ -14,6 +14,7 @@ from behavior_tracker import BehaviorTracker, Detection
 from cooldown import CooldownRegistry
 from detector import Detector
 from event_poster import EventPoster
+from stats import WorkerStats
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class CameraTask:
         antmedia_url: str = "",
         antmedia_secret: str = "",
         antmedia_app: str = "LiveApp",
+        stats: WorkerStats | None = None,
     ):
         self.camera_id = camera_id
         self.site_id = site_id
@@ -51,6 +53,9 @@ class CameraTask:
         self.antmedia_url = antmedia_url
         self.antmedia_secret = antmedia_secret
         self.antmedia_app = antmedia_app
+        # Own counters when running standalone; the supervisor passes a shared
+        # instance so /health aggregates across every camera.
+        self.stats = stats if stats is not None else WorkerStats()
         # Persistent OpenCV capture for the Community-Edition HLS strategy.
         self._hls_cap = None
         self._consecutive_failures = 0
@@ -78,11 +83,14 @@ class CameraTask:
                 self._consecutive_failures = 0
 
                 try:
-                    detections = await self.detector.submit(frame)
+                    detections = await self.detector.submit(frame, self.camera_id)
                 except Exception as e:
+                    self.stats.record_gpu_error()
                     logger.error(f"Inference failed for {self.camera_id}: {e}")
                     await asyncio.sleep(self.snapshot_interval_s)
                     continue
+
+                self.stats.record_frame()
 
                 detections = [d for d in detections if d.confidence >= self.confidence_threshold]
 
@@ -95,7 +103,7 @@ class CameraTask:
                             {"class": d.cls, "bbox": list(d.bbox), "track_id": d.track_id}
                             for d in detections
                         ]
-                        await self.poster.post_event(
+                        posted = await self.poster.post_event(
                             camera_id=self.camera_id,
                             site_id=self.site_id,
                             event_type=event.event_type,
@@ -104,6 +112,8 @@ class CameraTask:
                             detections=det_dicts,
                             metadata=event.metadata,
                         )
+                        if posted:
+                            self.stats.record_alert()
                         self.cooldown.mark_fired(self.camera_id, event.event_type)
 
             except asyncio.CancelledError:

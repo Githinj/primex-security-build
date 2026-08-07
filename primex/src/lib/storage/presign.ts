@@ -2,9 +2,10 @@ import 'server-only'
 import crypto from 'crypto'
 
 // Presigns S3-compatible GET URLs for DigitalOcean Spaces (AWS Signature V4).
-// Hand-rolled to avoid pulling in the AWS SDK. When credentials aren't set the
-// original URL is returned unchanged, so a public bucket keeps working (the
-// signing only matters once the recordings bucket is made private).
+// Hand-rolled to avoid pulling in the AWS SDK. Used for recording playback and
+// for AI detection frames. When credentials aren't set the original URL is
+// returned unchanged, so a public bucket keeps working — but note the AI frames
+// bucket is private, so those need the credentials set to render at all.
 
 const REGION = process.env.DO_SPACES_REGION || 'sgp1'
 const ACCESS_KEY = process.env.DO_SPACES_KEY

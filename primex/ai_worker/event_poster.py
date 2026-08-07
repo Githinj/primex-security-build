@@ -4,6 +4,7 @@ import os
 import json
 import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import httpx
 import boto3
@@ -18,13 +19,24 @@ class EventPoster:
         self.edge_fn_url = os.environ["SUPABASE_URL"] + "/functions/v1/ai-event-ingest"
         self.worker_secret = os.environ["AI_WORKER_SECRET"]
 
+        self.endpoint = os.environ["DO_SPACES_ENDPOINT"]
         self.s3 = boto3.client(
             "s3",
-            endpoint_url=os.environ["DO_SPACES_ENDPOINT"],
+            endpoint_url=self.endpoint,
             aws_access_key_id=os.environ["DO_SPACES_KEY"],
             aws_secret_access_key=os.environ["DO_SPACES_SECRET"],
         )
         self.bucket = os.environ["DO_SPACES_BUCKET"]
+
+    def object_url(self, key: str) -> str:
+        """Virtual-hosted URL: https://<bucket>.<region>.digitaloceanspaces.com/<key>.
+
+        This shape matters. signedPlaybackUrl() in src/lib/storage/presign.ts
+        treats the whole URL path as the object key, so a path-style URL (bucket
+        in the path) would sign the wrong key and every frame would 403.
+        """
+        parsed = urlparse(self.endpoint)
+        return f"{parsed.scheme}://{self.bucket}.{parsed.netloc}/{key}"
 
     async def upload_frame(self, frame: bytes, camera_id: str) -> str | None:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
@@ -35,9 +47,12 @@ class EventPoster:
                 Key=key,
                 Body=frame,
                 ContentType="image/jpeg",
-                ACL="public-read",
+                # Private: these are frames of customer premises. The app
+                # presigns a short-lived GET when it renders the alert, so the
+                # URL stored on the row grants no access on its own.
+                ACL="private",
             )
-            return f"{os.environ['DO_SPACES_ENDPOINT']}/{self.bucket}/{key}"
+            return self.object_url(key)
         except Exception as e:
             logger.warning(f"Frame upload failed for {camera_id}: {e}")
             return None

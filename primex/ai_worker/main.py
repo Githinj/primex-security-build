@@ -24,7 +24,11 @@ supervisor: Supervisor | None = None
 async def health_handler(request: web.Request) -> web.Response:
     if supervisor is None:
         return web.json_response({"status": "starting"}, status=503)
-    return web.json_response(supervisor.get_health())
+    health = supervisor.get_health()
+    # Non-200 so an uptime check or orchestrator restarts us, rather than the
+    # endpoint reporting green while every camera fails.
+    status = 200 if health["status"] == "healthy" else 503
+    return web.json_response(health, status=status)
 
 
 async def start_worker(app: web.Application):
