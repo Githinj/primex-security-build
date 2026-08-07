@@ -1,15 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { timingSafeEqual } from 'crypto'
 import { getRoleHomePath } from '@/lib/auth/role-redirect'
 
-// GET version of login for mobile debugging — tests the full auth flow
-// Usage: /api/auth/test-login?email=x&password=y
-export async function GET(request: NextRequest) {
-  const email = request.nextUrl.searchParams.get('email')
-  const password = request.nextUrl.searchParams.get('password')
+// POST-only login helper for mobile debugging — tests the full auth flow.
+// Disabled unless TEST_LOGIN_SECRET is set, and even then requires that
+// secret on every call, so it can't be reached by guessing credentials alone.
+// Usage: POST /api/auth/test-login  { "email": "x", "password": "y" }
+//   header: x-test-login-secret: <TEST_LOGIN_SECRET>
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
+
+export async function GET() {
+  return NextResponse.json({ success: false, error: 'Use POST' }, { status: 405 })
+}
+
+export async function POST(request: NextRequest) {
+  const configuredSecret = process.env.TEST_LOGIN_SECRET
+  if (!configuredSecret) {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+  }
+
+  const suppliedSecret = request.headers.get('x-test-login-secret') ?? ''
+  if (!timingSafeStringEqual(suppliedSecret, configuredSecret)) {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+  }
+
+  const body = await request.json().catch(() => null)
+  const email = body?.email
+  const password = body?.password
 
   if (!email || !password) {
-    return NextResponse.json({ success: false, error: 'Pass ?email=x&password=y' })
+    return NextResponse.json({ success: false, error: 'Pass { email, password } in the JSON body' }, { status: 400 })
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
