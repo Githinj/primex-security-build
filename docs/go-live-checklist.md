@@ -49,7 +49,9 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 | `ANTMEDIA_APP` | ⚙️ | `LiveApp` (Community) / `WebRTCAppEE` (Enterprise) |
 | `ANTMEDIA_WS_URL` | ⚙️ | WebRTC signalling ws URL |
 | `ANTMEDIA_WEBHOOK_SECRET` | 🔑⚙️ | Shared secret for `/api/webhooks/antmedia` |
-| `ANTMEDIA_API_KEY` | 🔑💤 | Enterprise only — HS256 **signing secret** (AMS `jwtSecretKey`), not a token; app signs a 60s JWT per REST call. Same value in `ai_worker` env (per-stream tokens + REST snapshot) |
+| `ANTMEDIA_API_KEY` | 🔑💤 | Enterprise only — HS256 **signing secret** (AMS `jwtSecretKey`), not a token; app signs a 60s JWT per REST call. Same value in `ai_worker` env (per-stream play/publish tokens + REST snapshot) |
+| `ANTMEDIA_RTMP_URL` | ⚙️ | Ingest endpoint cameras publish into, e.g. `rtmps://host:443/WebRTCAppEE`. Unset derives plaintext `rtmp://` from `ANTMEDIA_URL` — **set an `rtmps://` value in prod** or the publish token and video cross the network in the clear (SEC-178) |
+| `ANTMEDIA_PUBLISH_TOKEN_TTL_DAYS` | 💤 | Publish-token lifetime, default 365 |
 
 ### Recordings (DigitalOcean Spaces)
 | Var | | Notes |
@@ -102,6 +104,15 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 
 ### Ant Media / AI worker
 - [ ] Point `ANTMEDIA_*` at the live server.
+- [ ] **Enable token control for BOTH `play` and `publish`** on the AMS app. AMS
+      enforces it per-type, so play-only leaves ingest wide open — anyone who
+      learns a stream ID can publish into a monitored camera (SEC-178). With
+      `ANTMEDIA_API_KEY` set, `createBroadcast()` fails closed rather than issuing
+      an unsecured ingest URL, so this must be working before provisioning.
+- [ ] Set `ANTMEDIA_RTMP_URL` to an **`rtmps://`** endpoint and confirm the port is
+      open. The derived fallback is plaintext RTMP.
+- [ ] Re-issue ingest URLs for any camera provisioned before this change — the old
+      URLs carry no token, and the token is shown once at creation.
 - [ ] Deploy the Python `ai_worker` separately — **see `docs/ai-worker-deploy.md`**
       for the full runbook (Docker, sizing, first-light validation, troubleshooting).
       Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`

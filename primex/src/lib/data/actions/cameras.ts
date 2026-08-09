@@ -2,11 +2,16 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireActiveCompany } from '@/lib/auth/require-role'
+// Only super_admin may bind a camera to a stream (SEC-176) — both camera modals
+// hide the streaming fields from other roles, so reaching this throw means a
+// hand-made call.
+import { assertMayAssignStreamId } from '@/lib/auth/stream-id-guard'
 import { logActivity } from './activity'
 
 export async function createCamera(data: { site_id: string; name: string; location: string; status?: string; stream_id?: string | null }) {
   const caller = await requireRole('super_admin', 'company_manager')
   await requireActiveCompany(caller)
+  assertMayAssignStreamId(caller, data)
   const supabase = await createServerSupabaseClient()
   const { data: inserted, error } = await supabase.from('cameras').insert(data).select('id').single()
   if (error) throw error
@@ -20,6 +25,7 @@ export async function updateCamera(id: string, data: { name?: string; location?:
   // company (RLS on `cameras` scopes them to their sites); super_admin edits any.
   const caller = await requireRole('super_admin', 'company_manager')
   await requireActiveCompany(caller)
+  assertMayAssignStreamId(caller, data)
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('cameras').update(data).eq('id', id)
   if (error) throw error
