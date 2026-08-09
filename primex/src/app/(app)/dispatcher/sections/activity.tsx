@@ -12,7 +12,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { PageTitle, Card } from '@/components/ui'
+import { PageTitle, Card, getToneClasses } from '@/components/ui'
 import type { ActivityItem } from '@/lib/types'
 
 interface DispatcherActivityProps {
@@ -28,14 +28,6 @@ const iconMap: Record<string, React.ElementType> = {
   'map-pin': MapPin,
   settings: Settings,
   eye: Eye,
-}
-
-const toneBg: Record<string, string> = {
-  red: 'bg-p-red-soft text-p-red',
-  amber: 'bg-p-amber-soft text-p-amber',
-  green: 'bg-p-green-soft text-p-green',
-  blue: 'bg-p-blue-soft text-p-blue',
-  gray: 'bg-p-gray-soft text-p-gray',
 }
 
 function formatTimestamp(dateStr: string) {
@@ -71,7 +63,7 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
           ) : (
             paginatedActivity.map((item) => {
               const Icon = iconMap[item.icon] ?? Bell
-              const toneClass = toneBg[item.tone] ?? toneBg.gray
+              const { fg, bg } = getToneClasses(item.tone)
 
               return (
                 <div
@@ -80,9 +72,9 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
                 >
                   {/* Icon */}
                   <span
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${toneClass}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}
                   >
-                    <Icon size={15} strokeWidth={2} />
+                    <Icon size={15} strokeWidth={2} className={fg} />
                   </span>
 
                   {/* Content */}

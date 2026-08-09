@@ -28,6 +28,7 @@ import {
   Card,
   StatCard,
   SearchInput,
+  getToneClasses,
 } from "@/components/ui";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { exportAuditLog } from "@/lib/data/actions/audit";
@@ -108,28 +109,13 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 function ActivityIcon({ iconName, tone }: { iconName: string; tone: ActivityItem["tone"] }) {
   const Icon = ICON_MAP[iconName] ?? Activity;
-
-  const bgMap: Record<ActivityItem["tone"], string> = {
-    red: "bg-p-red-soft",
-    amber: "bg-p-amber-soft",
-    green: "bg-p-green-soft",
-    blue: "bg-p-blue-soft",
-    gray: "bg-p-gray-soft",
-  };
-
-  const fgMap: Record<ActivityItem["tone"], string> = {
-    red: "text-p-red",
-    amber: "text-p-amber",
-    green: "text-p-green",
-    blue: "text-p-blue",
-    gray: "text-p-gray",
-  };
+  const { fg, bg } = getToneClasses(tone);
 
   return (
     <span
-      className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${bgMap[tone]}`}
+      className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${bg}`}
     >
-      <Icon size={16} strokeWidth={2} className={fgMap[tone]} />
+      <Icon size={16} strokeWidth={2} className={fg} />
     </span>
   );
 }

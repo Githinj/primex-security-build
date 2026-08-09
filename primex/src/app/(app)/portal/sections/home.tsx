@@ -10,7 +10,7 @@ import {
   Download,
   CheckCircle2,
 } from 'lucide-react'
-import { PageTitle, Card, StatCard, Button, KV } from '@/components/ui'
+import { PageTitle, Card, StatCard, Button, KV, getToneClasses } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { DISPATCH_PHONE_DISPLAY, DISPATCH_PHONE_TEL } from '@/lib/support'
 import { generateReportPdf } from '@/lib/data/actions/generate-report-pdf'
@@ -130,14 +130,6 @@ export function ClientHome({ siteId, cameras, alerts, incidents, reports }: Clie
     (i) => i.started_at.slice(0, 7) === thisMonth
   ).length
 
-  const toneCircleColors: Record<string, string> = {
-    red: 'bg-p-red-soft text-p-red',
-    amber: 'bg-p-amber-soft text-p-amber',
-    green: 'bg-p-green-soft text-p-green',
-    blue: 'bg-p-blue-soft text-p-blue',
-    gray: 'bg-p-gray-soft text-p-gray',
-  }
-
   return (
     <div className="flex flex-col gap-8 max-w-[1200px]">
       <PageTitle
@@ -231,8 +223,8 @@ export function ClientHome({ siteId, cameras, alerts, incidents, reports }: Clie
               <div key={event.id} className="flex items-start gap-3">
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    toneCircleColors[event.tone] ?? toneCircleColors.gray
-                  }`}
+                    getToneClasses(event.tone).bg
+                  } ${getToneClasses(event.tone).fg}`}
                 >
                   {event.tone === 'green' ? (
                     <CheckCircle2 size={16} strokeWidth={2} />

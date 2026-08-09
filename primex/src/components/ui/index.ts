@@ -3,7 +3,7 @@
 
 export { Button } from "./button";
 export { Card } from "./card";
-export { Pill } from "./pill";
+export { Pill, getToneClasses, type Tone } from "./pill";
 export { StatCard } from "./stat-card";
 export { DataTable, type DataTablePagination } from "./data-table";
 export { Pagination } from "./pagination";
