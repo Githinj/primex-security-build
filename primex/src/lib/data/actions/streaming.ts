@@ -4,15 +4,25 @@ import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
-import type { StreamToken } from '@/lib/types'
+import type { CameraStreamConfig, StreamToken } from '@/lib/types'
 
 const ANTMEDIA_URL = process.env.ANTMEDIA_URL!
 const ANTMEDIA_APP = process.env.ANTMEDIA_APP || 'LiveApp'
 // The EE JWT *signing secret* (AMS `jwtSecretKey`), not a token. Unset on Community Edition.
 const ANTMEDIA_API_KEY = process.env.ANTMEDIA_API_KEY
 const ANTMEDIA_WS_URL = process.env.ANTMEDIA_WS_URL!
+// Endpoint a camera publishes *into*. Deliberately separate from ANTMEDIA_URL (the
+// REST base): ingest runs on its own port and, in production, its own scheme —
+// point this at an `rtmps://host:443/AppName` endpoint. The derived fallback below
+// is plaintext RTMP, which puts the publish token and the video on the wire in
+// the clear; it exists so local Docker keeps working.
+const ANTMEDIA_RTMP_URL = process.env.ANTMEDIA_RTMP_URL
 const TOKEN_DURATION_MS = 60 * 60 * 1000 // 1 hour
 const REST_JWT_TTL_S = 60 // short-lived: a fresh token is signed per request
+// Publish tokens gate ingest, and a camera publishes indefinitely, so these are
+// long-lived by nature. Re-running createBroadcast() mints a fresh one, which is
+// the rotation path.
+const PUBLISH_TOKEN_TTL_S = (Number(process.env.ANTMEDIA_PUBLISH_TOKEN_TTL_DAYS) || 365) * 86400
 
 // Mints the per-request JWT that Ant Media Enterprise's REST filter expects.
 // ANTMEDIA_API_KEY is the shared HS256 secret — sending it verbatim as the
@@ -61,6 +71,74 @@ function antmediaHeaders(contentType?: string): Record<string, string> {
   return headers
 }
 
+// Ingest endpoint the installer points the camera at, without the token.
+function ingestBaseUrl(): string {
+  if (ANTMEDIA_RTMP_URL) return ANTMEDIA_RTMP_URL.replace(/\/+$/, '')
+  return `rtmp://${new URL(ANTMEDIA_URL).hostname}/${ANTMEDIA_APP}`
+}
+
+/**
+ * Mint an Ant Media token for a stream. `type` matters: AMS enforces token
+ * control per-type, so a play token does nothing to protect ingest and vice
+ * versa (SEC-178).
+ *
+ * `expireDate` is a unix timestamp in *seconds*. Passing milliseconds — as this
+ * file previously did for play tokens — yields a date around the year 58,000,
+ * i.e. a token that never expires.
+ *
+ * Returns null on Community Edition (no token API) or on any failure; callers
+ * decide whether that is survivable.
+ */
+async function mintAntmediaToken(
+  streamId: string,
+  type: 'play' | 'publish',
+  ttlSeconds: number,
+): Promise<string | null> {
+  if (!ANTMEDIA_API_KEY) return null
+
+  const expireDate = Math.floor(Date.now() / 1000) + ttlSeconds
+  try {
+    const res = await fetch(
+      `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${streamId}/token?expireDate=${expireDate}&type=${type}`,
+      { method: 'GET', headers: antmediaHeaders(), cache: 'no-store' },
+    )
+    if (!res.ok) {
+      console.error(
+        `Ant Media ${type} token request failed for streamId "${streamId}": ${await antmediaError(res)}`,
+      )
+      return null
+    }
+    const { tokenId } = await res.json()
+    return typeof tokenId === 'string' && tokenId ? tokenId : null
+  } catch (err) {
+    console.error(`Ant Media ${type} token request threw for streamId "${streamId}":`, err)
+    return null
+  }
+}
+
+/**
+ * Ingest configuration for one camera. Split out of the normal camera reads
+ * because `source_url` embeds the camera's RTSP credentials and `stream_url` is
+ * its publish endpoint — `getCameras()` rows are serialized into client
+ * components for every role that can see the camera, so these two fields must
+ * never travel on that path (SEC-177).
+ */
+export async function getCameraStreamConfig(
+  cameraId: string,
+): Promise<CameraStreamConfig | null> {
+  await requireRole('super_admin')
+
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('cameras')
+    .select('stream_id, stream_url, source_url')
+    .eq('id', cameraId)
+    .single()
+
+  if (error || !data) return null
+  return data as CameraStreamConfig
+}
+
 export async function getStreamToken(cameraId: string): Promise<StreamToken | null> {
   await requireRole('super_admin', 'dispatcher', 'company_manager', 'client', 'guard')
 
@@ -74,7 +152,9 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
   if (error || !camera?.stream_id) return null
 
   const streamId = camera.stream_id
-  const expireDate = Date.now() + TOKEN_DURATION_MS
+  // Client-side refresh scheduling works in epoch ms; AMS wants seconds. The
+  // conversion lives in mintAntmediaToken().
+  const expiresAt = Date.now() + TOKEN_DURATION_MS
 
   // Community Edition doesn't support the token API — return tokenless URLs
   if (!ANTMEDIA_API_KEY) {
@@ -83,33 +163,19 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
       streamId,
       webrtcUrl: ANTMEDIA_WS_URL,
       hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8`,
-      expiresAt: expireDate,
+      expiresAt,
     }
   }
 
-  const res = await fetch(
-    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${streamId}/token?expireDate=${expireDate}&type=play`,
-    {
-      method: 'GET',
-      headers: antmediaHeaders(),
-    }
-  )
-
-  if (!res.ok) {
-    console.error(
-      `Ant Media token request failed for streamId "${streamId}": ${await antmediaError(res)}`,
-    )
-    return null
-  }
-
-  const { tokenId } = await res.json()
+  const tokenId = await mintAntmediaToken(streamId, 'play', TOKEN_DURATION_MS / 1000)
+  if (!tokenId) return null
 
   return {
     token: tokenId,
     streamId,
     webrtcUrl: ANTMEDIA_WS_URL,
-    hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8?token=${tokenId}`,
-    expiresAt: expireDate,
+    hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8?token=${encodeURIComponent(tokenId)}`,
+    expiresAt,
   }
 }
 
@@ -159,10 +225,32 @@ export async function getCameraSnapshot(cameraId: string): Promise<string | null
   }
 }
 
-export async function createBroadcast(cameraId: string, cameraName: string, streamId: string): Promise<{ success: boolean; ingestUrl?: string }> {
+/**
+ * RTMP push ingest: provision the broadcast and return the URL the camera
+ * publishes into.
+ *
+ * The returned URL carries a **publish** token (SEC-178). Ant Media enforces
+ * token control per-type, so the play tokens getStreamToken() mints do nothing
+ * for ingest — without this, anyone who learned a stream ID could publish
+ * arbitrary video into a monitored camera, poisoning the live view, the
+ * recordings, and the AI worker's input. On Enterprise this fails closed: no
+ * token, no URL.
+ *
+ * The token is returned but never stored. `cameras.stream_url` keeps only the
+ * tokenless endpoint, so a database read never yields publish rights; re-running
+ * this action mints a fresh token and is the rotation path.
+ */
+export async function createBroadcast(
+  cameraId: string,
+  cameraName: string,
+  streamId: string,
+): Promise<{ success: boolean; ingestUrl?: string; secured?: boolean; error?: string }> {
   await requireRole('super_admin')
 
-  const ingestUrl = `rtmp://${new URL(ANTMEDIA_URL).hostname}/${ANTMEDIA_APP}/${streamId}`
+  const trimmedId = streamId.trim()
+  if (!trimmedId) {
+    return { success: false, error: 'A stream ID is required to create a broadcast.' }
+  }
 
   // Ant Media's create resource is /broadcasts/create — POSTing to /broadcasts
   // itself is 405 (that path only lists). Keep the /create suffix.
@@ -172,34 +260,55 @@ export async function createBroadcast(cameraId: string, cameraName: string, stre
       method: 'POST',
       headers: antmediaHeaders('application/json'),
       body: JSON.stringify({
-        streamId,
+        streamId: trimmedId,
         name: cameraName,
         type: 'liveStream',
       }),
     }
   )
 
-  if (res.status === 409) {
-    return { success: true, ingestUrl }
+  // 409 = the broadcast already exists, which is a reusable state — but it still
+  // needs a fresh token and still has to be persisted. It used to return early,
+  // leaving stream_id/stream_url unset on the camera row.
+  if (!res.ok && res.status !== 409) {
+    console.error(
+      `Failed to create broadcast for streamId "${trimmedId}": ${await antmediaError(res)}`,
+    )
+    return { success: false, error: 'Ant Media rejected the broadcast.' }
   }
 
-  if (!res.ok) {
-    console.error(
-      `Failed to create broadcast for streamId "${streamId}": ${await antmediaError(res)}`,
-    )
-    return { success: false }
+  const streamEndpoint = `${ingestBaseUrl()}/${trimmedId}`
+
+  const publishToken = await mintAntmediaToken(trimmedId, 'publish', PUBLISH_TOKEN_TTL_S)
+  if (ANTMEDIA_API_KEY && !publishToken) {
+    // Enterprise with token control configured: handing back a bare URL here
+    // would be handing out unauthenticated ingest. Fail instead.
+    return {
+      success: false,
+      error: 'Could not mint a publish token — refusing to issue an unsecured ingest URL.',
+    }
   }
+
+  const ingestUrl = publishToken
+    ? `${streamEndpoint}?token=${encodeURIComponent(publishToken)}`
+    : streamEndpoint
 
   const supabase = await createServerSupabaseClient()
-  await supabase
+  const { error } = await supabase
     .from('cameras')
     .update({
-      stream_id: streamId,
-      stream_url: ingestUrl,
+      stream_id: trimmedId,
+      stream_url: streamEndpoint, // tokenless — see the note above
     })
     .eq('id', cameraId)
+  if (error) {
+    console.error('Failed to persist broadcast on camera:', error)
+    return { success: false, error: 'Created in Ant Media but failed to save on the camera.' }
+  }
 
-  return { success: true, ingestUrl }
+  revalidatePath('/cameras')
+  revalidatePath(`/cameras/${cameraId}`)
+  return { success: true, ingestUrl, secured: Boolean(publishToken) }
 }
 
 // RTSP pull ingest: Ant Media connects OUT to an RTSP camera (type "streamSource")

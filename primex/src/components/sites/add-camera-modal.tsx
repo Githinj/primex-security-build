@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Copy, Check, Radio, Video } from "lucide-react";
 import { createCamera } from "@/lib/data/actions/cameras";
 import { createBroadcast, createStreamSource } from "@/lib/data/actions/streaming";
+import { useProfile } from "@/components/providers/profile-provider";
 import {
   Modal,
   ModalHeader,
@@ -46,12 +47,19 @@ const INITIAL_FORM: FormState = {
 };
 
 export function AddCameraModal({ open, onClose, companies, sites: allSites }: AddCameraModalProps) {
+  const profile = useProfile();
+  // Only super_admin may assign a stream ID or provision ingest — enforced in
+  // createCamera and by migration 018's unique index (SEC-176). Hiding the
+  // section keeps managers from filling in a field that would throw on submit.
+  const canManageStreaming = profile?.role === "super_admin";
+
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [createdCameraId, setCreatedCameraId] = useState<string | null>(null);
   const [ingestUrl, setIngestUrl] = useState<string | null>(null);
+  const [ingestSecured, setIngestSecured] = useState(true);
   const [copied, setCopied] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
   const [sourceConnected, setSourceConnected] = useState(false);
@@ -88,7 +96,9 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
           name: form.name,
           location: form.location,
           status: form.status || undefined,
-          stream_id: form.stream_id.trim() || null,
+          // Omit the key entirely for non-super_admins — the server rejects the
+          // field rather than ignoring it (SEC-176).
+          ...(canManageStreaming ? { stream_id: form.stream_id.trim() || null } : {}),
         });
         setCreatedCameraId(cameraId);
         setSuccess(true);
@@ -106,8 +116,9 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
         const result = await createBroadcast(createdCameraId, form.name, form.stream_id.trim());
         if (result.success && result.ingestUrl) {
           setIngestUrl(result.ingestUrl);
+          setIngestSecured(result.secured ?? false);
         } else {
-          setBroadcastError("Failed to create broadcast in Ant Media.");
+          setBroadcastError(result.error ?? "Failed to create broadcast in Ant Media.");
         }
       } catch {
         setBroadcastError("Failed to create broadcast.");
@@ -150,6 +161,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
     setError(null);
     setCreatedCameraId(null);
     setIngestUrl(null);
+    setIngestSecured(true);
     setCopied(false);
     setBroadcastError(null);
     setSourceConnected(false);
@@ -231,9 +243,19 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
                   )}
                 </button>
               </div>
-              <InfoBox tone="blue">
-                Point your camera&apos;s RTSP/RTMP output to this URL. The stream will appear in the live player once connected.
-              </InfoBox>
+              {ingestSecured ? (
+                <InfoBox tone="blue">
+                  Point your camera&apos;s RTMP output to this URL. It contains a publish
+                  token and is shown once — copy it now. Re-create the broadcast to
+                  issue a new one.
+                </InfoBox>
+              ) : (
+                <InfoBox tone="amber">
+                  This ingest URL has no publish token, so anyone who learns the stream
+                  ID can publish into this camera. Token control needs Ant Media
+                  Enterprise with <code>ANTMEDIA_API_KEY</code> set.
+                </InfoBox>
+              )}
             </div>
           )}
         </div>
@@ -298,13 +320,14 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
                 />
               </Field>
 
-              {/* Streaming section */}
+              {/* Streaming section — super_admin only (SEC-176) */}
+              {canManageStreaming && (
               <div className="border-t border-border pt-4 flex flex-col gap-4">
                 <p className="text-xs text-ink-3 font-semibold uppercase tracking-wider font-sans">
                   Streaming
                 </p>
 
-                <Field label="Stream ID" hint="Ant Media broadcast identifier. You can set this up after adding the camera too.">
+                <Field label="Stream ID" hint="Ant Media broadcast identifier. Must be unique across all cameras. You can set this up after adding the camera too.">
                   <TextInput
                     value={form.stream_id}
                     onChange={handleChange("stream_id")}
@@ -329,6 +352,7 @@ export function AddCameraModal({ open, onClose, companies, sites: allSites }: Ad
                   </InfoBox>
                 )}
               </div>
+              )}
 
               {/* Error display */}
               {error && (

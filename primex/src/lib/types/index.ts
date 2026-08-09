@@ -67,10 +67,24 @@ export interface Camera {
   last_checked: string
   warning: string | null
   stream_id: string | null
-  stream_url: string | null
-  source_url: string | null
   recording_enabled: boolean
   last_frame_at: string | null
+}
+
+/**
+ * Ingest configuration — deliberately NOT part of `Camera` (SEC-177).
+ *
+ * `source_url` is an RTSP URL that carries the camera's credentials inline, and
+ * `stream_url` is its publish endpoint. `Camera` rows are serialized into client
+ * components on /cameras, /dispatcher, /portal and /sites/[id], so anything on
+ * that interface reaches the browser of every role that can see the camera.
+ * These two fields are read only through `getCameraStreamConfig()`, which is
+ * super_admin-gated.
+ */
+export interface CameraStreamConfig {
+  stream_id: string | null
+  stream_url: string | null
+  source_url: string | null
 }
 
 export interface AiZone {
