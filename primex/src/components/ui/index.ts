@@ -6,6 +6,7 @@ export { Card } from "./card";
 export { Pill } from "./pill";
 export { StatCard } from "./stat-card";
 export { DataTable, type DataTablePagination } from "./data-table";
+export { Pagination } from "./pagination";
 export { Breadcrumb } from "./breadcrumb";
 export { PageTitle } from "./page-title";
 export { LiveDot } from "./live-dot";

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Pagination } from "./pagination";
 
 export interface DataTablePagination {
   page: number;
@@ -17,10 +17,6 @@ interface DataTableProps {
 }
 
 export function DataTable({ columns, rows, pagination }: DataTableProps) {
-  const totalPages = pagination
-    ? Math.ceil(pagination.total / pagination.pageSize)
-    : 1;
-
   return (
     <div className="w-full">
       <div className="overflow-x-auto">
@@ -73,40 +69,13 @@ export function DataTable({ columns, rows, pagination }: DataTableProps) {
       </div>
 
       {pagination && (
-        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
-          <span className="text-xs text-ink-3 font-sans tabular-nums">
-            {pagination.total === 0
-              ? "0 results"
-              : `${(pagination.page - 1) * pagination.pageSize + 1}\u2013${Math.min(
-                  pagination.page * pagination.pageSize,
-                  pagination.total
-                )} of ${pagination.total}`}
-          </span>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={pagination.page <= 1}
-                onClick={() => pagination.onPageChange(pagination.page - 1)}
-                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Previous page"
-              >
-                <ChevronLeft size={16} strokeWidth={2} />
-              </button>
-              <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
-                Page {pagination.page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={pagination.page >= totalPages}
-                onClick={() => pagination.onPageChange(pagination.page + 1)}
-                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Next page"
-              >
-                <ChevronRight size={16} strokeWidth={2} />
-              </button>
-            </div>
-          )}
+        <div className="px-5 py-3 border-t border-border">
+          <Pagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            onPageChange={pagination.onPageChange}
+          />
         </div>
       )}
     </div>
