@@ -58,6 +58,11 @@ function count(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
 }
 
+/** Same caution for the string fields — an empty string is as absent as null. */
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
 /**
  * Frames/packets AMS itself reports as dropped on a `liveStreamStatus` hook.
  *
@@ -74,6 +79,60 @@ export function streamDropCounts(payload: Record<string, unknown>): {
   const ingestion = count(payload.dropPacketCountInIngestion)
   const encoding = count(payload.dropFrameCountInEncoding)
   return { ingestion, encoding, degraded: ingestion > 0 || encoding > 0 }
+}
+
+/** The `recordings` insert a `vodReady` hook produces, minus `camera_id`. */
+export type VodRecordingRow = {
+  file_url: string
+  stream_id: string
+  file_size: number | null
+  duration_s: number | null
+  started_at: string
+  ended_at: string
+  status: string
+}
+
+/**
+ * Build the `recordings` row for a `vodReady` hook.
+ *
+ * `file_url` doubles as the idempotency key — migration 019 puts a unique index
+ * on it so a redelivered hook conflicts instead of double-listing the recording
+ * (SEC-179). That only holds if the same hook body always derives the same URL,
+ * which is why the fallbacks below are ordered by how stable they are rather
+ * than by how plausible the resulting URL looks:
+ *
+ * 1. `vodName` — the actual object AMS stored. The only fallback that yields a
+ *    URL that plays.
+ * 2. `vodId` — AMS's own identifier for the recording. The URL is a guess, but a
+ *    redelivery guesses identically.
+ * 3. `startTime` — stable across redeliveries only if AMS sends it, which is
+ *    exactly what SEC-182 is open to verify against a captured payload.
+ * 4. `receivedAt` — arrival time, and so the one case a redelivery *can* still
+ *    duplicate. Reaching it means the body carried nothing identifying at all.
+ */
+export function vodRecordingRow(
+  streamId: string,
+  payload: Record<string, unknown>,
+  options: { spacesEndpoint: string; receivedAt: string },
+): VodRecordingRow {
+  const startTime = text(payload.startTime) ?? options.receivedAt
+  const objectName =
+    text(payload.vodName) ??
+    `${streamId}_${text(payload.vodId) ?? startTime}.mp4`
+
+  const duration = count(payload.duration)
+  const fileSize = count(payload.fileSize)
+
+  return {
+    file_url: `${options.spacesEndpoint}/recordings/${objectName}`,
+    stream_id: streamId,
+    file_size: fileSize || null,
+    // AMS reports duration in milliseconds; the column is seconds.
+    duration_s: duration ? Math.round(duration / 1000) : null,
+    started_at: startTime,
+    ended_at: text(payload.endTime) ?? options.receivedAt,
+    status: 'complete',
+  }
 }
 
 /**
