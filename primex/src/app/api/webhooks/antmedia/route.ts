@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { authenticateWebhook } from '@/lib/streaming/webhook-auth'
 import {
   AMS_HOOK,
+  FLEET_WIDE_WARNING,
   parseHookBody,
   streamDropCounts,
   streamWebhookEffect,
@@ -25,6 +26,50 @@ const DO_SPACES_HOST = (process.env.DO_SPACES_ENDPOINT ?? 'sgp1.digitaloceanspac
 const DO_SPACES_ENDPOINT = process.env.DO_SPACES_RECORDINGS_BUCKET
   ? `https://${process.env.DO_SPACES_RECORDINGS_BUCKET}.${DO_SPACES_HOST}`
   : ''
+
+/**
+ * `serverShutdown` says the whole server is going down, so every camera it was
+ * carrying is about to stop at once (SEC-181). Marking them Offline here is what
+ * stops the dispatcher console from showing a wall of cameras it believes are
+ * covered, in the window before anything else notices.
+ *
+ * Scoped to cameras that were Online: a camera already Offline needs no update,
+ * and rewriting it would clobber a more specific warning with a generic one.
+ */
+async function handleServerShutdown(
+  supabase: SupabaseClient,
+  body: Record<string, unknown>,
+) {
+  const { data: cameras, error } = await supabase
+    .from('cameras')
+    .select('id')
+    .not('stream_id', 'is', null)
+    .eq('status', 'Online')
+
+  if (error) {
+    console.error('serverShutdown: could not read the affected cameras:', error.message)
+    return NextResponse.json({ error: 'Failed to apply shutdown' }, { status: 500 })
+  }
+
+  const ids = (cameras ?? []).map((camera) => camera.id as string)
+  if (ids.length === 0) return NextResponse.json({ ok: true, affected: 0 })
+
+  console.error(`Ant Media reported serverShutdown — taking ${ids.length} camera(s) Offline`)
+
+  await supabase
+    .from('cameras')
+    .update({ status: 'Offline', warning: FLEET_WIDE_WARNING })
+    .in('id', ids)
+
+  // One row per camera rather than a single fleet row: stream_events is keyed on
+  // camera_id, and post-incident the question is always "what happened to *this*
+  // camera", which a fleet-level row can't answer.
+  await supabase
+    .from('stream_events')
+    .insert(ids.map((id) => ({ camera_id: id, event_type: 'server_shutdown', payload: body })))
+
+  return NextResponse.json({ ok: true, affected: ids.length })
+}
 
 export async function POST(req: NextRequest) {
   const auth = authenticateWebhook({
@@ -60,11 +105,22 @@ export async function POST(req: NextRequest) {
   // broadcast name, NOT a key — never resolve a camera on it.
   const streamId = (body.streamId as string) ?? (body.id as string)
 
-  if (!action || !streamId) {
-    return NextResponse.json({ error: 'Missing action or streamId' }, { status: 400 })
+  if (!action) {
+    return NextResponse.json({ error: 'Missing action' }, { status: 400 })
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+  // Fleet-wide, and it arrives with no stream id — so it has to be handled before
+  // the camera lookup or it dies at the "missing streamId" 400 below (SEC-181).
+  // Every camera on this server just went dark simultaneously.
+  if (action === AMS_HOOK.serverShutdown) {
+    return handleServerShutdown(supabase, body)
+  }
+
+  if (!streamId) {
+    return NextResponse.json({ error: 'Missing streamId' }, { status: 400 })
+  }
 
   const { data: camera } = await supabase
     .from('cameras')
@@ -137,8 +193,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const cameraUpdate: Record<string, string> = {}
+  const cameraUpdate: Record<string, string | null> = {}
   if (effect.status) cameraUpdate.status = effect.status
+  // Tri-state on purpose: undefined leaves the existing warning, null clears it
+  // (the stream recovered), a string replaces it (SEC-181).
+  if (effect.warning !== undefined) cameraUpdate.warning = effect.warning
   if (effect.touchLastFrame) cameraUpdate.last_frame_at = new Date().toISOString()
   if (Object.keys(cameraUpdate).length > 0) {
     await supabase.from('cameras').update(cameraUpdate).eq('id', cameraId)

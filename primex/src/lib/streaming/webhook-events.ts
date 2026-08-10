@@ -15,7 +15,17 @@ export const AMS_HOOK = {
   encoderNotOpened: 'encoderNotOpenedError',
   endpointFailed: 'endpointFailed',
   idleExpired: 'idleTimeIsExpired',
+  serverShutdown: 'serverShutdown',
 } as const
+
+/**
+ * `serverShutdown` is about the server, not a stream — it carries no stream id,
+ * so the route has to act on it *before* resolving a camera or it dies at the
+ * "missing streamId" 400. Every camera is about to go dark at once, which is the
+ * one event worth a fleet-wide write (SEC-181).
+ */
+export const FLEET_WIDE_WARNING =
+  'Ant Media Server shut down — every camera on it stopped at the same time.'
 
 /**
  * Per-viewer and per-subtrack hooks, deliberately dropped. AMS fires these once
@@ -40,6 +50,16 @@ export type StreamWebhookEffect = {
   eventType: string | null
   /** New `cameras.status`, or null to leave the current value alone. */
   status: CameraStatus | null
+  /**
+   * `cameras.warning`, rendered on the camera detail page. Three states, because
+   * "say why this camera went dark", "it recovered, stop saying it" and "this
+   * event says nothing about health" are all different (SEC-181):
+   *
+   * * a string — set it
+   * * `null` — clear it
+   * * `undefined` — leave whatever is there alone
+   */
+  warning?: string | null
   /** Bump `cameras.last_frame_at` — evidence the source is still delivering. */
   touchLastFrame: boolean
   /** False when AMS sent an action this handler has no mapping for. */
@@ -225,6 +245,8 @@ export function streamWebhookEffect(
       return {
         eventType: 'stream_started',
         status: 'Online',
+        // Video is arriving, so whatever we last complained about is over.
+        warning: null,
         touchLastFrame: true,
         recognised: true,
       }
@@ -233,6 +255,8 @@ export function streamWebhookEffect(
       return {
         eventType: 'stream_stopped',
         status: 'Offline',
+        // A clean stop is not a fault; Offline already says everything true here.
+        warning: null,
         touchLastFrame: false,
         recognised: true,
       }
@@ -250,13 +274,20 @@ export function streamWebhookEffect(
     // Online here rather than sitting Offline until someone reloads. Only worth
     // an event row when AMS is reporting actual loss — it fires on a timer, and
     // logging every beat would swamp the table.
-    case AMS_HOOK.streamStatus:
+    case AMS_HOOK.streamStatus: {
+      const { ingestion, encoding, degraded } = streamDropCounts(payload)
       return {
-        eventType: streamDropCounts(payload).degraded ? 'stream_degraded' : null,
+        eventType: degraded ? 'stream_degraded' : null,
         status: 'Online',
+        // Loss on a running stream is the early warning a dispatcher should see
+        // *before* the feed fails outright. A clean beat clears it.
+        warning: degraded
+          ? `Ant Media is dropping data on this stream — ${ingestion} ingest packet(s), ${encoding} encode frame(s).`
+          : null,
         touchLastFrame: true,
         recognised: true,
       }
+    }
 
     // The source stopped delivering data for longer than AMS's publish timeout.
     // On the RTSP-pull sites this is the gateway dropping the tunnel, and it is
@@ -265,6 +296,7 @@ export function streamWebhookEffect(
       return {
         eventType: 'stream_error',
         status: 'Offline',
+        warning: 'The camera stopped sending video — Ant Media timed the publisher out.',
         touchLastFrame: false,
         recognised: true,
       }
@@ -275,10 +307,20 @@ export function streamWebhookEffect(
     // the camera Offline on either would report a false outage while the feed is
     // still arriving.
     case AMS_HOOK.encoderNotOpened:
+      return {
+        eventType: 'stream_error',
+        status: null,
+        warning:
+          "Ant Media could not open an encoder for this stream — check the camera's codec and profile.",
+        touchLastFrame: false,
+        recognised: true,
+      }
+
     case AMS_HOOK.endpointFailed:
       return {
         eventType: 'stream_error',
         status: null,
+        warning: 'A re-publish endpoint rejected this stream.',
         touchLastFrame: false,
         recognised: true,
       }
@@ -289,6 +331,21 @@ export function streamWebhookEffect(
       return {
         eventType: 'stream_stopped',
         status: 'Offline',
+        // Worth saying: "Offline" alone reads as a fault, and this one is AMS
+        // doing what it was configured to do.
+        warning: 'Ant Media stopped this stream after an idle timeout.',
+        touchLastFrame: false,
+        recognised: true,
+      }
+
+    // Fleet-wide, and it carries no stream id. The route intercepts it before the
+    // camera lookup; reaching the mapper at all means it arrived with a stream id
+    // attached, so record it against that camera rather than dropping it.
+    case AMS_HOOK.serverShutdown:
+      return {
+        eventType: 'stream_error',
+        status: 'Offline',
+        warning: FLEET_WIDE_WARNING,
         touchLastFrame: false,
         recognised: true,
       }
