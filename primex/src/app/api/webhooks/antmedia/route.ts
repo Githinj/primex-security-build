@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+  AMS_HOOK,
+  streamDropCounts,
+  streamWebhookEffect,
+} from '@/lib/streaming/webhook-events'
 
 const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -49,81 +54,83 @@ export async function POST(req: NextRequest) {
 
   const cameraId = camera.id
 
-  switch (action) {
-    case 'liveStreamStarted': {
-      await supabase
-        .from('cameras')
-        .update({ status: 'Online', last_frame_at: new Date().toISOString() })
-        .eq('id', cameraId)
+  // What this action means for camera state and the event log lives in
+  // lib/streaming/webhook-events.ts so the mapping is unit-testable; this route
+  // only performs the writes it asks for.
+  const effect = streamWebhookEffect(action, body)
 
-      await supabase.from('stream_events').insert({
-        camera_id: cameraId,
-        event_type: 'stream_started',
-        payload: body,
-      })
-      break
+  if (!effect.recognised) {
+    // Recorded as `stream_unhandled` below, not just logged. An AMS action we
+    // have no mapping for used to vanish into the server log, which is how a
+    // flapping stream stayed invisible to everyone but AMS (SEC-201).
+    console.warn(`Unhandled Ant Media webhook action "${action}" for stream ${streamId}`)
+  }
+
+  if (effect.eventType === 'stream_error') {
+    console.error(`Ant Media reported "${action}" on stream ${streamId} (camera ${cameraId})`)
+  }
+
+  if (effect.eventType === 'stream_degraded') {
+    const { ingestion, encoding } = streamDropCounts(body)
+    console.warn(
+      `Stream ${streamId} degrading — AMS dropped ${ingestion} ingest packet(s), ${encoding} encode frame(s)`,
+    )
+  }
+
+  // vodReady carries a second write (the recordings row) plus its own
+  // idempotency guard, so it runs before the shared effect is applied.
+  if (action === AMS_HOOK.vodReady) {
+    const vodName = body.vodName as string ?? ''
+    const duration = body.duration as number ?? 0
+    const fileSize = body.fileSize as number ?? 0
+    const startTime = body.startTime as string ?? new Date().toISOString()
+    const endTime = body.endTime as string ?? new Date().toISOString()
+
+    // Use startTime (not Date.now()) in the fallback name so a redelivered
+    // webhook resolves to the same file_url and stays idempotent.
+    const fileUrl = vodName
+      ? `${DO_SPACES_ENDPOINT}/recordings/${vodName}`
+      : `${DO_SPACES_ENDPOINT}/recordings/${streamId}_${startTime}.mp4`
+
+    // Idempotency: Ant Media can redeliver vodReady. Without this guard a
+    // duplicate delivery inserts a second row and double-lists the recording.
+    const { data: existingRecording } = await supabase
+      .from('recordings')
+      .select('id')
+      .eq('file_url', fileUrl)
+      .maybeSingle()
+
+    // Returns before the effect is applied, so a redelivery adds neither a
+    // recording row nor a second recording_saved event.
+    if (existingRecording) {
+      return NextResponse.json({ ok: true, duplicate: true })
     }
 
-    case 'liveStreamEnded': {
-      await supabase
-        .from('cameras')
-        .update({ status: 'Offline' })
-        .eq('id', cameraId)
+    await supabase.from('recordings').insert({
+      camera_id: cameraId,
+      stream_id: streamId,
+      file_url: fileUrl,
+      file_size: fileSize || null,
+      duration_s: duration ? Math.round(duration / 1000) : null,
+      started_at: startTime,
+      ended_at: endTime,
+      status: 'complete',
+    })
+  }
 
-      await supabase.from('stream_events').insert({
-        camera_id: cameraId,
-        event_type: 'stream_stopped',
-        payload: body,
-      })
-      break
-    }
+  const cameraUpdate: Record<string, string> = {}
+  if (effect.status) cameraUpdate.status = effect.status
+  if (effect.touchLastFrame) cameraUpdate.last_frame_at = new Date().toISOString()
+  if (Object.keys(cameraUpdate).length > 0) {
+    await supabase.from('cameras').update(cameraUpdate).eq('id', cameraId)
+  }
 
-    case 'vodReady': {
-      const vodName = body.vodName as string ?? ''
-      const duration = body.duration as number ?? 0
-      const fileSize = body.fileSize as number ?? 0
-      const startTime = body.startTime as string ?? new Date().toISOString()
-      const endTime = body.endTime as string ?? new Date().toISOString()
-
-      // Use startTime (not Date.now()) in the fallback name so a redelivered
-      // webhook resolves to the same file_url and stays idempotent.
-      const fileUrl = vodName
-        ? `${DO_SPACES_ENDPOINT}/recordings/${vodName}`
-        : `${DO_SPACES_ENDPOINT}/recordings/${streamId}_${startTime}.mp4`
-
-      // Idempotency: Ant Media can redeliver vodReady. Without this guard a
-      // duplicate delivery inserts a second row and double-lists the recording.
-      const { data: existingRecording } = await supabase
-        .from('recordings')
-        .select('id')
-        .eq('file_url', fileUrl)
-        .maybeSingle()
-
-      if (existingRecording) {
-        return NextResponse.json({ ok: true, duplicate: true })
-      }
-
-      await supabase.from('recordings').insert({
-        camera_id: cameraId,
-        stream_id: streamId,
-        file_url: fileUrl,
-        file_size: fileSize || null,
-        duration_s: duration ? Math.round(duration / 1000) : null,
-        started_at: startTime,
-        ended_at: endTime,
-        status: 'complete',
-      })
-
-      await supabase.from('stream_events').insert({
-        camera_id: cameraId,
-        event_type: 'recording_saved',
-        payload: body,
-      })
-      break
-    }
-
-    default:
-      console.warn(`Unknown Ant Media webhook action: ${action}`)
+  if (effect.eventType) {
+    await supabase.from('stream_events').insert({
+      camera_id: cameraId,
+      event_type: effect.eventType,
+      payload: body,
+    })
   }
 
   return NextResponse.json({ ok: true })
