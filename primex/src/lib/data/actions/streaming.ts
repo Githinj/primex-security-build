@@ -87,6 +87,29 @@ function broadcastHookUrl(streamId: string): string | null {
 }
 
 /**
+ * Per-broadcast viewer caps (SEC-192).
+ *
+ * Every player opens its own peer connection straight to the single origin
+ * droplet — there is no edge tier, and nobody has measured the ceiling. The
+ * shape of the failure matters: the dispatcher queue renders a player inline in
+ * the alert detail, so several dispatchers watching the same busy site during an
+ * incident all fan in to one box at the moment ingest load is also highest.
+ *
+ * A cap does not add capacity. It decides what happens at the limit: the next
+ * viewer is refused, instead of every stream on the server degrading together.
+ * Unset leaves AMS's default (-1, unlimited), so this changes nothing until
+ * someone has load-tested and picked a number.
+ */
+function viewerLimits(): Record<string, number> {
+  const limits: Record<string, number> = {}
+  const webrtc = Number(process.env.ANTMEDIA_WEBRTC_VIEWER_LIMIT)
+  const hls = Number(process.env.ANTMEDIA_HLS_VIEWER_LIMIT)
+  if (Number.isInteger(webrtc) && webrtc > 0) limits.webRTCViewerLimit = webrtc
+  if (Number.isInteger(hls) && hls > 0) limits.hlsViewerLimit = hls
+  return limits
+}
+
+/**
  * Refuse to point Ant Media at an address that can't be a camera (SEC-193).
  *
  * Returns an error string when the target is blocked, null when it is fine. The
@@ -375,6 +398,7 @@ export async function createBroadcast(
     // recordings (SEC-202). Omitted entirely rather than sent as null when there
     // is no secret, so an existing hook is never cleared by a re-provision.
     ...(hookUrl ? { listenerHookURL: hookUrl } : {}),
+    ...viewerLimits(),
   }
 
   // Ant Media's create resource is /broadcasts/create — POSTing to /broadcasts
@@ -499,6 +523,7 @@ export async function createStreamSource(
     // 409 branch below PUTs this same payload, so re-running the action is what
     // repairs a source provisioned before the hook existed.
     ...(hookUrl ? { listenerHookURL: hookUrl } : {}),
+    ...viewerLimits(),
   }
 
   // Create goes to /broadcasts/create (POST /broadcasts is 405); the PUT-update

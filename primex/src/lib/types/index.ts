@@ -127,6 +127,12 @@ export interface Recording {
   started_at: string
   ended_at: string | null
   status: 'recording' | 'complete' | 'failed'
+  /**
+   * Explicit evidentiary hold (SEC-190, migration 020). While this is in the
+   * future, retention will not delete the row. Incident-linked footage is held
+   * automatically and does not need it set.
+   */
+  hold_until: string | null
   created_at: string
 }
 
