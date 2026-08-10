@@ -5,6 +5,7 @@ import { WifiOff, Maximize, Minimize, RefreshCw } from 'lucide-react'
 import Hls from 'hls.js'
 import { Pill } from '@/components/ui'
 import { useStreamToken } from '@/lib/hooks/use-stream-token'
+import { withStreamToken, withoutStreamToken } from '@/lib/streaming/hls-token'
 import type { CameraStatus } from '@/lib/types'
 
 type PlayerState = 'idle' | 'loading_token' | 'connecting_webrtc' | 'fallback_hls' | 'live' | 'error'
@@ -30,6 +31,26 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
     isOnline ? cameraId : null
   )
 
+  // The connection effect below reads the token through this ref rather than
+  // closing over it (SEC-191). Under Enterprise every refresh mints a new
+  // tokenId — and rewrites hlsUrl's query string with it — so keying the effect
+  // on those values tore down and rebuilt a perfectly healthy stream roughly
+  // every 55 minutes, a visible drop for anyone watching continuously.
+  //
+  // Synced in an effect declared *before* the connection effect below, so it is
+  // already current when that one runs — a refreshed token then applies to the
+  // next connection and to in-flight HLS segment requests without restarting
+  // anything. (Assigning during render trips react-hooks/refs.)
+  const tokenRef = useRef(token)
+  useEffect(() => {
+    tokenRef.current = token
+  }, [token])
+
+  // Identity of the stream, deliberately excluding the part that rotates.
+  const streamId = token?.streamId ?? null
+  const webrtcUrl = token?.webrtcUrl ?? null
+  const hlsIdentity = withoutStreamToken(token?.hlsUrl)
+
   useEffect(() => {
     if (isLoading) setPlayerState('loading_token')
     else if (tokenError) setPlayerState('error')
@@ -37,7 +58,7 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
 
   useEffect(() => {
     const video = videoRef.current
-    if (!token || !video) return
+    if (!streamId || !webrtcUrl || !video) return
 
     setPlayerState('connecting_webrtc')
 
@@ -48,7 +69,7 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
 
     const cleanupWebrtc = () => {
       if (webrtcRef.current) {
-        try { webrtcRef.current.stop(token.streamId) } catch {}
+        try { webrtcRef.current.stop(streamId) } catch {}
         webrtcRef.current = null
       }
     }
@@ -75,7 +96,10 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
     const fallbackToHls = () => {
       if (cancelled) return
       cleanupWebrtc()
-      if (!token.hlsUrl) { setPlayerState('error'); return }
+      // Read at call time, not capture time, so a token refreshed while WebRTC
+      // was still trying is the one the fallback uses.
+      const hlsUrl = tokenRef.current?.hlsUrl
+      if (!hlsUrl) { setPlayerState('error'); return }
 
       setPlayerState('fallback_hls')
       active.protocol = 'HLS'
@@ -83,7 +107,18 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
       if (Hls.isSupported()) {
         // lowLatencyMode removed: Ant Media standard HLS isn't LL-HLS, and enabling
         // it against a non-LL origin causes stalls + extra manifest fetches.
-        const hls = new Hls({ enableWorker: true })
+        const hls = new Hls({
+          enableWorker: true,
+          // Segment URIs in the manifest are resolved relative to it, and that
+          // drops the query string — so without this every .ts request goes out
+          // tokenless and AMS answers 403 while the manifest itself loaded fine
+          // (SEC-183).
+          // Reading the ref per request means a token refreshed mid-playback
+          // applies to the next segment without reloading the source.
+          xhrSetup: (xhr, url) => {
+            xhr.open('GET', withStreamToken(url, tokenRef.current?.token ?? null, hlsUrl), true)
+          },
+        })
         let mediaRecoveries = 0
         let networkRetries = 0
         hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}) })
@@ -106,12 +141,17 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
             setPlayerState('error')
           }
         })
-        hls.loadSource(token.hlsUrl)
+        hls.loadSource(hlsUrl)
         hls.attachMedia(video)
         hlsRef.current = hls
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         // Native HLS (Safari); `onPlaying` flips us to live.
-        video.src = token.hlsUrl
+        //
+        // Known gap: native playback gives no hook to rewrite segment requests,
+        // so Safari still fetches them tokenless (SEC-183). With token control on
+        // it will fail here. WebRTC is the primary path on Safari too, and TURN
+        // (SEC-184) is what keeps this from being reached in the first place.
+        video.src = hlsUrl
         video.play().catch(() => {})
       } else {
         setPlayerState('error')
@@ -125,14 +165,23 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
         active.protocol = 'WebRTC'
 
         const adaptor = new WebRTCAdaptor({
-          websocket_url: token.webrtcUrl,
+          websocket_url: webrtcUrl,
+          // Without this the adaptor uses its own default public STUN and no
+          // relay, so a viewer behind symmetric NAT or on a network that blocks
+          // outbound UDP never completes ICE — they wait out the timeout below
+          // and drop to HLS (SEC-184). Omitted entirely when unconfigured, which
+          // leaves the adaptor's existing behaviour untouched.
+          ...(tokenRef.current?.iceServers?.length
+            ? { peerconnection_config: { iceServers: tokenRef.current.iceServers } }
+            : {}),
           mediaConstraints: { video: false, audio: false },
           sdp_constraints: { OfferToReceiveAudio: false, OfferToReceiveVideo: true },
           remoteVideoElement: video,
           callback: (info: string) => {
             if (cancelled) return
             if (info === 'initialized') {
-              adaptor.play(token.streamId, token.token ?? undefined)
+              // Current token, not the one this effect started with.
+              adaptor.play(streamId, tokenRef.current?.token ?? undefined)
             } else if (
               info === 'play_started' ||
               info === 'newStreamAvailable' ||
@@ -188,11 +237,11 @@ export function CameraPlayer({ cameraId, cameraName, status, compact = false }: 
       cleanupWebrtc()
       cleanupHls()
     }
-    // Keyed on the actual connection inputs, not the token object identity, so a
-    // token refresh with unchanged URLs/token (e.g. Community Edition, token=null)
-    // doesn't needlessly tear down and rebuild a healthy stream.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token?.streamId, token?.webrtcUrl, token?.hlsUrl, token?.token])
+    // Keyed on the stream's identity only. The rotating parts — the token itself
+    // and the token in hlsUrl's query string — are deliberately absent and read
+    // through tokenRef instead, so a refresh never restarts a healthy stream
+    // (SEC-191).
+  }, [streamId, webrtcUrl, hlsIdentity])
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return

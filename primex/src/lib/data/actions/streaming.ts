@@ -7,6 +7,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { listenerHookUrl } from '@/lib/streaming/webhook-auth'
 import { checkSourceAddress, isIpLiteral, parseSourceUrl } from '@/lib/streaming/source-url'
+import { buildIceServers } from '@/lib/streaming/ice-servers'
+import { REST_JWT_TTL_S, restJwtExpiry, signRestJwt } from '@/lib/streaming/rest-jwt'
 import { SITE_URL } from '@/lib/site-url'
 import type { CameraStreamConfig, StreamToken } from '@/lib/types'
 
@@ -22,28 +24,15 @@ const ANTMEDIA_WS_URL = process.env.ANTMEDIA_WS_URL!
 // the clear; it exists so local Docker keeps working.
 const ANTMEDIA_RTMP_URL = process.env.ANTMEDIA_RTMP_URL
 const TOKEN_DURATION_MS = 60 * 60 * 1000 // 1 hour
-const REST_JWT_TTL_S = 60 // short-lived: a fresh token is signed per request
 // Publish tokens gate ingest, and a camera publishes indefinitely, so these are
 // long-lived by nature. Re-running createBroadcast() mints a fresh one, which is
 // the rotation path.
 const PUBLISH_TOKEN_TTL_S = (Number(process.env.ANTMEDIA_PUBLISH_TOKEN_TTL_DAYS) || 365) * 86400
 
-// Mints the per-request JWT that Ant Media Enterprise's REST filter expects.
-// ANTMEDIA_API_KEY is the shared HS256 secret — sending it verbatim as the
-// Authorization value gets a 403 "Invalid App JWT Token"; it has to sign a
-// token. AMS only checks the signature and `exp`, so no other claims are set.
+// The token format lives in lib/streaming/rest-jwt.ts, pinned byte-for-byte
+// against the Python worker's signer by a shared golden fixture (SEC-188).
 function signAntmediaRestJwt(secret: string): string {
-  const b64url = (value: string) => Buffer.from(value, 'utf8').toString('base64url')
-  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = b64url(
-    JSON.stringify({ exp: Math.floor(Date.now() / 1000) + REST_JWT_TTL_S }),
-  )
-  const signingInput = `${header}.${payload}`
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(signingInput, 'utf8')
-    .digest('base64url')
-  return `${signingInput}.${signature}`
+  return signRestJwt(secret, restJwtExpiry(Date.now(), REST_JWT_TTL_S))
 }
 
 // Ant Media answers a rejected write with {"success":false,"message":"…"} — the
@@ -263,6 +252,21 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
   // conversion lives in mintAntmediaToken().
   const expiresAt = Date.now() + TOKEN_DURATION_MS
 
+  // Minted per request and short-lived, so it rides along with the play token
+  // rather than being NEXT_PUBLIC_ config the browser keeps (SEC-184).
+  const iceServers = buildIceServers({
+    stunUrls: process.env.ANTMEDIA_STUN_URLS,
+    turnUrls: process.env.ANTMEDIA_TURN_URLS,
+    turnSecret: process.env.ANTMEDIA_TURN_SECRET,
+    turnUsername: process.env.ANTMEDIA_TURN_USERNAME,
+    turnCredential: process.env.ANTMEDIA_TURN_CREDENTIAL,
+    // Outlive the play token slightly: an ICE restart just after a token refresh
+    // must not fail on an expired relay credential.
+    turnTtlSeconds: TOKEN_DURATION_MS / 1000 + 600,
+    label: streamId,
+    nowMs: Date.now(),
+  })
+
   // Community Edition doesn't support the token API — return tokenless URLs
   if (!ANTMEDIA_API_KEY) {
     return {
@@ -271,6 +275,7 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
       webrtcUrl: ANTMEDIA_WS_URL,
       hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8`,
       expiresAt,
+      iceServers,
     }
   }
 
@@ -283,6 +288,7 @@ export async function getStreamToken(cameraId: string): Promise<StreamToken | nu
     webrtcUrl: ANTMEDIA_WS_URL,
     hlsUrl: `${ANTMEDIA_URL}/${ANTMEDIA_APP}/streams/${streamId}.m3u8?token=${encodeURIComponent(tokenId)}`,
     expiresAt,
+    iceServers,
   }
 }
 
