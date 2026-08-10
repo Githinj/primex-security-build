@@ -53,9 +53,24 @@ const ignored: StreamWebhookEffect = {
   recognised: true,
 }
 
-/** AMS sends these as numbers, but a JSON hook body is never guaranteed. */
+/**
+ * Read a counter off a hook body.
+ *
+ * Numeric *strings* count. Under `application/x-www-form-urlencoded` — which is
+ * what AMS actually posts (SEC-202) — every value arrives as a string, so
+ * rejecting them would silently zero out the drop counters and disable the
+ * degradation detection this file exists to provide. Anything that isn't a
+ * finite positive number still reads as zero: a malformed body must not fake an
+ * outage on a healthy stream.
+ */
 function count(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : Number.NaN
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0
 }
 
 /** Same caution for the string fields — an empty string is as absent as null. */
@@ -79,6 +94,64 @@ export function streamDropCounts(payload: Record<string, unknown>): {
   const ingestion = count(payload.dropPacketCountInIngestion)
   const encoding = count(payload.dropFrameCountInEncoding)
   return { ingestion, encoding, degraded: ingestion > 0 || encoding > 0 }
+}
+
+function parseJsonBody(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    // not JSON — the caller tries the other encoding
+  }
+  return null
+}
+
+function parseFormBody(raw: string): Record<string, unknown> | null {
+  // URLSearchParams never throws, so it would happily turn `{"a":1}` into a
+  // single garbage key. Rule those out before trusting it.
+  if (!raw.includes('=') || /^\s*[[{]/.test(raw)) return null
+
+  const params = new URLSearchParams(raw)
+  const body: Record<string, unknown> = {}
+  for (const [key, value] of params) body[key] = value
+  return Object.keys(body).length > 0 ? body : null
+}
+
+/**
+ * Turn a raw hook body into the shape the mapper reads.
+ *
+ * Ant Media posts listener hooks as `application/x-www-form-urlencoded`, not
+ * JSON — the route assumed JSON and would have answered every real delivery with
+ * a 400, and AMS retries a non-200 (2.8.3+), so it would have retry-stormed
+ * against a body we could never parse (SEC-202).
+ *
+ * Both encodings are accepted rather than swapping one bet for another: the
+ * declared `Content-Type` is tried first and the other is the fallback, so this
+ * is correct whichever way the server behaves and stays correct if a future AMS
+ * switches. Note that under form encoding every value is a string — `count()`
+ * above handles the numeric ones.
+ */
+export function parseHookBody(
+  contentType: string | null | undefined,
+  raw: string,
+): Record<string, unknown> | null {
+  if (!raw.trim()) return null
+
+  const declaresForm = (contentType ?? '')
+    .toLowerCase()
+    .includes('application/x-www-form-urlencoded')
+
+  const attempts = declaresForm
+    ? [parseFormBody, parseJsonBody]
+    : [parseJsonBody, parseFormBody]
+
+  for (const attempt of attempts) {
+    const parsed = attempt(raw)
+    if (parsed) return parsed
+  }
+  return null
 }
 
 /** The `recordings` insert a `vodReady` hook produces, minus `camera_id`. */
