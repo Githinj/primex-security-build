@@ -30,6 +30,41 @@ import { createHash, timingSafeEqual } from 'node:crypto'
  * body integrity, and that is infrastructure rather than app code.
  */
 
+/** Path of the hook endpoint, relative to the app's public origin. */
+const WEBHOOK_PATH = '/api/webhooks/antmedia'
+
+/**
+ * Build the `listenerHookURL` to hand Ant Media when provisioning a broadcast.
+ *
+ * Nothing set this, so every broadcast on the live server had `listenerHookURL:
+ * null` and the webhook had never once fired (SEC-202). Setting it at
+ * provisioning time is what makes a newly added camera report anything at all.
+ *
+ * Returns null when there is no secret to embed. A hook URL without one points
+ * AMS at an endpoint that fails closed on every delivery (SEC-187), and AMS
+ * retries non-200s — so configuring it would buy a retry storm rather than
+ * telemetry. No hook is the better failure.
+ *
+ * `override` exists because the public origin is not always the address AMS can
+ * reach: a split-horizon DNS, a tunnel, or a proxy that adds a real signature in
+ * front of this endpoint all need a different base.
+ */
+export function listenerHookUrl(config: {
+  siteUrl: string | null | undefined
+  secret: string | null | undefined
+  override?: string | null
+}): string | null {
+  if (!config.secret) return null
+
+  // An explicit override is taken as the complete endpoint, minus the secret —
+  // whoever sets it knows the path AMS must call.
+  const base = (config.override || config.siteUrl || '').trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(base)) return null
+
+  const endpoint = config.override ? base : `${base}${WEBHOOK_PATH}`
+  return `${endpoint}?secret=${encodeURIComponent(config.secret)}`
+}
+
 /** Fixed-length digests, so the comparison can't leak length either. */
 function digest(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest()

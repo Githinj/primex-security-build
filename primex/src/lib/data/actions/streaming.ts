@@ -4,6 +4,8 @@ import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
+import { listenerHookUrl } from '@/lib/streaming/webhook-auth'
+import { SITE_URL } from '@/lib/site-url'
 import type { CameraStreamConfig, StreamToken } from '@/lib/types'
 
 const ANTMEDIA_URL = process.env.ANTMEDIA_URL!
@@ -69,6 +71,28 @@ function antmediaHeaders(contentType?: string): Record<string, string> {
   // Ant Media EE reads the raw compact JWT from Authorization — no "Bearer " prefix.
   if (ANTMEDIA_API_KEY) headers['Authorization'] = signAntmediaRestJwt(ANTMEDIA_API_KEY)
   return headers
+}
+
+/**
+ * The hook URL every broadcast we provision gets told to call.
+ *
+ * Computed per call rather than at module load so a missing secret is visible in
+ * the log at the moment a camera is provisioned, which is when someone can act
+ * on it — not at cold start, where it scrolls past.
+ */
+function broadcastHookUrl(streamId: string): string | null {
+  const url = listenerHookUrl({
+    siteUrl: SITE_URL,
+    secret: process.env.ANTMEDIA_WEBHOOK_SECRET,
+    override: process.env.ANTMEDIA_WEBHOOK_URL,
+  })
+  if (!url) {
+    console.warn(
+      `Provisioning "${streamId}" with no listenerHookURL — ANTMEDIA_WEBHOOK_SECRET is unset, so ` +
+        'the camera will never report status, drops, or recordings (SEC-202).',
+    )
+  }
+  return url
 }
 
 // Ingest endpoint the installer points the camera at, without the token.
@@ -252,20 +276,25 @@ export async function createBroadcast(
     return { success: false, error: 'A stream ID is required to create a broadcast.' }
   }
 
+  const base = `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts`
+  const hookUrl = broadcastHookUrl(trimmedId)
+  const broadcastPayload = {
+    streamId: trimmedId,
+    name: cameraName,
+    type: 'liveStream',
+    // Without this the broadcast reports nothing back — no status, no drops, no
+    // recordings (SEC-202). Omitted entirely rather than sent as null when there
+    // is no secret, so an existing hook is never cleared by a re-provision.
+    ...(hookUrl ? { listenerHookURL: hookUrl } : {}),
+  }
+
   // Ant Media's create resource is /broadcasts/create — POSTing to /broadcasts
   // itself is 405 (that path only lists). Keep the /create suffix.
-  const res = await fetch(
-    `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/create`,
-    {
-      method: 'POST',
-      headers: antmediaHeaders('application/json'),
-      body: JSON.stringify({
-        streamId: trimmedId,
-        name: cameraName,
-        type: 'liveStream',
-      }),
-    }
-  )
+  const res = await fetch(`${base}/create`, {
+    method: 'POST',
+    headers: antmediaHeaders('application/json'),
+    body: JSON.stringify(broadcastPayload),
+  })
 
   // 409 = the broadcast already exists, which is a reusable state — but it still
   // needs a fresh token and still has to be persisted. It used to return early,
@@ -275,6 +304,24 @@ export async function createBroadcast(
       `Failed to create broadcast for streamId "${trimmedId}": ${await antmediaError(res)}`,
     )
     return { success: false, error: 'Ant Media rejected the broadcast.' }
+  }
+
+  // Create is a no-op on 409, so the payload never reaches an existing broadcast
+  // — which is precisely the state the live server is in: broadcasts that predate
+  // the hook URL keep reporting nothing until something writes it. Re-running
+  // provisioning is the repair path, so apply it here. Non-fatal: the ingest URL
+  // below is still valid, the camera is just still silent.
+  if (res.status === 409 && hookUrl) {
+    const updateRes = await fetch(`${base}/${trimmedId}`, {
+      method: 'PUT',
+      headers: antmediaHeaders('application/json'),
+      body: JSON.stringify(broadcastPayload),
+    })
+    if (!updateRes.ok) {
+      console.error(
+        `Could not attach listenerHookURL to existing broadcast "${trimmedId}": ${await antmediaError(updateRes)}`,
+      )
+    }
   }
 
   const streamEndpoint = `${ingestBaseUrl()}/${trimmedId}`
@@ -340,11 +387,16 @@ export async function createStreamSource(
   }
 
   const base = `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts`
+  const hookUrl = broadcastHookUrl(trimmedId)
   const sourcePayload = {
     streamId: trimmedId,
     name: cameraName,
     type: 'streamSource',
     streamUrl: trimmedUrl,
+    // See createBroadcast(): no hook URL means a silent camera (SEC-202). The
+    // 409 branch below PUTs this same payload, so re-running the action is what
+    // repairs a source provisioned before the hook existed.
+    ...(hookUrl ? { listenerHookURL: hookUrl } : {}),
   }
 
   // Create goes to /broadcasts/create (POST /broadcasts is 405); the PUT-update

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { authenticateWebhook, clientIp, ipAllowed, secretMatches } from './webhook-auth'
+import {
+  authenticateWebhook,
+  clientIp,
+  ipAllowed,
+  listenerHookUrl,
+  secretMatches,
+} from './webhook-auth'
 
 const SECRET = 'a-long-random-capability-secret'
 
@@ -86,6 +92,87 @@ describe('ipAllowed', () => {
     // A delivery that arrives without a forwarded-for did not come from the
     // droplet, so an unknown origin is a rejection rather than a pass.
     expect(ipAllowed(null, '203.0.113.7')).toBe(false)
+  })
+})
+
+describe('listenerHookUrl', () => {
+  it('builds the hook URL AMS should call, secret included', () => {
+    expect(listenerHookUrl({ siteUrl: 'https://primex.example', secret: SECRET })).toBe(
+      `https://primex.example/api/webhooks/antmedia?secret=${encodeURIComponent(SECRET)}`,
+    )
+  })
+
+  it('round-trips through the verifier it is minted for', () => {
+    // The two halves of SEC-187/202 have to agree: what we hand AMS must be what
+    // authenticateWebhook accepts back.
+    const url = listenerHookUrl({ siteUrl: 'https://primex.example', secret: SECRET })
+    const querySecret = new URL(url!).searchParams.get('secret')
+    expect(
+      authenticateWebhook({
+        headerSecret: null,
+        querySecret,
+        expectedSecret: SECRET,
+        forwardedFor: null,
+        allowList: null,
+      }),
+    ).toEqual({ ok: true })
+  })
+
+  it('percent-encodes a secret containing URL metacharacters', () => {
+    const url = listenerHookUrl({ siteUrl: 'https://primex.example', secret: 'a&b=c d/e' })
+    expect(new URL(url!).searchParams.get('secret')).toBe('a&b=c d/e')
+  })
+
+  it('trims a trailing slash off the origin rather than doubling it', () => {
+    expect(listenerHookUrl({ siteUrl: 'https://primex.example//', secret: 'x' })).toBe(
+      'https://primex.example/api/webhooks/antmedia?secret=x',
+    )
+  })
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty', ''],
+  ])('returns null when the secret is %s', (_label, secret) => {
+    // A hook URL with no secret points AMS at an endpoint that fails closed on
+    // every delivery, and AMS retries non-200s — that buys a retry storm, not
+    // telemetry. No hook is the better failure.
+    expect(listenerHookUrl({ siteUrl: 'https://primex.example', secret })).toBeNull()
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['not absolute', '/api'],
+    ['scheme-relative', '//primex.example'],
+    ['a bare hostname', 'primex.example'],
+  ])('returns null when the origin is %s', (_label, siteUrl) => {
+    expect(listenerHookUrl({ siteUrl, secret: SECRET })).toBeNull()
+  })
+
+  it('treats an override as the complete endpoint, not an origin', () => {
+    // The override exists for the case where AMS reaches this app by a different
+    // address entirely — a tunnel, split-horizon DNS, or a signing proxy — so it
+    // must not have the default path appended to it.
+    expect(
+      listenerHookUrl({
+        siteUrl: 'https://primex.example',
+        secret: 'x',
+        override: 'https://hooks.internal/ams',
+      }),
+    ).toBe('https://hooks.internal/ams?secret=x')
+  })
+
+  it('ignores a blank override and falls back to the site origin', () => {
+    expect(
+      listenerHookUrl({ siteUrl: 'https://primex.example', secret: 'x', override: '' }),
+    ).toBe('https://primex.example/api/webhooks/antmedia?secret=x')
+  })
+
+  it('allows a plain-http origin for local Docker AMS', () => {
+    expect(listenerHookUrl({ siteUrl: 'http://localhost:3000', secret: 'x' })).toBe(
+      'http://localhost:3000/api/webhooks/antmedia?secret=x',
+    )
   })
 })
 

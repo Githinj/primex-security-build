@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { authenticateWebhook } from '@/lib/streaming/webhook-auth'
 import {
   AMS_HOOK,
+  parseHookBody,
   streamDropCounts,
   streamWebhookEffect,
   vodRecordingRow,
@@ -42,15 +43,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: Record<string, unknown>
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  // Read once as text and let the parser decide the encoding: AMS posts
+  // form-urlencoded, not JSON (SEC-202).
+  const raw = await req.text()
+  const body = parseHookBody(req.headers.get('content-type'), raw)
+  if (!body) {
+    console.warn(
+      `Unparseable Ant Media webhook body (content-type: ${req.headers.get('content-type') ?? 'none'})`,
+    )
+    return NextResponse.json({ error: 'Unparseable body' }, { status: 400 })
   }
 
   const action = body.action as string
-  const streamId = body.streamId as string ?? body.id as string
+  // `id` is the stream id on a listener hook, and it is the field the
+  // form-encoded contract actually carries. `streamName` is the human-readable
+  // broadcast name, NOT a key — never resolve a camera on it.
+  const streamId = (body.streamId as string) ?? (body.id as string)
 
   if (!action || !streamId) {
     return NextResponse.json({ error: 'Missing action or streamId' }, { status: 400 })

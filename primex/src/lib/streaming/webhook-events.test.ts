@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   AMS_HOOK,
+  parseHookBody,
   streamDropCounts,
   streamWebhookEffect,
   vodRecordingRow,
@@ -145,18 +146,92 @@ describe('streamDropCounts', () => {
     expect(streamDropCounts({}).degraded).toBe(false)
   })
 
+  it('counts numeric strings, because form-encoded hooks send everything as text', () => {
+    // Reversed deliberately (SEC-202): this used to assert that '12' read as
+    // zero, on the assumption the body was JSON. AMS posts
+    // application/x-www-form-urlencoded, so every value arrives as a string and
+    // the old rule would have zeroed out the drop counters on every real
+    // delivery — silently disabling the degradation detection.
+    const counts = streamDropCounts({
+      dropPacketCountInIngestion: '12',
+      dropFrameCountInEncoding: '3',
+    })
+    expect(counts).toEqual({ ingestion: 12, encoding: 3, degraded: true })
+  })
+
   it.each([
-    ['a string', '12'],
+    ['a non-numeric string', 'lots'],
+    ['an empty string', ''],
+    ['whitespace', '   '],
     ['null', null],
     ['undefined', undefined],
     ['NaN', Number.NaN],
     ['a negative count', -5],
+    ['a negative numeric string', '-5'],
   ])('coerces %s to zero rather than reporting a false degradation', (_label, value) => {
-    // A hook body is JSON from another process; a non-numeric counter must not
-    // read as loss and page someone about a healthy stream.
+    // A hook body comes from another process; a counter that isn't a real
+    // positive number must not read as loss and page someone about a healthy
+    // stream.
     const counts = streamDropCounts({ dropPacketCountInIngestion: value })
     expect(counts.ingestion).toBe(0)
     expect(counts.degraded).toBe(false)
+  })
+})
+
+describe('parseHookBody', () => {
+  const FORM = 'application/x-www-form-urlencoded'
+
+  it('parses the form-encoded body AMS actually sends', () => {
+    // The delivery shape the route used to answer with a 400 (SEC-202).
+    expect(
+      parseHookBody(`${FORM};charset=UTF-8`, 'id=cam-01&action=liveStreamStarted&streamName=Front+Gate'),
+    ).toEqual({ id: 'cam-01', action: 'liveStreamStarted', streamName: 'Front Gate' })
+  })
+
+  it('parses a JSON body', () => {
+    expect(
+      parseHookBody('application/json', '{"id":"cam-01","action":"liveStreamEnded"}'),
+    ).toEqual({ id: 'cam-01', action: 'liveStreamEnded' })
+  })
+
+  it('decodes percent-encoded and plus-encoded form values', () => {
+    expect(parseHookBody(FORM, 'vodName=front+gate%2F2026.mp4')).toEqual({
+      vodName: 'front gate/2026.mp4',
+    })
+  })
+
+  it('reads JSON that arrives mislabelled as form-encoded', () => {
+    // The declared type is a hint, not a promise — accepting both means this
+    // stays correct whichever way the server behaves, and if a future AMS
+    // switches encodings.
+    expect(parseHookBody(FORM, '{"id":"cam-01","action":"vodReady"}')).toEqual({
+      id: 'cam-01',
+      action: 'vodReady',
+    })
+  })
+
+  it('reads form data that arrives with no content-type at all', () => {
+    expect(parseHookBody(null, 'id=cam-01&action=vodReady')).toEqual({
+      id: 'cam-01',
+      action: 'vodReady',
+    })
+  })
+
+  it('does not mangle a JSON body into a single garbage form key', () => {
+    // URLSearchParams never throws, so '{"a":1}' would otherwise parse as one
+    // key named '{"a":1}' and the action would come back undefined.
+    const parsed = parseHookBody(FORM, '{"action":"liveStreamStarted"}')
+    expect(parsed).toEqual({ action: 'liveStreamStarted' })
+  })
+
+  it.each([
+    ['an empty body', ''],
+    ['whitespace only', '   '],
+    ['a bare token', 'not-a-body'],
+    ['a JSON array', '[1,2,3]'],
+    ['JSON null', 'null'],
+  ])('rejects %s', (_label, raw) => {
+    expect(parseHookBody('application/json', raw)).toBeNull()
   })
 })
 

@@ -118,6 +118,24 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       listener too. Confirm the first response byte of an RTMP handshake is `0x03`.
 - [ ] Re-issue ingest URLs for any camera provisioned before this change — the old
       URLs carry no token, and the token is shown once at creation.
+- [ ] **Verify the webhook actually arrives** (SEC-202). As of 2026-08-10 it never
+      has: `listenerHookURL` was `null` on all three live broadcasts and
+      `stream_events` / `recordings` are empty, so camera status, drop telemetry
+      and recordings are all inert in production.
+      - `createBroadcast()` / `createStreamSource()` now set `listenerHookURL`
+        themselves, derived from `NEXT_PUBLIC_SITE_URL` (or `ANTMEDIA_WEBHOOK_URL`)
+        plus `ANTMEDIA_WEBHOOK_SECRET`. **Both must be set before provisioning** —
+        with no secret the hook is omitted rather than pointed at an endpoint that
+        401s every delivery.
+      - **Re-provision the cameras that already exist.** Create is a no-op on an
+        existing broadcast; the actions now PUT the payload on 409, so re-running
+        Connect from the camera detail page is the repair path.
+      - Optionally set `settings.listenerHookURL` in the app's
+        `WEB-INF/red5-web.properties` as a server-wide default.
+      - Then confirm end to end: start a stream → a `stream_events` row appears.
+        **Capture the real `Content-Type` and field names from that delivery** and
+        record them on SEC-202 / SEC-182 — the route accepts both form-encoded and
+        JSON, but the exact payload has still never been observed.
 - [ ] **Set the AMS app setting `rtspPullTransportType` to `tcp`** for every app that
       pulls RTSP (SEC-201). This is an **application** setting — AMS reads it in
       `StreamFetcher` and passes it to ffmpeg as `rtsp_transport`, so it cannot be set
