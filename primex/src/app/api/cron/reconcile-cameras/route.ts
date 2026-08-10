@@ -20,6 +20,14 @@ import { restJwtExpiry, signRestJwt } from '@/lib/streaming/rest-jwt'
  *
  * Node runtime, not edge: it needs the service-role client to write across
  * tenants, the same RLS-bypassing position the webhook occupies.
+ *
+ * **Scheduled from Postgres, not Vercel.** `vercel.json` lists this at a daily
+ * schedule, which is a backstop rather than the real cadence: Vercel's Hobby plan
+ * rejects any sub-daily cron *at deployment time* (the build succeeds and the
+ * deploy fails, which is a confusing signal to debug). The 15-minute schedule
+ * lives in pg_cron + pg_net — see migration 021 — alongside the retention jobs.
+ * A daily correction window would be close to useless here: this exists because a
+ * lost webhook strands a camera at the wrong status indefinitely.
  */
 export const runtime = 'nodejs'
 

@@ -165,11 +165,25 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       `Hls.isSupported()`) and watch the network tab for segment 403s.
       Safari's native HLS has no hook to rewrite segment requests and is a known
       gap — it depends on WebRTC, and therefore on TURN above.
-- [ ] **Set `CRON_SECRET`** in Vercel (SEC-180). `/api/cron/reconcile-cameras` runs
-      every 15 min and corrects camera status against Ant Media; it **fails closed**
-      without the secret, so an unset value means every run 401s and status silently
-      stops being reconciled. Confirm one run returns `{"ok":true}` with a
-      plausible `checked` count.
+- [ ] **Set `CRON_SECRET`** in Vercel (SEC-180). `/api/cron/reconcile-cameras`
+      corrects camera status against Ant Media; it **fails closed** without the
+      secret, so an unset value means every run 401s and status silently stops
+      being reconciled. Confirm one run returns `{"ok":true}` with a plausible
+      `checked` count.
+- [ ] **Store the same secret plus the site URL in Supabase Vault** — the 15-minute
+      schedule runs from pg_cron, not Vercel (migration 021), because **Vercel
+      Hobby rejects any sub-daily cron at deploy time**. Run once per environment:
+      ```sql
+      select vault.create_secret('https://<domain>', 'primex_site_url');
+      select vault.create_secret('<CRON_SECRET>',    'primex_cron_secret');
+      ```
+      Until both exist the job logs a warning and does nothing — deliberately, so a
+      missing secret isn't an invisible 401 every 15 minutes. Verify with
+      `select public.trigger_camera_reconcile();` (non-null = request sent) and
+      check `net._http_response` for the status.
+      The daily Vercel cron is kept as a backstop: pg_net is fire-and-forget, so an
+      external run also proves the endpoint is reachable. Reconciliation is
+      idempotent, so both running is harmless.
 - [ ] **Set the AMS app setting `rtspPullTransportType` to `tcp`** for every app that
       pulls RTSP (SEC-201). This is an **application** setting — AMS reads it in
       `StreamFetcher` and passes it to ffmpeg as `rtsp_transport`, so it cannot be set
