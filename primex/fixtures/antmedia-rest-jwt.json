@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "Golden fixture for the Ant Media Enterprise REST JWT (SEC-188).",
+    "The same token format is implemented twice, in two languages:",
+    "  - src/lib/streaming/rest-jwt.ts        signRestJwt()",
+    "  - ai_worker/antmedia_jwt.py            sign_rest_jwt()",
+    "Both test suites assert against this file, so a change to either side that",
+    "alters a byte fails a test instead of failing production auth with a 403",
+    "that looks like the IP-allowlist problem in the deploy notes.",
+    "If you change the token format deliberately, change BOTH implementations and",
+    "recompute `token` — do not edit one side to make its own test pass."
+  ],
+  "secret": "primex-antmedia-test-secret",
+  "exp": 1760000060,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAwMDAwNjB9.BElL9y026U0axu41tMbzFHdO_6wDbyw-9qKq5UjuAbw"
+}

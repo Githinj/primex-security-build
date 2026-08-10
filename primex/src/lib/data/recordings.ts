@@ -7,12 +7,19 @@ export async function getRecordings(
   to: string
 ): Promise<Recording[]> {
   const supabase = await createServerSupabaseClient()
+  // Overlap, not containment (SEC-191). Filtering on `started_at BETWEEN from AND
+  // to` drops a recording that began before the window and is still running
+  // inside it — the long recording covering "now" is exactly the one a scrubber
+  // needs. The timeline re-filters client-side for overlap, logic that could
+  // never fire because the row it would match was already excluded here.
+  //
+  // `ended_at IS NULL` means still recording, so it extends to now by definition.
   const { data, error } = await supabase
     .from('recordings')
     .select('*')
     .eq('camera_id', cameraId)
-    .gte('started_at', from)
     .lte('started_at', to)
+    .or(`ended_at.is.null,ended_at.gte.${from}`)
     .eq('status', 'complete')
     .order('started_at', { ascending: true })
   if (error) throw error

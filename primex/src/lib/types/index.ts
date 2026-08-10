@@ -136,6 +136,19 @@ export interface StreamToken {
   webrtcUrl: string
   hlsUrl: string
   expiresAt: number
+  /**
+   * ICE servers for the WebRTC peer connection (SEC-184). Travels with the token
+   * because TURN credentials are minted per request and expire — see
+   * `lib/streaming/ice-servers.ts` for why they are not client-side config.
+   * Empty/absent leaves the adaptor on its own defaults.
+   */
+  iceServers?: IceServer[]
+}
+
+export interface IceServer {
+  urls: string[]
+  username?: string
+  credential?: string
 }
 
 export interface StreamEvent {
