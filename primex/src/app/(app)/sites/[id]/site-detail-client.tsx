@@ -97,7 +97,7 @@ export function SiteDetailClient({
       />
 
       {/* Mini stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Risk */}
         <Card className="flex flex-col gap-2">
           <span className="text-[11px] text-ink-3 font-semibold tracking-widest uppercase font-sans">

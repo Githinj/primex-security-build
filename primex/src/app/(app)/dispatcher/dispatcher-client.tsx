@@ -126,7 +126,7 @@ export function DispatcherClient({
       </nav>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 overflow-auto px-4 sm:px-6 py-6">
+      <div className="flex-1 min-w-0 overflow-auto px-4 sm:px-9 py-6 sm:py-8">
         {section === 'queue' && (
           <DispatcherQueue
             alerts={alerts}

@@ -55,7 +55,7 @@ export function ClientIncidents({ incidents }: ClientIncidentsProps) {
   ])
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1100px]">
+    <div className="flex flex-col gap-6 max-w-[1200px]">
       <PageTitle
         title="Incident log"
         sub={`${incidents.length} incident${incidents.length !== 1 ? 's' : ''} on record`}

@@ -47,7 +47,7 @@ export function CamerasClient({ cameras, total, page, pageSize, sites, companies
         />
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <StatCard label="Online" value={String(online)} icon={Wifi} accent="text-p-green" />
           <StatCard label="Offline" value={String(offline)} icon={WifiOff} accent="text-p-red" />
           <StatCard label="Maintenance" value={String(maintenance)} icon={Wrench} accent="text-p-amber" />
