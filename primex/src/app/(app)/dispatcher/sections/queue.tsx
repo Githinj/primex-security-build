@@ -11,7 +11,7 @@ import {
   X,
   ArrowUpRight,
 } from 'lucide-react'
-import { Button, Pill, Label, Card, LiveDot, KV, SectionHeader } from '@/components/ui'
+import { Button, Pill, Label, Card, LiveDot, KV, SectionHeader, PageTitle } from '@/components/ui'
 import { Timeline } from '@/components/incidents/timeline'
 import { AssignGuardModal } from '@/components/dispatch/assign-guard-modal'
 import { CreateAlertModal } from '@/components/alerts/create-alert-modal'
@@ -208,9 +208,7 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
               </div>
 
               {/* Title */}
-              <h1 className="font-serif text-[32px] font-semibold text-ink leading-tight">
-                {selected.title}
-              </h1>
+              <PageTitle title={selected.title} />
 
               {/* Location */}
               <div className="flex items-center gap-4 text-sm font-sans">

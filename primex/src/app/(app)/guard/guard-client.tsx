@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Pill, Label, LiveDot, Breadcrumb } from '@/components/ui'
+import { Button, Pill, Label, LiveDot, Breadcrumb, PageTitle } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { updateIncidentStatus, uploadIncidentPhoto, addIncidentUpdate } from '@/lib/data/actions/incidents'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -201,13 +201,13 @@ function ListView({
       </div>
 
       {/* Greeting */}
-      <h1 className="font-serif text-[26px] font-bold text-ink leading-tight mb-6">
-        Hi {firstName}
-        <span className="font-serif text-[26px] italic font-normal text-ink-3">
-          {' '}
-          &middot; {incidents.length} assignment{incidents.length !== 1 ? 's' : ''}
-        </span>
-      </h1>
+      <div className="mb-6">
+        <PageTitle
+          size="compact"
+          title={`Hi ${firstName}`}
+          sub={`${incidents.length} assignment${incidents.length !== 1 ? 's' : ''}`}
+        />
+      </div>
 
       {/* Incident cards */}
       <div className="flex flex-col gap-3">
