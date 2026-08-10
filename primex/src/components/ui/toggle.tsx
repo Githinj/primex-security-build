@@ -3,16 +3,18 @@
 interface ToggleProps {
   on: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }
 
-export function Toggle({ on, onChange }: ToggleProps) {
+export function Toggle({ on, onChange, disabled = false }: ToggleProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       onClick={() => onChange(!on)}
-      className={`relative inline-flex w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p-blue ${
+      disabled={disabled}
+      className={`relative inline-flex w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p-blue ${
         on ? "bg-p-blue" : "bg-surface border border-border-strong"
       }`}
     >

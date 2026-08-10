@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { Card, KV, Button, Label, Pill, Breadcrumb } from "@/components/ui";
+import { Card, KV, Button, Label, Pill, Breadcrumb, Toggle } from "@/components/ui";
 import { CameraPlayer } from "@/components/streaming/camera-player";
 import { RecordingTimeline } from "@/components/streaming/recording-timeline";
 import { RecordingPlayer } from "@/components/streaming/recording-player";
@@ -122,12 +122,10 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-ink font-sans">Status</span>
-              <button
-                type="button"
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                  aiConfig?.enabled ? 'bg-p-blue' : 'bg-p-gray/30'
-                }`}
-                onClick={() => startTransition(async () => {
+              <Toggle
+                on={aiConfig?.enabled ?? false}
+                disabled={isPending}
+                onChange={() => startTransition(async () => {
                   try {
                     await toggleCameraAi(camera.id, !(aiConfig?.enabled ?? false));
                     router.refresh();
@@ -135,14 +133,7 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
                     console.error(err);
                   }
                 })}
-                disabled={isPending}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                    aiConfig?.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              />
             </div>
             <KV k="Zones configured" v={String(aiConfig?.zones?.length ?? 0)} />
             {aiConfig?.zones && aiConfig.zones.length > 0 && (

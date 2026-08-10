@@ -37,7 +37,7 @@ export function AppShell({ children, navCounts }: AppShellProps) {
       >
         {/* Backdrop */}
         <div
-          className="absolute inset-0 bg-black/40"
+          className="absolute inset-0 bg-navy/50"
           onClick={() => setSidebarOpen(false)}
         />
         {/* Sidebar panel */}

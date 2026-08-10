@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Wifi, WifiOff, Wrench, Circle, Plus, Eye, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PageTitle, StatCard, ActionMenu, Pagination } from "@/components/ui";
+import { PageTitle, StatCard, ActionMenu, Pagination, Button } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
 import { RemoveCameraModal } from "@/components/cameras/remove-camera-modal";
@@ -40,14 +40,9 @@ export function CamerasClient({ cameras, total, page, pageSize, sites, companies
           title="Cameras & devices"
           sub={`${total} cameras across all company sites. Click a camera to view live stream.`}
           actions={
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg font-medium font-sans transition-colors duration-150 cursor-pointer bg-p-blue text-white hover:bg-p-blue-hover active:bg-p-blue-hover px-4 py-2 text-sm"
-            >
-              <Plus size={15} strokeWidth={2} />
+            <Button variant="primary" icon={Plus} onClick={() => setModalOpen(true)}>
               Add camera
-            </button>
+            </Button>
           }
         />
 
