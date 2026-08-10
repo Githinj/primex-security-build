@@ -10,7 +10,7 @@ import {
   Download,
   CheckCircle2,
 } from 'lucide-react'
-import { PageTitle, Card, StatCard, Button, KV, getToneClasses } from '@/components/ui'
+import { PageTitle, Card, StatCard, Button, KV, getToneClasses, SectionHeader } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { DISPATCH_PHONE_DISPLAY, DISPATCH_PHONE_TEL } from '@/lib/support'
 import { generateReportPdf } from '@/lib/data/actions/generate-report-pdf'
@@ -210,9 +210,9 @@ export function ClientHome({ siteId, cameras, alerts, incidents, reports }: Clie
       <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6">
         {/* Left: Recent events */}
         <Card>
-          <h3 className="font-serif text-lg font-semibold text-ink mb-4">
-            What happened recently
-          </h3>
+          <div className="mb-4">
+            <SectionHeader title="What happened recently" />
+          </div>
           <div className="flex flex-col gap-4">
             {displayEvents.length === 0 && (
               <p className="text-sm text-ink-3 font-sans py-4">
@@ -254,9 +254,9 @@ export function ClientHome({ siteId, cameras, alerts, incidents, reports }: Clie
         <div className="flex flex-col gap-4">
           {/* Need help card */}
           <Card>
-            <h3 className="font-serif text-lg font-semibold text-ink mb-3">
-              Need help?
-            </h3>
+            <div className="mb-3">
+              <SectionHeader title="Need help?" />
+            </div>
             <p className="text-sm text-ink-3 font-sans mb-4">
               Our dispatch team is available around the clock at{' '}
               <span className="text-ink font-medium whitespace-nowrap">
@@ -281,9 +281,9 @@ export function ClientHome({ siteId, cameras, alerts, incidents, reports }: Clie
 
           {/* This month card */}
           <Card>
-            <h3 className="font-serif text-lg font-semibold text-ink mb-3">
-              This month
-            </h3>
+            <div className="mb-3">
+              <SectionHeader title="This month" />
+            </div>
             <div className="flex flex-col gap-2.5">
               <KV k="Alerts" v={monthlyAlerts} />
               <KV k="Incidents" v={monthlyIncidents} />

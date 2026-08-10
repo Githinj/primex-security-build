@@ -16,6 +16,7 @@ import {
   Pill,
   DataTable,
   Button,
+  SectionHeader,
 } from "@/components/ui";
 import { generateReportPdf } from "@/lib/data/actions/generate-report-pdf";
 import { GenerateReportModal } from "@/components/reports/generate-report-modal";
@@ -180,15 +181,8 @@ export function CompanyReports({ company, reports, incidents }: CompanyReportsPr
 
       {/* Reports table */}
       <Card padding="p-0">
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-border">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="font-serif text-xl font-semibold text-ink">
-              Recent reports
-            </h2>
-            <p className="text-ink-3 text-xs font-sans">
-              Sorted by date
-            </p>
-          </div>
+        <div className="px-5 py-4 border-b border-border">
+          <SectionHeader title="Recent reports" sub="Sorted by date" />
         </div>
         <DataTable
           columns={["Report", "Type", "Incidents", "Date", "Size", ""]}

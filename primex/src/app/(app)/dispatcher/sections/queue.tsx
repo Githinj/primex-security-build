@@ -11,7 +11,7 @@ import {
   X,
   ArrowUpRight,
 } from 'lucide-react'
-import { Button, Pill, Label, Card, LiveDot, KV } from '@/components/ui'
+import { Button, Pill, Label, Card, LiveDot, KV, SectionHeader } from '@/components/ui'
 import { Timeline } from '@/components/incidents/timeline'
 import { AssignGuardModal } from '@/components/dispatch/assign-guard-modal'
 import { CreateAlertModal } from '@/components/alerts/create-alert-modal'
@@ -91,20 +91,22 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
         <div className="border-r border-border bg-bg flex flex-col h-full overflow-hidden">
           {/* Header */}
           <div className="p-5 pb-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <Label>Live queue</Label>
-                <h2 className="font-serif text-xl font-semibold text-ink">
+            <SectionHeader
+              eyebrow="Live queue"
+              title={
+                <>
                   Alerts{' '}
                   <span className="text-ink-3 font-sans text-sm font-normal">
                     ({filtered.length})
                   </span>
-                </h2>
-              </div>
-              <Button variant="primary" size="sm" icon={Bell} onClick={() => setCreateAlertOpen(true)}>
-                Create alert
-              </Button>
-            </div>
+                </>
+              }
+              actions={
+                <Button variant="primary" size="sm" icon={Bell} onClick={() => setCreateAlertOpen(true)}>
+                  Create alert
+                </Button>
+              }
+            />
 
             {/* Filter pills */}
             <div className="flex gap-1.5 mt-1">

@@ -7,7 +7,7 @@ import {
   AlertTriangle,
   Clock,
 } from "lucide-react";
-import { PageTitle, StatCard, Card, Pill, DataTable } from "@/components/ui";
+import { PageTitle, StatCard, Card, Pill, DataTable, SectionHeader } from "@/components/ui";
 import { severityTone, incidentTone } from "@/lib/utils";
 import type { Company, Site, Camera as CameraType, Alert, Incident } from "@/lib/types";
 
@@ -152,13 +152,11 @@ export function CompanyDashboard({
       <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-5">
         {/* Recent incidents */}
         <Card padding="p-0">
-          <div className="flex flex-col gap-0.5 px-6 pt-5 pb-0">
-            <h2 className="font-serif text-[20px] font-bold text-ink">
-              Recent incidents
-            </h2>
-            <p className="text-[12.5px] text-ink-3">
-              Last {recentIncidents.length} incidents for {company.name}
-            </p>
+          <div className="px-6 pt-5 pb-0">
+            <SectionHeader
+              title="Recent incidents"
+              sub={`Last ${recentIncidents.length} incidents for ${company.name}`}
+            />
           </div>
           <div className="pt-2">
             <DataTable
@@ -170,11 +168,8 @@ export function CompanyDashboard({
 
         {/* Response time card */}
         <Card>
-          <div className="flex flex-col gap-1 mb-6">
-            <h2 className="font-serif text-[20px] font-bold text-ink">
-              Avg response time
-            </h2>
-            <p className="text-[12.5px] text-ink-3">All time</p>
+          <div className="mb-6">
+            <SectionHeader title="Avg response time" sub="All time" />
           </div>
 
           <div className="flex items-baseline gap-3 mb-6">

@@ -9,6 +9,7 @@ export { DataTable, type DataTablePagination } from "./data-table";
 export { Pagination } from "./pagination";
 export { Breadcrumb } from "./breadcrumb";
 export { PageTitle } from "./page-title";
+export { SectionHeader } from "./section-header";
 export { LiveDot } from "./live-dot";
 export { Label } from "./label";
 export { PhaseTag } from "./phase-tag";
