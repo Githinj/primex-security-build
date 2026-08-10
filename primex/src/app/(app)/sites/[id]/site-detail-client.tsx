@@ -2,11 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Settings, ArrowLeft, Camera } from "lucide-react";
-import { Card, Pill, Button, Label } from "@/components/ui";
+import { MapPin, Settings, ArrowLeft, Camera, Clock } from "lucide-react";
+import { Card, Pill, Button, Label, InfoBox } from "@/components/ui";
 import { CameraGrid } from "@/components/sites/camera-grid";
 import { EditSiteModal } from "@/components/sites/edit-site-modal";
-import type { Site, Company, Camera as CameraType, Alert, Incident, SiteRisk } from "@/lib/types";
+import { BusinessHoursModal } from "@/components/sites/business-hours-modal";
+import { BUSINESS_DAYS, DAY_SHORT } from "@/lib/business-hours";
+import type {
+  Site,
+  Company,
+  Camera as CameraType,
+  Alert,
+  Incident,
+  SiteRisk,
+  SiteBusinessHours,
+} from "@/lib/types";
 
 function riskTone(risk: SiteRisk): "red" | "amber" | "green" {
   switch (risk) {
@@ -25,6 +35,7 @@ interface SiteDetailClientProps {
   cameras: CameraType[];
   alerts: Alert[];
   incidents: Incident[];
+  businessHours: SiteBusinessHours | null;
 }
 
 export function SiteDetailClient({
@@ -33,9 +44,11 @@ export function SiteDetailClient({
   cameras,
   alerts,
   incidents,
+  businessHours,
 }: SiteDetailClientProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
 
   const openAlerts = alerts.filter(
     (a) => a.status !== "Closed"
@@ -83,6 +96,12 @@ export function SiteDetailClient({
       </div>
 
       <EditSiteModal open={editOpen} onClose={() => setEditOpen(false)} site={site} />
+      <BusinessHoursModal
+        open={hoursOpen}
+        onClose={() => setHoursOpen(false)}
+        siteId={site.id}
+        businessHours={businessHours}
+      />
 
       {/* Mini stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -136,6 +155,48 @@ export function SiteDetailClient({
             {openIncidents}
           </p>
         </Card>
+      </div>
+
+      {/* Business hours — drives AI after-hours detection */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Clock size={15} strokeWidth={2} className="text-ink-3" />
+            <Label>Business hours</Label>
+          </div>
+          <Button variant="secondary" onClick={() => setHoursOpen(true)}>
+            {businessHours ? "Edit hours" : "Set hours"}
+          </Button>
+        </div>
+
+        {businessHours ? (
+          <Card className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-x-7 gap-y-2">
+              {BUSINESS_DAYS.map((day) => {
+                const entry = businessHours.hours?.[day];
+                return (
+                  <div key={day} className="flex items-baseline gap-2 font-sans">
+                    <span className="text-[11px] text-ink-3 font-semibold uppercase tracking-wider w-7">
+                      {DAY_SHORT[day]}
+                    </span>
+                    <span className={`text-sm ${entry ? "text-ink" : "text-ink-4"}`}>
+                      {entry ? `${entry.open}–${entry.close}` : "Closed"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <span className="text-xs text-ink-4 font-sans">
+              {businessHours.timezone} — anything detected outside these hours raises an
+              after-hours alert.
+            </span>
+          </Card>
+        ) : (
+          <InfoBox tone="amber">
+            No business hours set. After-hours alerts can&apos;t fire for this site until
+            they are — AI detection has no way to tell when the site should be empty.
+          </InfoBox>
+        )}
       </div>
 
       {/* Cameras section */}
