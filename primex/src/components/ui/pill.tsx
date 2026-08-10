@@ -13,7 +13,7 @@ const toneClasses: Record<Tone, { fg: string; bg: string }> = {
 };
 
 export function getToneClasses(tone: Tone): { fg: string; bg: string } {
-  return toneClasses[tone];
+  return toneClasses[tone] ?? toneClasses.gray;
 }
 
 const sizeClasses: Record<Size, string> = {
