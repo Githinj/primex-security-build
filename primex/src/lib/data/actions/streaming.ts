@@ -315,6 +315,13 @@ export async function createBroadcast(
 // and republishes it under `streamId` as WebRTC/HLS — the pull counterpart to
 // createBroadcast()'s RTMP push flow. Playback (getStreamToken) and the webhook are
 // keyed on stream_id, so both work unchanged once the source is republishing.
+//
+// The RTSP transport (TCP vs UDP) is deliberately absent from the payload below:
+// AMS reads it from the *application* setting `rtspPullTransportType` in
+// StreamFetcher and hands it to ffmpeg as `rtsp_transport`, so there is no
+// per-broadcast field to set. Adding one here would be silently ignored. It has to
+// be `tcp` on the server for the site gateways' MSS clamp to do anything — see
+// docs/go-live-checklist.md (SEC-201).
 export async function createStreamSource(
   cameraId: string,
   cameraName: string,

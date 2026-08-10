@@ -50,13 +50,13 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 | `ANTMEDIA_WS_URL` | ⚙️ | WebRTC signalling ws URL |
 | `ANTMEDIA_WEBHOOK_SECRET` | 🔑⚙️ | Shared secret for `/api/webhooks/antmedia` |
 | `ANTMEDIA_API_KEY` | 🔑💤 | Enterprise only — HS256 **signing secret** (AMS `jwtSecretKey`), not a token; app signs a 60s JWT per REST call. Same value in `ai_worker` env (per-stream play/publish tokens + REST snapshot) |
-| `ANTMEDIA_RTMP_URL` | ⚙️ | Ingest endpoint cameras publish into, e.g. `rtmps://host:443/WebRTCAppEE`. Unset derives plaintext `rtmp://` from `ANTMEDIA_URL` — **set an `rtmps://` value in prod** or the publish token and video cross the network in the clear (SEC-178) |
+| `ANTMEDIA_RTMP_URL` | ⚙️ | Ingest endpoint cameras publish into. Unset derives plaintext `rtmp://` from `ANTMEDIA_URL` — **set an `rtmps://` value in prod** or the publish token and video cross the network in the clear (SEC-178). ⚠️ **Do not assume port 443.** Probe the server first: on the current prod box (2026-08-10) 443 is a web listener answering `HTTP/1.1 400 Bad Request`, and only plaintext RTMP on **1935** works. An unlistened `rtmps://` port silently breaks ingest (SEC-194) |
 | `ANTMEDIA_PUBLISH_TOKEN_TTL_DAYS` | 💤 | Publish-token lifetime, default 365 |
 
 ### Recordings (DigitalOcean Spaces)
 | Var | | Notes |
 |-----|---|-------|
-| `DO_SPACES_RECORDINGS_BUCKET` | ⚙️ | Bucket name |
+| `DO_SPACES_RECORDINGS_BUCKET` | ⚙️ | Bucket name. ⚠️ Confirm in the DO console — `primex-recordings`, used throughout this repo's specs, **does not exist in any region** (probed 2026-08-10). A bucket named `primex` exists in `sgp1`. SEC-194 |
 | `DO_SPACES_ENDPOINT` | ⚙️ | e.g. `https://sgp1.digitaloceanspaces.com` |
 | `DO_SPACES_REGION` | 💤 | Presign region (default `sgp1`) |
 | `DO_SPACES_KEY` / `DO_SPACES_SECRET` | 🔑 | Presigns private-bucket reads. Optional for recordings (only if that bucket is private) but **required** for AI detection frames — that bucket is private by design, so without these every alert snapshot 403s |
@@ -109,10 +109,28 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       learns a stream ID can publish into a monitored camera (SEC-178). With
       `ANTMEDIA_API_KEY` set, `createBroadcast()` fails closed rather than issuing
       an unsecured ingest URL, so this must be working before provisioning.
-- [ ] Set `ANTMEDIA_RTMP_URL` to an **`rtmps://`** endpoint and confirm the port is
-      open. The derived fallback is plaintext RTMP.
+- [ ] **Configure an RTMPS listener on AMS** — as of 2026-08-10 there isn't one.
+      Probed: `:1935` completes a real RTMP handshake, `:443` returns
+      `HTTP/1.1 400 Bad Request` over TLS (a web listener). Until this is done,
+      ingest is plaintext and the publish token crosses the wire in the clear.
+- [ ] Then set `ANTMEDIA_RTMP_URL` to that **`rtmps://`** endpoint and re-probe.
+      "Port is open" is NOT sufficient — a TCP connect succeeds against the web
+      listener too. Confirm the first response byte of an RTMP handshake is `0x03`.
 - [ ] Re-issue ingest URLs for any camera provisioned before this change — the old
       URLs carry no token, and the token is shown once at creation.
+- [ ] **Set the AMS app setting `rtspPullTransportType` to `tcp`** for every app that
+      pulls RTSP (SEC-201). This is an **application** setting — AMS reads it in
+      `StreamFetcher` and passes it to ffmpeg as `rtsp_transport`, so it cannot be set
+      per-broadcast and `createStreamSource()` has no field for it. Change it in the
+      AMS dashboard (App → Settings) or via the management REST API; the default
+      (`prefer_tcp`) can still negotiate UDP.
+      **Why it matters:** the site-gateway MTU fix relies on an MSS clamp
+      (`--clamp-mss-to-pmtu`), and a clamp only applies to TCP. Left on the default,
+      the RTSP pull may negotiate UDP, the clamp does nothing, and oversized packets
+      keep vanishing into the MTU black hole (SEC-197 / SEC-198).
+- [ ] While in there, review `rtspTimeoutDurationMs` — it feeds ffmpeg's RTSP
+      `timeout`, so it decides how long a lossy tunnel may stall before AMS gives up
+      and the stream flaps.
 - [ ] Deploy the Python `ai_worker` separately — **see `docs/ai-worker-deploy.md`**
       for the full runbook (Docker, sizing, first-light validation, troubleshooting).
       Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`
