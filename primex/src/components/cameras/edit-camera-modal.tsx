@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Copy, Check, Radio, Video, Unplug } from "lucide-react";
 import { updateCamera } from "@/lib/data/actions/cameras";
-import { createBroadcast, createStreamSource, stopStreamSource } from "@/lib/data/actions/streaming";
+import {
+  createBroadcast,
+  createStreamSource,
+  getCameraStreamConfig,
+  stopStreamSource,
+} from "@/lib/data/actions/streaming";
+import { useProfile } from "@/components/providers/profile-provider";
 import {
   Modal,
   ModalHeader,
@@ -33,19 +39,26 @@ interface FormState {
 }
 
 export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps) {
+  const profile = useProfile();
+  // Only super_admin may assign a stream ID or touch ingest — enforced in
+  // createCamera/updateCamera and by migration 018's unique index (SEC-176).
+  // Hiding the section keeps managers from filling in a field that would throw.
+  const canManageStreaming = profile?.role === "super_admin";
+
   const [form, setForm] = useState<FormState>({
     name: camera?.name ?? "",
     location: camera?.location ?? "",
     status: camera?.status ?? "",
     stream_id: camera?.stream_id ?? "",
-    source_url: camera?.source_url ?? "",
+    source_url: "",
   });
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [ingestUrl, setIngestUrl] = useState<string | null>(camera?.stream_url ?? null);
+  const [ingestUrl, setIngestUrl] = useState<string | null>(null);
+  const [ingestSecured, setIngestSecured] = useState(true);
   const [copied, setCopied] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
-  const [sourceConnected, setSourceConnected] = useState<boolean>(!!camera?.source_url);
+  const [sourceConnected, setSourceConnected] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
 
   // Reset form when camera changes
@@ -55,11 +68,30 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
       location: camera.location,
       status: camera.status,
       stream_id: camera.stream_id ?? "",
-      source_url: camera.source_url ?? "",
+      source_url: "",
     });
-    setIngestUrl(camera.stream_url ?? null);
-    setSourceConnected(!!camera.source_url);
   }
+
+  // `source_url` (RTSP credentials) and `stream_url` are not on the Camera type —
+  // they never travel in the page payload (SEC-177). Fetch them on open, through
+  // the super_admin-gated action.
+  const cameraId = camera?.id;
+  useEffect(() => {
+    if (!open || !cameraId || !canManageStreaming) return;
+    let active = true;
+    getCameraStreamConfig(cameraId)
+      .then((cfg) => {
+        if (!active || !cfg) return;
+        setForm((f) => ({ ...f, source_url: cfg.source_url ?? "" }));
+        setSourceConnected(Boolean(cfg.source_url));
+      })
+      .catch(() => {
+        /* the fields simply stay blank — provisioning still works */
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, cameraId, canManageStreaming]);
 
   function handleChange(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
@@ -76,7 +108,9 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
           name: form.name,
           location: form.location,
           status: form.status,
-          stream_id: form.stream_id || null,
+          // Omit the key entirely for non-super_admins — the server rejects the
+          // field rather than ignoring it (SEC-176).
+          ...(canManageStreaming ? { stream_id: form.stream_id || null } : {}),
         });
         setSuccess(true);
       } catch (err) {
@@ -93,8 +127,9 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
         const result = await createBroadcast(camera.id, form.name, form.stream_id.trim());
         if (result.success && result.ingestUrl) {
           setIngestUrl(result.ingestUrl);
+          setIngestSecured(result.secured ?? false);
         } else {
-          setBroadcastError("Failed to create broadcast in Ant Media.");
+          setBroadcastError(result.error ?? "Failed to create broadcast in Ant Media.");
         }
       } catch (err) {
         setBroadcastError("Failed to create broadcast.");
@@ -151,6 +186,7 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
     setForm({ name: "", location: "", status: "", stream_id: "", source_url: "" });
     setSuccess(false);
     setIngestUrl(null);
+    setIngestSecured(true);
     setCopied(false);
     setBroadcastError(null);
     setSourceConnected(false);
@@ -214,14 +250,15 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
                 />
               </Field>
 
-              {/* Streaming section */}
+              {/* Streaming section — super_admin only (SEC-176) */}
+              {canManageStreaming && (
               <div className="border-t border-border pt-4 flex flex-col gap-4">
                 <p className="text-xs text-ink-3 font-semibold uppercase tracking-wider font-sans">
                   Streaming
                 </p>
 
                 {/* Stream ID */}
-                <Field label="Stream ID" hint="Ant Media broadcast identifier. Enter manually or auto-create below.">
+                <Field label="Stream ID" hint="Ant Media broadcast identifier. Enter manually or auto-create below. Must be unique across all cameras.">
                   <TextInput
                     value={form.stream_id}
                     onChange={handleChange("stream_id")}
@@ -266,9 +303,19 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
                         )}
                       </button>
                     </div>
-                    <InfoBox tone="blue">
-                      Point your camera&apos;s RTSP/RTMP output to this URL. The stream will appear in the live player once connected.
-                    </InfoBox>
+                    {ingestSecured ? (
+                      <InfoBox tone="blue">
+                        Point your camera&apos;s RTMP output to this URL. It contains a
+                        publish token and is shown once — copy it now. Re-create the
+                        broadcast to issue a new one.
+                      </InfoBox>
+                    ) : (
+                      <InfoBox tone="amber">
+                        This ingest URL has no publish token, so anyone who learns the
+                        stream ID can publish into this camera. Token control needs Ant
+                        Media Enterprise with <code>ANTMEDIA_API_KEY</code> set.
+                      </InfoBox>
+                    )}
                   </div>
                 )}
 
@@ -328,6 +375,7 @@ export function EditCameraModal({ open, onClose, camera }: EditCameraModalProps)
                   </InfoBox>
                 )}
               </div>
+              )}
             </div>
           </ModalBody>
 

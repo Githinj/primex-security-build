@@ -2,14 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+// ArrowLeft is deliberately absent: this branch replaced the hand-rolled back
+// link with the Breadcrumb primitive, so nothing references it any more.
+import { Trash2, SquareDashedMousePointer } from "lucide-react";
 import { Card, KV, Button, Label, Pill, Breadcrumb, Toggle } from "@/components/ui";
+import { ZoneEditorModal } from "@/components/cameras/zone-editor-modal";
 import { CameraPlayer } from "@/components/streaming/camera-player";
 import { RecordingTimeline } from "@/components/streaming/recording-timeline";
 import { RecordingPlayer } from "@/components/streaming/recording-player";
 import { cameraTone } from "@/lib/utils";
 import { deleteCamera } from "@/lib/data/actions/cameras";
 import { toggleCameraAi } from "@/lib/data/actions/camera-ai-config";
+import { setCameraRecording } from "@/lib/data/actions/streaming";
 import type { Camera, Site, CameraAiConfig, Recording } from "@/lib/types";
 
 interface CameraDetailClientProps {
@@ -36,6 +40,10 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
   const [mode, setMode] = useState<'live' | 'playback'>('live');
   const [activeRecording, setActiveRecording] = useState<Recording | null>(null);
   const [seekTimestamp, setSeekTimestamp] = useState<Date | null>(null);
+  const [zonesOpen, setZonesOpen] = useState(false);
+  // Surfaced when the DB write lands but Ant Media refuses — the two can diverge,
+  // and pretending otherwise is how recording_enabled became decorative.
+  const [recordingNote, setRecordingNote] = useState<string | null>(null);
 
   const tone = cameraTone(camera.status);
 
@@ -104,6 +112,45 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
             <KV k="Last checked" v={formatTime(camera.last_checked)} />
             {camera.stream_id && <KV k="Stream ID" v={camera.stream_id} />}
             <KV
+              k="Recording"
+              v={
+                <div className="flex items-center gap-2">
+                  <Toggle
+                    on={camera.recording_enabled}
+                    disabled={isPending}
+                    label="Recording"
+                    onChange={() => startTransition(async () => {
+                      try {
+                        // The column existed since migration 003 but nothing read
+                        // or wrote it — this is the only control over whether Ant
+                        // Media records the camera at all (SEC-189).
+                        const result = await setCameraRecording(
+                          camera.id,
+                          !camera.recording_enabled,
+                        );
+                        if (result.success && !result.appliedToServer && camera.stream_id) {
+                          setRecordingNote(
+                            "Saved, but Ant Media did not accept the change — it will be re-applied next time the camera is connected.",
+                          );
+                        } else {
+                          setRecordingNote(null);
+                        }
+                        router.refresh();
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    })}
+                  />
+                  {!camera.stream_id && (
+                    <span className="text-xs text-ink-4">Applies when connected</span>
+                  )}
+                </div>
+              }
+            />
+            {recordingNote && (
+              <p className="text-xs text-p-amber">{recordingNote}</p>
+            )}
+            <KV
               k="Warning"
               v={
                 camera.warning ? (
@@ -145,6 +192,23 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
                 ))}
               </div>
             )}
+
+            <Button
+              variant="secondary"
+              icon={SquareDashedMousePointer}
+              onClick={() => setZonesOpen(true)}
+              className="w-fit"
+            >
+              {aiConfig?.zones?.length ? "Edit zones" : "Draw zones"}
+            </Button>
+
+            {!aiConfig?.zones?.length && (
+              <p className="text-xs text-ink-4 font-sans">
+                Without zones this camera can still detect loitering and after-hours
+                motion, but not concealment or vehicles in restricted areas.
+              </p>
+            )}
+
             {!aiConfig && (
               <p className="text-xs text-ink-4 font-sans">
                 No AI config. Detection will be enabled when the camera is assigned a stream.
@@ -176,6 +240,14 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
           </div>
         </Card>
       </div>
+
+      <ZoneEditorModal
+        open={zonesOpen}
+        onClose={() => setZonesOpen(false)}
+        cameraId={camera.id}
+        cameraName={camera.name}
+        zones={aiConfig?.zones ?? []}
+      />
     </div>
   );
 }

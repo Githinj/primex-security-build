@@ -1,15 +1,12 @@
 """Per-camera async task loop: poll -> detect -> track -> alert."""
 
 import asyncio
-import base64
-import hmac
-import hashlib
-import json
 import logging
 import time
 
 import httpx
 
+from antmedia_jwt import REST_JWT_TTL_S, rest_jwt_expiry, sign_rest_jwt
 from behavior_tracker import BehaviorTracker, Detection
 from cooldown import CooldownRegistry
 from detector import Detector
@@ -17,8 +14,6 @@ from event_poster import EventPoster
 from stats import WorkerStats
 
 logger = logging.getLogger(__name__)
-
-REST_JWT_TTL_S = 60  # short-lived: a fresh token is signed per request
 
 
 class CameraTask:
@@ -141,27 +136,10 @@ class CameraTask:
     def _sign_rest_jwt(self) -> str:
         """Mint the per-request JWT Ant Media Enterprise's REST filter expects.
 
-        ANTMEDIA_API_KEY is the shared HS256 signing secret (AMS `jwtSecretKey`),
-        not a token — sending it verbatim gets a 403 "Invalid App JWT Token".
-        Must stay in step with signAntmediaRestJwt() in
-        src/lib/data/actions/streaming.ts: same claims, raw value, no "Bearer ".
+        The format lives in antmedia_jwt.py, which is pinned byte-for-byte
+        against the TypeScript signer by a shared golden fixture (SEC-188).
         """
-
-        def b64url(raw: bytes) -> str:
-            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-        # Compact separators so this serializes byte-identically to the TS side's
-        # JSON.stringify — keeps the two runtimes emitting the same token.
-        def compact(obj: dict) -> bytes:
-            return json.dumps(obj, separators=(",", ":")).encode()
-
-        header = b64url(compact({"alg": "HS256", "typ": "JWT"}))
-        payload = b64url(compact({"exp": int(time.time()) + REST_JWT_TTL_S}))
-        signing_input = f"{header}.{payload}".encode("ascii")
-        signature = b64url(
-            hmac.new(self.antmedia_secret.encode(), signing_input, hashlib.sha256).digest()
-        )
-        return f"{header}.{payload}.{signature}"
+        return sign_rest_jwt(self.antmedia_secret, rest_jwt_expiry(ttl_s=REST_JWT_TTL_S))
 
     async def _fetch_snapshot_rest(self) -> bytes | None:
         url = f"{self.antmedia_url}/{self.antmedia_app}/rest/v2/broadcasts/{self.stream_id}/snapshot"

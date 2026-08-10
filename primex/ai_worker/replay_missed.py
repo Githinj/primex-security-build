@@ -16,7 +16,11 @@ load_dotenv()
 
 def main():
     parser = argparse.ArgumentParser(description="Replay missed AI detection events")
-    parser.add_argument("--file", default="missed_events.jsonl", help="Path to missed events JSONL file")
+    parser.add_argument(
+        "--file",
+        default=os.environ.get("MISSED_EVENTS_FILE", "missed_events.jsonl"),
+        help="Path to missed events JSONL file (default: $MISSED_EVENTS_FILE)",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.file):

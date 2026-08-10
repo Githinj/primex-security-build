@@ -1,0 +1,23 @@
+services:
+  ai-worker:
+    build: .
+    image: primex-ai-worker:latest
+    container_name: primex-ai-worker
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Loopback only — /health exposes camera IDs and should not be public.
+      # Reach it over the droplet's SSH tunnel, or put it behind the firewall.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Keeps failed events across container recreation so replay_missed.py
+      # can still recover them.
+      - missed-events:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  missed-events:
