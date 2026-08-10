@@ -101,6 +101,19 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 ### Recordings retention (SEC-94)
 - [ ] Set a **30-day object lifecycle expiry** on the DO Spaces recordings bucket
       (pairs with the DB retention cron from SEC-91).
+- [ ] ⚠️ **Reconcile that window against the evidentiary hold** (SEC-190). The DB
+      now keeps incident-linked footage for up to a year (`evidence_retention_days`
+      in migration 020) and honours `recordings.hold_until` for footage requested
+      by a client, insurer or police. The bucket knows nothing about either.
+      If the lifecycle expires objects at 30 days, a held row survives pointing at
+      a **404** — the row is evidence that footage existed, not the footage.
+      Pick one before go-live:
+      - set the bucket window to match `evidence_retention_days` (simple, costs
+        storage), **or**
+      - copy held objects to a longer-retention prefix that the lifecycle rule
+        does not cover (cheaper, needs building — no code does this yet).
+      Deletions are logged to `recording_deletions`, so DB-side losses are
+      answerable; object-side losses are still not.
 
 ### Ant Media / AI worker
 - [ ] Point `ANTMEDIA_*` at the live server.
