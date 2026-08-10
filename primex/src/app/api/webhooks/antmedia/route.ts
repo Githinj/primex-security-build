@@ -4,6 +4,7 @@ import {
   AMS_HOOK,
   streamDropCounts,
   streamWebhookEffect,
+  vodRecordingRow,
 } from '@/lib/streaming/webhook-events'
 
 const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET!
@@ -80,42 +81,36 @@ export async function POST(req: NextRequest) {
   // vodReady carries a second write (the recordings row) plus its own
   // idempotency guard, so it runs before the shared effect is applied.
   if (action === AMS_HOOK.vodReady) {
-    const vodName = body.vodName as string ?? ''
-    const duration = body.duration as number ?? 0
-    const fileSize = body.fileSize as number ?? 0
-    const startTime = body.startTime as string ?? new Date().toISOString()
-    const endTime = body.endTime as string ?? new Date().toISOString()
+    const recording = vodRecordingRow(streamId, body, {
+      spacesEndpoint: DO_SPACES_ENDPOINT,
+      receivedAt: new Date().toISOString(),
+    })
 
-    // Use startTime (not Date.now()) in the fallback name so a redelivered
-    // webhook resolves to the same file_url and stays idempotent.
-    const fileUrl = vodName
-      ? `${DO_SPACES_ENDPOINT}/recordings/${vodName}`
-      : `${DO_SPACES_ENDPOINT}/recordings/${streamId}_${startTime}.mp4`
-
-    // Idempotency: Ant Media can redeliver vodReady. Without this guard a
-    // duplicate delivery inserts a second row and double-lists the recording.
-    const { data: existingRecording } = await supabase
+    // Idempotency: Ant Media redelivers vodReady, and a retry storm delivers it
+    // concurrently. The unique index on file_url (migration 019) arbitrates —
+    // ON CONFLICT DO NOTHING, and the returned rows tell us whether this
+    // delivery was the one that won (SEC-179). A select-then-insert could not:
+    // both racers passed the check and both inserted.
+    const { data: inserted, error } = await supabase
       .from('recordings')
+      .upsert({ camera_id: cameraId, ...recording }, {
+        onConflict: 'file_url',
+        ignoreDuplicates: true,
+      })
       .select('id')
-      .eq('file_url', fileUrl)
-      .maybeSingle()
+
+    if (error) {
+      // Retrying is the right move here: the recording exists on AMS and this is
+      // the only delivery that would ever have created its row.
+      console.error(`Failed to store recording for stream ${streamId}:`, error.message)
+      return NextResponse.json({ error: 'Failed to store recording' }, { status: 500 })
+    }
 
     // Returns before the effect is applied, so a redelivery adds neither a
     // recording row nor a second recording_saved event.
-    if (existingRecording) {
+    if (!inserted?.length) {
       return NextResponse.json({ ok: true, duplicate: true })
     }
-
-    await supabase.from('recordings').insert({
-      camera_id: cameraId,
-      stream_id: streamId,
-      file_url: fileUrl,
-      file_size: fileSize || null,
-      duration_s: duration ? Math.round(duration / 1000) : null,
-      started_at: startTime,
-      ended_at: endTime,
-      status: 'complete',
-    })
   }
 
   const cameraUpdate: Record<string, string> = {}

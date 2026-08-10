@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { AMS_HOOK, streamDropCounts, streamWebhookEffect } from './webhook-events'
+import {
+  AMS_HOOK,
+  streamDropCounts,
+  streamWebhookEffect,
+  vodRecordingRow,
+} from './webhook-events'
 
 describe('streamWebhookEffect', () => {
   it('brings a camera Online and stamps last_frame_at when a stream starts', () => {
@@ -152,5 +157,97 @@ describe('streamDropCounts', () => {
     const counts = streamDropCounts({ dropPacketCountInIngestion: value })
     expect(counts.ingestion).toBe(0)
     expect(counts.degraded).toBe(false)
+  })
+})
+
+describe('vodRecordingRow', () => {
+  const SPACES = 'https://primex.sgp1.digitaloceanspaces.com'
+  const options = { spacesEndpoint: SPACES, receivedAt: '2026-08-10T12:00:00.000Z' }
+
+  const fullPayload = {
+    action: AMS_HOOK.vodReady,
+    streamId: 'cam-front-gate',
+    vodName: 'cam-front-gate_2026-08-10_09-00-00.mp4',
+    vodId: 'vod-77',
+    duration: 900_000,
+    fileSize: 48_000_000,
+    startTime: '2026-08-10T09:00:00.000Z',
+    endTime: '2026-08-10T09:15:00.000Z',
+  }
+
+  it('maps a complete AMS payload onto the recordings row', () => {
+    expect(vodRecordingRow('cam-front-gate', fullPayload, options)).toEqual({
+      file_url: `${SPACES}/recordings/cam-front-gate_2026-08-10_09-00-00.mp4`,
+      stream_id: 'cam-front-gate',
+      file_size: 48_000_000,
+      // AMS counts milliseconds, the column holds seconds.
+      duration_s: 900,
+      started_at: '2026-08-10T09:00:00.000Z',
+      ended_at: '2026-08-10T09:15:00.000Z',
+      status: 'complete',
+    })
+  })
+
+  describe('idempotency key (SEC-179)', () => {
+    it('derives the same file_url from a redelivered hook', () => {
+      // The unique index in migration 019 only rejects the duplicate if both
+      // deliveries resolve to the same key. Different arrival times, same row.
+      const first = vodRecordingRow('cam-front-gate', fullPayload, options)
+      const second = vodRecordingRow('cam-front-gate', fullPayload, {
+        spacesEndpoint: SPACES,
+        receivedAt: '2026-08-10T12:04:31.000Z',
+      })
+      expect(second.file_url).toBe(first.file_url)
+    })
+
+    it('falls back to vodId, not arrival time, when vodName is missing', () => {
+      // Whether AMS sends vodName is still unverified (SEC-182). If it does not,
+      // the URL is a guess either way — but a guess built from vodId is one a
+      // retry storm reproduces, and one built from now() is not.
+      const row = vodRecordingRow(
+        'cam-front-gate',
+        { ...fullPayload, vodName: undefined },
+        options,
+      )
+      expect(row.file_url).toBe(`${SPACES}/recordings/cam-front-gate_vod-77.mp4`)
+    })
+
+    it('falls back to startTime when neither vodName nor vodId is present', () => {
+      const row = vodRecordingRow(
+        'cam-front-gate',
+        { ...fullPayload, vodName: undefined, vodId: undefined },
+        options,
+      )
+      expect(row.file_url).toBe(
+        `${SPACES}/recordings/cam-front-gate_2026-08-10T09:00:00.000Z.mp4`,
+      )
+    })
+
+    it.each([
+      ['empty strings', { vodName: '', vodId: '' }],
+      ['nulls', { vodName: null, vodId: null }],
+    ])('treats %s as absent rather than keying on them', (_label, blanks) => {
+      // `${''}` is a perfectly valid string to concatenate, so an empty vodName
+      // would otherwise key every recording on the same URL and collapse them
+      // all into one row.
+      const row = vodRecordingRow('cam-front-gate', { ...fullPayload, ...blanks }, options)
+      expect(row.file_url).toBe(
+        `${SPACES}/recordings/cam-front-gate_2026-08-10T09:00:00.000Z.mp4`,
+      )
+    })
+  })
+
+  it('leaves absent metadata null instead of storing a zero', () => {
+    // A zero-second, zero-byte recording reads as a real (broken) file; null
+    // reads as "AMS did not tell us", which is the truth.
+    const row = vodRecordingRow('cam-front-gate', { vodName: 'clip.mp4' }, options)
+    expect(row.file_size).toBeNull()
+    expect(row.duration_s).toBeNull()
+  })
+
+  it('times an undated recording at arrival rather than the epoch', () => {
+    const row = vodRecordingRow('cam-front-gate', { vodName: 'clip.mp4' }, options)
+    expect(row.started_at).toBe(options.receivedAt)
+    expect(row.ended_at).toBe(options.receivedAt)
   })
 })
