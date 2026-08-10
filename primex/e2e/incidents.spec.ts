@@ -23,7 +23,9 @@ test.describe('Incident Lifecycle', () => {
 
     // Open action menu and close
     await row.getByRole('button').last().click()
-    await page.getByRole('button', { name: 'Close' }).click()
+    // `exact` matters: the status filter chips include a "Closed" button, and a
+    // non-exact "Close" matches both.
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
 
     // Verify status changed — find the row by title, check it now shows Closed
     const updatedRow = page.getByRole('row').filter({ hasText: incidentTitle! })
