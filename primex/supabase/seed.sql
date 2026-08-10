@@ -146,6 +146,21 @@ INSERT INTO auth.users (
     '{"full_name":"Brett Collins","role":"client"}',
     'authenticated', 'authenticated',
     '', '', '', '', '', '', '', '', 0, false
+  ),
+  -- u10: Nadia Okonkwo - company_manager (Nexus Logistics)
+  -- A second manager on a *different* company to Claire. Tenant isolation is only
+  -- observable with two managers: one has to be able to look for the other's data
+  -- and come up empty.
+  (
+    '00000000-0000-0000-0000-00000000aa10',
+    '00000000-0000-0000-0000-000000000000',
+    'nadia@nexuslogistics.com.au',
+    crypt('testpass123', gen_salt('bf')),
+    now(), now(), now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Nadia Okonkwo","role":"company_manager"}',
+    'authenticated', 'authenticated',
+    '', '', '', '', '', '', '', '', 0, false
   );
 
 
@@ -181,7 +196,10 @@ INSERT INTO auth.identities (
    'email', '00000000-0000-0000-0000-00000000aa08', now(), now(), now()),
   ('00000000-0000-0000-0000-00000000aa09', '00000000-0000-0000-0000-00000000aa09',
    '{"sub":"00000000-0000-0000-0000-00000000aa09","email":"brett@nexuslogistics.com.au"}',
-   'email', '00000000-0000-0000-0000-00000000aa09', now(), now(), now());
+   'email', '00000000-0000-0000-0000-00000000aa09', now(), now(), now()),
+  ('00000000-0000-0000-0000-00000000aa10', '00000000-0000-0000-0000-00000000aa10',
+   '{"sub":"00000000-0000-0000-0000-00000000aa10","email":"nadia@nexuslogistics.com.au"}',
+   'email', '00000000-0000-0000-0000-00000000aa10', now(), now(), now());
 
 
 -- ===================  4. PROFILE UPDATES  ===================
@@ -256,6 +274,12 @@ UPDATE profiles SET
   last_active = '2025-06-10T11:00:00Z',
   status      = 'Inactive'
 WHERE id = '00000000-0000-0000-0000-00000000aa09'; -- Brett Collins (client, Nexus)
+
+UPDATE profiles SET
+  company_id  = '00000000-0000-0000-0000-000000000c02',
+  last_active = '2025-06-14T06:45:00Z',
+  status      = 'Active'
+WHERE id = '00000000-0000-0000-0000-00000000aa10'; -- Nadia Okonkwo (company_manager, Nexus)
 
 
 -- ===================  5. SITES  =============================
