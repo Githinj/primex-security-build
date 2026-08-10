@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Wifi, WifiOff, Wrench, Circle, Plus, Eye, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wifi, WifiOff, Wrench, Circle, Plus, Eye, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PageTitle, StatCard, ActionMenu } from "@/components/ui";
+import { PageTitle, StatCard, ActionMenu, Pagination } from "@/components/ui";
 import { CameraTile } from "@/components/sites/camera-tile";
 import { AddCameraModal } from "@/components/sites/add-camera-modal";
 import { RemoveCameraModal } from "@/components/cameras/remove-camera-modal";
@@ -26,8 +26,6 @@ export function CamerasClient({ cameras, total, page, pageSize, sites, companies
   const [modalOpen, setModalOpen] = useState(false);
   const [removeModal, setRemoveModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
   const [editModal, setEditModal] = useState<{ open: boolean; camera: Camera | null }>({ open: false, camera: null });
-
-  const totalPages = Math.ceil(total / pageSize);
 
   // Stats are approximate for the current page — total counts come from the full dataset count
   const online = cameras.filter((c) => c.status === "Online").length;
@@ -86,37 +84,8 @@ export function CamerasClient({ cameras, total, page, pageSize, sites, companies
         </div>
 
         {/* Pagination */}
-        {totalPages > 0 && (
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-3 font-sans tabular-nums">
-              {total === 0
-                ? "0 cameras"
-                : `${(page - 1) * pageSize + 1}\u2013${Math.min(page * pageSize, total)} of ${total}`}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft size={16} strokeWidth={2} />
-                </button>
-                <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight size={16} strokeWidth={2} />
-                </button>
-              </div>
-            )}
-          </div>
+        {total > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} itemLabel="cameras" />
         )}
       </div>
 

@@ -19,8 +19,6 @@ import {
   Bell,
   Zap,
   X,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import {
   PageTitle,
@@ -29,6 +27,7 @@ import {
   StatCard,
   SearchInput,
   getToneClasses,
+  Pagination,
 } from "@/components/ui";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { exportAuditLog } from "@/lib/data/actions/audit";
@@ -141,8 +140,6 @@ export function AuditClient({ activity, total, page, pageSize, auditStats }: Aud
   const [exporting, startExport] = useTransition();
   const { setPage } = usePagination({ defaultPageSize: pageSize });
 
-  const totalPages = Math.ceil(total / pageSize);
-
   // Apply client-side filters (search + time) on the current page of data
   const cutoff = getTimeFilterDate(timeFilter);
   const filtered = activity.filter((item) => matchesFilters(item, cutoff, search));
@@ -254,38 +251,9 @@ export function AuditClient({ activity, total, page, pageSize, auditStats }: Aud
         </div>
 
         {/* Pagination footer */}
-        {totalPages > 0 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-border">
-            <span className="text-xs text-ink-3 font-sans tabular-nums">
-              {total === 0
-                ? "0 results"
-                : `${(page - 1) * pageSize + 1}\u2013${Math.min(page * pageSize, total)} of ${total}`}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft size={16} strokeWidth={2} />
-                </button>
-                <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Next page"
-                >
-                  <ChevronRight size={16} strokeWidth={2} />
-                </button>
-              </div>
-            )}
+        {total > 0 && (
+          <div className="px-5 py-3 border-t border-border">
+            <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
           </div>
         )}
       </Card>
