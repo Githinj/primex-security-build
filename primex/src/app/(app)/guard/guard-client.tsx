@@ -230,7 +230,7 @@ function ListView({
               </div>
 
               {/* Title */}
-              <p className="font-serif text-[18px] font-bold text-ink leading-snug mb-1">
+              <p className="font-serif text-[20px] font-bold text-ink leading-snug mb-1">
                 {incident.title}
               </p>
 
@@ -351,7 +351,7 @@ function DetailView({
             strokeWidth={2}
             className="text-p-green mx-auto mb-2"
           />
-          <p className="font-serif text-[22px] font-bold text-ink mb-1">
+          <p className="font-serif text-[20px] font-bold text-ink mb-1">
             Incident resolved.
           </p>
           <p className="text-[12.5px] text-ink-3 font-sans">
@@ -380,7 +380,7 @@ function DetailView({
       </div>
 
       {/* Title */}
-      <h2 className="font-serif text-[22px] font-bold text-ink leading-tight mb-5">
+      <h2 className="font-serif text-[20px] font-bold text-ink leading-tight mb-5">
         {incident.title}
       </h2>
 
