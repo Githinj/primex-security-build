@@ -11,7 +11,9 @@ import boto3
 
 logger = logging.getLogger(__name__)
 
-MISSED_EVENTS_FILE = "missed_events.jsonl"
+# Overridable so a container can point it at a mounted volume — otherwise
+# failed events die with the container that wrote them.
+MISSED_EVENTS_FILE = os.environ.get("MISSED_EVENTS_FILE", "missed_events.jsonl")
 
 
 class EventPoster:

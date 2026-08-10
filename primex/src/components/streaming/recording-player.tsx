@@ -29,10 +29,31 @@ export function RecordingPlayer({ recording, seekToTimestamp, cameraName }: Reco
   const src = resolved?.id === recording.id ? resolved.url : undefined
 
   useEffect(() => {
-    if (!videoRef.current || !seekToTimestamp) return
-    const offset = (seekToTimestamp.getTime() - new Date(recording.started_at).getTime()) / 1000
-    videoRef.current.currentTime = Math.max(0, offset)
-    videoRef.current.play().catch(() => {})
+    const video = videoRef.current
+    if (!video || !seekToTimestamp) return
+
+    const offset = Math.max(
+      0,
+      (seekToTimestamp.getTime() - new Date(recording.started_at).getTime()) / 1000,
+    )
+
+    const seek = () => {
+      video.currentTime = offset
+      video.play().catch(() => {})
+    }
+
+    // Assigning currentTime before the browser knows the duration is silently
+    // discarded, and playback starts at 0 (SEC-191). That was the common case,
+    // not the edge one: this effect runs right after `src` is first set, so the
+    // metadata has almost never loaded yet — every click-to-seek from the
+    // timeline landed at the start of the file.
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      seek()
+      return
+    }
+
+    video.addEventListener('loadedmetadata', seek, { once: true })
+    return () => video.removeEventListener('loadedmetadata', seek)
   }, [seekToTimestamp, recording.started_at, src])
 
   const startTime = new Date(recording.started_at).toLocaleTimeString('en-AU', {

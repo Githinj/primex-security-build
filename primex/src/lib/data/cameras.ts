@@ -3,6 +3,14 @@ import { applyPagination, toPaginatedResult } from './pagination'
 import type { PaginationParams, PaginatedResult } from './pagination'
 import type { Camera } from '@/lib/types'
 
+// Explicit column list, never `*` (SEC-177). `stream_url` and `source_url` are
+// ingest credentials — `source_url` embeds the camera's RTSP username/password —
+// and every caller below feeds its rows into client components, which serializes
+// whatever is selected into the browser's RSC payload. Read those two through
+// `getCameraStreamConfig()` (super_admin-gated) instead of widening this list.
+const CAMERA_COLUMNS =
+  'id, site_id, name, location, status, last_checked, warning, stream_id, recording_enabled, last_frame_at'
+
 export async function getCameras(siteId?: string): Promise<Camera[]>
 export async function getCameras(siteId: string | undefined, pagination: PaginationParams): Promise<PaginatedResult<Camera>>
 export async function getCameras(siteId?: string, pagination?: PaginationParams) {
@@ -11,7 +19,7 @@ export async function getCameras(siteId?: string, pagination?: PaginationParams)
   if (pagination) {
     let query = supabase
       .from('cameras')
-      .select('*', { count: 'exact' })
+      .select(CAMERA_COLUMNS, { count: 'exact' })
       .order('name')
     if (siteId) query = query.eq('site_id', siteId)
     query = applyPagination(query, pagination)
@@ -20,7 +28,7 @@ export async function getCameras(siteId?: string, pagination?: PaginationParams)
     return toPaginatedResult(data ?? [], count, pagination)
   }
 
-  let query = supabase.from('cameras').select('*').order('name')
+  let query = supabase.from('cameras').select(CAMERA_COLUMNS).order('name')
   if (siteId) query = query.eq('site_id', siteId)
   const { data, error } = await query
   if (error) throw error
@@ -31,7 +39,7 @@ export async function getCameraById(id: string): Promise<Camera | null> {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('cameras')
-    .select('*')
+    .select(CAMERA_COLUMNS)
     .eq('id', id)
     .single()
   if (error) return null

@@ -67,10 +67,24 @@ export interface Camera {
   last_checked: string
   warning: string | null
   stream_id: string | null
-  stream_url: string | null
-  source_url: string | null
   recording_enabled: boolean
   last_frame_at: string | null
+}
+
+/**
+ * Ingest configuration — deliberately NOT part of `Camera` (SEC-177).
+ *
+ * `source_url` is an RTSP URL that carries the camera's credentials inline, and
+ * `stream_url` is its publish endpoint. `Camera` rows are serialized into client
+ * components on /cameras, /dispatcher, /portal and /sites/[id], so anything on
+ * that interface reaches the browser of every role that can see the camera.
+ * These two fields are read only through `getCameraStreamConfig()`, which is
+ * super_admin-gated.
+ */
+export interface CameraStreamConfig {
+  stream_id: string | null
+  stream_url: string | null
+  source_url: string | null
 }
 
 export interface AiZone {
@@ -113,6 +127,12 @@ export interface Recording {
   started_at: string
   ended_at: string | null
   status: 'recording' | 'complete' | 'failed'
+  /**
+   * Explicit evidentiary hold (SEC-190, migration 020). While this is in the
+   * future, retention will not delete the row. Incident-linked footage is held
+   * automatically and does not need it set.
+   */
+  hold_until: string | null
   created_at: string
 }
 
@@ -122,6 +142,19 @@ export interface StreamToken {
   webrtcUrl: string
   hlsUrl: string
   expiresAt: number
+  /**
+   * ICE servers for the WebRTC peer connection (SEC-184). Travels with the token
+   * because TURN credentials are minted per request and expire — see
+   * `lib/streaming/ice-servers.ts` for why they are not client-side config.
+   * Empty/absent leaves the adaptor on its own defaults.
+   */
+  iceServers?: IceServer[]
+}
+
+export interface IceServer {
+  urls: string[]
+  username?: string
+  credential?: string
 }
 
 export interface StreamEvent {

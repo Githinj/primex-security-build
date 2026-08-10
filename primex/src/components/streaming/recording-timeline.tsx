@@ -30,23 +30,44 @@ export function RecordingTimeline({ cameraId, initialRecordings, onSeek, onLive,
   const [recordings, setRecordings] = useState<Recording[]>(initialRecordings)
   const barRef = useRef<HTMLDivElement>(null)
 
-  const now = Date.now()
+  // `now` has to be state, not a render-time Date.now() (SEC-191). Nothing else
+  // re-renders this component on a timer, so the red playhead sat pinned at
+  // left:100% and the visible window stopped tracking real time until the user
+  // happened to change the preset — on a 1h window that is visibly wrong within
+  // minutes.
+  const [now, setNow] = useState(() => Date.now())
   const windowMs = WINDOW_MS[window]
   const windowStart = now - windowMs
 
   useEffect(() => {
+    // A minute is fine for a 1h window (~1.7% of the bar) and is imperceptible
+    // on 24h; a per-second tick would re-render for nothing.
+    const tick = setInterval(() => setNow(Date.now()), 60 * 1000)
+    return () => clearInterval(tick)
+  }, [])
+
+  useEffect(() => {
+    let active = true
     const fetchRecordings = async () => {
       try {
         const { getRecordingsAction } = await import('@/lib/data/actions/streaming')
         const from = new Date(Date.now() - WINDOW_MS[window]).toISOString()
         const to = new Date().toISOString()
         const data = await getRecordingsAction(cameraId, from, to)
-        setRecordings(data)
+        // A slower earlier request must not overwrite a newer window's results.
+        if (active) setRecordings(data)
       } catch (err) {
         console.error('Failed to fetch recordings:', err)
       }
     }
     fetchRecordings()
+    // Re-fetch on the same cadence as the playhead: a recording that finishes
+    // while the page is open should appear without a reload.
+    const poll = setInterval(fetchRecordings, 60 * 1000)
+    return () => {
+      active = false
+      clearInterval(poll)
+    }
   }, [window, cameraId])
 
   const visible = recordings.filter((r) => {

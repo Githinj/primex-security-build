@@ -3,17 +3,27 @@
 from behavior_tracker import BehaviorTracker, Detection, SecurityEvent
 
 
-def make_person(track_id="p1", x1=100, y1=100, x2=200, y2=400, conf=0.8):
-    return Detection(cls="person", bbox=(x1, y1, x2, y2), confidence=conf, track_id=track_id)
+# Detections carry pixel boxes plus the frame they were measured in; zones are
+# normalised 0–1. FRAME_W/H is the notional snapshot the pixel boxes below are
+# expressed against.
+FRAME_W, FRAME_H = 640, 480
 
 
-def make_vehicle(track_id="v1", x1=100, y1=100, x2=300, y2=300, conf=0.85):
-    return Detection(cls="car", bbox=(x1, y1, x2, y2), confidence=conf, track_id=track_id)
+def make_person(track_id="p1", x1=100, y1=100, x2=200, y2=400, conf=0.8,
+                frame_w=FRAME_W, frame_h=FRAME_H):
+    return Detection(cls="person", bbox=(x1, y1, x2, y2), confidence=conf,
+                     track_id=track_id, frame_w=frame_w, frame_h=frame_h)
 
 
-ENTRY_ZONE = [{"name": "entry1", "type": "entry", "coords": {"x1": 50, "y1": 50, "x2": 250, "y2": 450}}]
-RESTRICTED_ZONE = [{"name": "restricted1", "type": "restricted", "coords": {"x1": 50, "y1": 50, "x2": 350, "y2": 350}}]
-DOOR_ZONE = [{"name": "door1", "type": "door", "coords": {"x1": 100, "y1": 100, "x2": 300, "y2": 400}}]
+def make_vehicle(track_id="v1", x1=100, y1=100, x2=300, y2=300, conf=0.85,
+                 frame_w=FRAME_W, frame_h=FRAME_H):
+    return Detection(cls="car", bbox=(x1, y1, x2, y2), confidence=conf,
+                     track_id=track_id, frame_w=frame_w, frame_h=frame_h)
+
+
+ENTRY_ZONE = [{"name": "entry1", "type": "entry", "coords": {"x1": 0.05, "y1": 0.1, "x2": 0.4, "y2": 0.95}}]
+RESTRICTED_ZONE = [{"name": "restricted1", "type": "restricted", "coords": {"x1": 0.05, "y1": 0.1, "x2": 0.55, "y2": 0.73}}]
+DOOR_ZONE = [{"name": "door1", "type": "door", "coords": {"x1": 0.15, "y1": 0.2, "x2": 0.47, "y2": 0.83}}]
 BIZ_HOURS = {"mon": {"open": "08:00", "close": "18:00"}}
 
 
@@ -83,6 +93,39 @@ def test_door_event_fires_after_threshold():
     events = tracker.process([], timestamp=1006.0)
     types = [e.event_type for e in events]
     assert "door_event" in types
+
+
+def test_zone_matching_is_resolution_independent():
+    """The same relative position must resolve to the same zone at any size.
+
+    This is the point of storing zones normalised: a rectangle drawn against a
+    640x480 snapshot must still cover the same part of the scene once the camera
+    publishes 1280x720.
+    """
+    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+
+    # Centre at (0.3125, 0.4167) of the frame, expressed at two resolutions.
+    small = make_vehicle(track_id="v-small", x1=100, y1=100, x2=300, y2=300, frame_w=640, frame_h=480)
+    large = make_vehicle(track_id="v-large", x1=200, y1=150, x2=600, y2=450, frame_w=1280, frame_h=720)
+
+    for vehicle in (small, large):
+        events = tracker.process([vehicle], timestamp=1000.0)
+        assert "vehicle_detection" in [e.event_type for e in events]
+
+
+def test_zone_matching_skipped_when_frame_size_unknown():
+    """Without frame dimensions a pixel centre can't be placed in a 0–1 zone.
+
+    Skipping beats guessing: comparing raw pixels against fractions would put
+    every detection outside every zone anyway, but silently.
+    """
+    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    vehicle = make_vehicle(x1=100, y1=100, x2=300, y2=300, frame_w=0, frame_h=0)
+
+    events = tracker.process([vehicle], timestamp=1000.0)
+
+    assert "vehicle_detection" not in [e.event_type for e in events]
+    assert tracker._tracks["v1"].zone is None
 
 
 def test_track_pruning_after_disappearance():

@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# pyproject.toml configures pytest but the dependency was never declared.
+pytest>=8.0.0
