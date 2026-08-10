@@ -136,6 +136,27 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
         **Capture the real `Content-Type` and field names from that delivery** and
         record them on SEC-202 / SEC-182 — the route accepts both form-encoded and
         JSON, but the exact payload has still never been observed.
+- [ ] **Stand up a TURN server** and set `ANTMEDIA_TURN_URLS` + `ANTMEDIA_TURN_SECRET`
+      (SEC-184). The app-side wiring is done — it mints short-lived coturn
+      credentials per request and passes them to the player — but without an actual
+      relay there is nothing to hand out. Run it over **TLS on 443** so it survives
+      firewalls that only allow HTTPS; `ANTMEDIA_TURN_SECRET` is coturn's
+      `static-auth-secret`.
+      **Why it matters:** with no relay, any viewer behind symmetric NAT or on a
+      network blocking outbound UDP silently degrades to HLS with 10–30s latency.
+      Note the trap in the verification step below: "confirm the WebRTC pill" passes
+      on an office network and fails at exactly the customer sites that matter.
+- [ ] **Verify the HLS fallback actually plays** with token control on (SEC-183).
+      hls.js now carries the token onto segment requests, but this has not been
+      exercised against the live server. Force the fallback (block UDP, or stub
+      `Hls.isSupported()`) and watch the network tab for segment 403s.
+      Safari's native HLS has no hook to rewrite segment requests and is a known
+      gap — it depends on WebRTC, and therefore on TURN above.
+- [ ] **Set `CRON_SECRET`** in Vercel (SEC-180). `/api/cron/reconcile-cameras` runs
+      every 15 min and corrects camera status against Ant Media; it **fails closed**
+      without the secret, so an unset value means every run 401s and status silently
+      stops being reconciled. Confirm one run returns `{"ok":true}` with a
+      plausible `checked` count.
 - [ ] **Set the AMS app setting `rtspPullTransportType` to `tcp`** for every app that
       pulls RTSP (SEC-201). This is an **application** setting — AMS reads it in
       `StreamFetcher` and passes it to ffmpeg as `rtsp_transport`, so it cannot be set
