@@ -12,6 +12,7 @@ describe('streamWebhookEffect', () => {
     expect(streamWebhookEffect(AMS_HOOK.streamStarted)).toEqual({
       eventType: 'stream_started',
       status: 'Online',
+      warning: null,
       touchLastFrame: true,
       recognised: true,
     })
@@ -104,6 +105,54 @@ describe('streamWebhookEffect', () => {
     const effect = streamWebhookEffect(AMS_HOOK.idleExpired)
     expect(effect.status).toBe('Offline')
     expect(effect.eventType).toBe('stream_stopped')
+  })
+
+  describe('cameras.warning', () => {
+    it.each([
+      [AMS_HOOK.publishTimeout, 'stopped sending video'],
+      [AMS_HOOK.encoderNotOpened, 'could not open an encoder'],
+      [AMS_HOOK.endpointFailed, 'endpoint rejected'],
+      [AMS_HOOK.idleExpired, 'idle timeout'],
+      [AMS_HOOK.serverShutdown, 'shut down'],
+    ])('says why the camera went dark on %s', (action, fragment) => {
+      // Status alone can't distinguish "the tunnel dropped" from "AMS stopped an
+      // idle stream" from "the encoder never started" — all three read as
+      // Offline, and only the warning tells anyone which to go fix.
+      expect(streamWebhookEffect(action).warning).toContain(fragment)
+    })
+
+    it('clears the warning when a stream starts', () => {
+      expect(streamWebhookEffect(AMS_HOOK.streamStarted).warning).toBeNull()
+    })
+
+    it('clears the warning on a clean stop', () => {
+      // A clean stop is not a fault. Leaving a stale error next to an Offline
+      // badge would send someone chasing an outage that already ended.
+      expect(streamWebhookEffect(AMS_HOOK.streamEnded).warning).toBeNull()
+    })
+
+    it('warns with the drop counts while a stream is degrading', () => {
+      const effect = streamWebhookEffect(AMS_HOOK.streamStatus, {
+        dropPacketCountInIngestion: 42,
+        dropFrameCountInEncoding: 7,
+      })
+      expect(effect.warning).toContain('42 ingest packet(s)')
+      expect(effect.warning).toContain('7 encode frame(s)')
+    })
+
+    it('clears the warning on a clean heartbeat', () => {
+      expect(streamWebhookEffect(AMS_HOOK.streamStatus, {}).warning).toBeNull()
+    })
+
+    it.each([
+      ['vodReady', AMS_HOOK.vodReady],
+      ['an ignored per-viewer hook', 'playStarted'],
+      ['an unmapped action', 'someHookAmsAddedLater'],
+    ])('leaves the warning alone for %s', (_label, action) => {
+      // undefined, not null: none of these say anything about camera health, so
+      // clearing an active warning on one would hide a real fault.
+      expect(streamWebhookEffect(action).warning).toBeUndefined()
+    })
   })
 
   describe('noise control', () => {

@@ -22,13 +22,18 @@ interface RemoveCameraModalProps {
 
 export function RemoveCameraModal({ open, onClose, camera }: RemoveCameraModalProps) {
   const [done, setDone] = useState(false);
+  const [orphaned, setOrphaned] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!camera) return null;
 
   async function handleRemove() {
     try {
-      await deleteCamera(camera!.id);
+      const result = await deleteCamera(camera!.id);
+      // The camera row is gone either way. If Ant Media wouldn't let go of the
+      // broadcast, say so — it keeps pulling and recording with nothing in the
+      // app pointing at it, and silence is what made that invisible (SEC-186).
+      setOrphaned(result?.released === false);
       setDone(true);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -37,6 +42,7 @@ export function RemoveCameraModal({ open, onClose, camera }: RemoveCameraModalPr
 
   function handleClose() {
     setDone(false);
+    setOrphaned(false);
     setError(null);
     onClose();
   }
@@ -46,7 +52,11 @@ export function RemoveCameraModal({ open, onClose, camera }: RemoveCameraModalPr
       {done ? (
         <SuccessState
           title="Camera removed."
-          sub={`${camera.name} is no longer monitored.`}
+          sub={
+            orphaned
+              ? `${camera.name} is no longer monitored, but Ant Media would not release its stream — it may still be pulling and recording. Remove the broadcast on the server.`
+              : `${camera.name} is no longer monitored.`
+          }
           onDone={handleClose}
         />
       ) : (

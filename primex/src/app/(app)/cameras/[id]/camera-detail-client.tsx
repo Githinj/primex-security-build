@@ -11,6 +11,7 @@ import { RecordingPlayer } from "@/components/streaming/recording-player";
 import { cameraTone } from "@/lib/utils";
 import { deleteCamera } from "@/lib/data/actions/cameras";
 import { toggleCameraAi } from "@/lib/data/actions/camera-ai-config";
+import { setCameraRecording } from "@/lib/data/actions/streaming";
 import type { Camera, Site, CameraAiConfig, Recording } from "@/lib/types";
 
 interface CameraDetailClientProps {
@@ -38,6 +39,9 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
   const [activeRecording, setActiveRecording] = useState<Recording | null>(null);
   const [seekTimestamp, setSeekTimestamp] = useState<Date | null>(null);
   const [zonesOpen, setZonesOpen] = useState(false);
+  // Surfaced when the DB write lands but Ant Media refuses — the two can diverge,
+  // and pretending otherwise is how recording_enabled became decorative.
+  const [recordingNote, setRecordingNote] = useState<string | null>(null);
 
   const tone = cameraTone(camera.status);
 
@@ -112,6 +116,57 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
             />
             <KV k="Last checked" v={formatTime(camera.last_checked)} />
             {camera.stream_id && <KV k="Stream ID" v={camera.stream_id} />}
+            <KV
+              k="Recording"
+              v={
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label={
+                      camera.recording_enabled ? "Turn recording off" : "Turn recording on"
+                    }
+                    aria-pressed={camera.recording_enabled}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                      camera.recording_enabled ? 'bg-p-blue' : 'bg-p-gray/30'
+                    }`}
+                    onClick={() => startTransition(async () => {
+                      try {
+                        // The column existed since migration 003 but nothing read
+                        // or wrote it — this is the only control over whether Ant
+                        // Media records the camera at all (SEC-189).
+                        const result = await setCameraRecording(
+                          camera.id,
+                          !camera.recording_enabled,
+                        );
+                        if (result.success && !result.appliedToServer && camera.stream_id) {
+                          setRecordingNote(
+                            "Saved, but Ant Media did not accept the change — it will be re-applied next time the camera is connected.",
+                          );
+                        } else {
+                          setRecordingNote(null);
+                        }
+                        router.refresh();
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    })}
+                    disabled={isPending}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                        camera.recording_enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  {!camera.stream_id && (
+                    <span className="text-xs text-ink-4">Applies when connected</span>
+                  )}
+                </div>
+              }
+            />
+            {recordingNote && (
+              <p className="text-xs text-p-amber">{recordingNote}</p>
+            )}
             <KV
               k="Warning"
               v={

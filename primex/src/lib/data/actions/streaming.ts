@@ -1,10 +1,12 @@
 'use server'
 
 import crypto from 'crypto'
+import dns from 'node:dns/promises'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { listenerHookUrl } from '@/lib/streaming/webhook-auth'
+import { checkSourceAddress, isIpLiteral, parseSourceUrl } from '@/lib/streaming/source-url'
 import { SITE_URL } from '@/lib/site-url'
 import type { CameraStreamConfig, StreamToken } from '@/lib/types'
 
@@ -93,6 +95,87 @@ function broadcastHookUrl(streamId: string): string | null {
     )
   }
   return url
+}
+
+/**
+ * Refuse to point Ant Media at an address that can't be a camera (SEC-193).
+ *
+ * Returns an error string when the target is blocked, null when it is fine. The
+ * hostname is resolved first and *every* answer is checked: one A record on the
+ * public internet next to another on 169.254 must not pass because the first one
+ * did.
+ *
+ * A resolution failure is not treated as a block — the app and the AMS droplet
+ * are on different networks, and a name that only resolves inside the tunnel is
+ * the normal case for a site camera, not an attack.
+ */
+async function blockedSourceTarget(hostname: string): Promise<string | null> {
+  const allowedCidrs = process.env.ANTMEDIA_SOURCE_ALLOWED_CIDRS
+
+  // An IP literal needs no lookup — judge it directly rather than handing an
+  // already-unambiguous address to a resolver.
+  if (isIpLiteral(hostname)) {
+    const verdict = checkSourceAddress(hostname, allowedCidrs)
+    if (verdict.allowed) return null
+    console.error(`Refused stream source "${hostname}": ${verdict.reason}`)
+    return verdict.reason
+  }
+
+  let addresses: { address: string }[]
+  try {
+    addresses = await dns.lookup(hostname, { all: true })
+  } catch {
+    console.warn(
+      `Could not resolve stream source host "${hostname}" — allowing, since a name that only resolves on the AMS side is normal for a tunnelled site camera.`,
+    )
+    return null
+  }
+
+  for (const { address } of addresses) {
+    const verdict = checkSourceAddress(address, allowedCidrs)
+    if (!verdict.allowed) {
+      console.error(`Refused stream source "${hostname}": ${verdict.reason}`)
+      return `That host resolves to ${address}, which Ant Media is not allowed to connect to.`
+    }
+  }
+
+  return null
+}
+
+/**
+ * Tell Ant Media whether to record this stream (SEC-189).
+ *
+ * `cameras.recording_enabled` has existed since migration 003 and was read by
+ * nothing — no action, no UI, no SQL — so whether a camera recorded was decided
+ * entirely by the AMS app default. On the live server that default is off:
+ * every broadcast reports `mp4Enabled: 0` and no camera has ever recorded.
+ *
+ * Uses the explicit recording resource rather than putting `mp4Enabled` in the
+ * Broadcast payload. The integer is tri-state — one value means "defer to the
+ * app setting" — and which value that is could not be confirmed against the docs,
+ * so setting it risked writing "use the default" while believing it meant "off".
+ * `PUT .../recording/{true|false}` says exactly what it does at both ends.
+ *
+ * Never fatal: a camera that provisioned but failed to apply its recording flag
+ * is still a working camera, and the flag is re-applied on the next change.
+ */
+async function setBroadcastRecording(streamId: string, enabled: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${streamId}/recording/${enabled}?recordType=mp4`,
+      { method: 'PUT', headers: antmediaHeaders(), cache: 'no-store' },
+    )
+    if (!res.ok) {
+      console.error(
+        `Could not set recording=${enabled} on stream "${streamId}": ${await antmediaError(res)}`,
+      )
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error(`Recording toggle threw for stream "${streamId}":`, err)
+    return false
+  }
 }
 
 // Ingest endpoint the installer points the camera at, without the token.
@@ -341,6 +424,16 @@ export async function createBroadcast(
     : streamEndpoint
 
   const supabase = await createServerSupabaseClient()
+  const { data: camera } = await supabase
+    .from('cameras')
+    .select('recording_enabled')
+    .eq('id', cameraId)
+    .single()
+  // Apply the column rather than leaving it to the AMS app default (SEC-189).
+  // Default true matches the column default, so a camera provisioned before the
+  // read fails still records.
+  await setBroadcastRecording(trimmedId, camera?.recording_enabled ?? true)
+
   const { error } = await supabase
     .from('cameras')
     .update({
@@ -378,9 +471,12 @@ export async function createStreamSource(
   await requireRole('super_admin')
 
   const trimmedUrl = sourceUrl.trim()
-  if (!/^rtsps?:\/\//i.test(trimmedUrl)) {
-    return { success: false, error: 'Source URL must be an rtsp:// or rtsps:// address.' }
-  }
+  const parsed = parseSourceUrl(trimmedUrl)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  const blocked = await blockedSourceTarget(parsed.hostname)
+  if (blocked) return { success: false, error: blocked }
+
   const trimmedId = streamId.trim()
   if (!trimmedId) {
     return { success: false, error: 'A stream ID is required to connect a source.' }
@@ -446,6 +542,13 @@ export async function createStreamSource(
   // Persist stream_id (play id) + source_url (for restart/rotation). RLS scopes the
   // row; super_admin may update any camera.
   const supabase = await createServerSupabaseClient()
+  const { data: camera } = await supabase
+    .from('cameras')
+    .select('recording_enabled')
+    .eq('id', cameraId)
+    .single()
+  await setBroadcastRecording(trimmedId, camera?.recording_enabled ?? true)
+
   const { error } = await supabase
     .from('cameras')
     .update({ stream_id: trimmedId, source_url: trimmedUrl })
@@ -458,6 +561,98 @@ export async function createStreamSource(
   revalidatePath('/cameras')
   revalidatePath(`/cameras/${cameraId}`)
   return { success: true }
+}
+
+/**
+ * Stop and delete a camera's Ant Media broadcast (SEC-186).
+ *
+ * Deleting the camera row used to be the whole of `deleteCamera()`, which left
+ * the broadcast running: for an RTSP pull, AMS keeps connecting out to the
+ * customer's camera forever, keeps recording into DO Spaces, and keeps costing
+ * money — with no row pointing at it, so nothing in the app can even show it
+ * exists. The orphan is invisible precisely because the thing that knew about it
+ * is what got deleted.
+ *
+ * Stop first, then delete: deleting a running broadcast can leave the fetcher
+ * thread alive on some versions, which is the orphan again by another route.
+ *
+ * Reports rather than throws. A camera the operator asked to remove must still
+ * be removed from the app even when AMS is unreachable — the alternative is a row
+ * they cannot delete. The return value lets the caller say so out loud.
+ */
+export async function releaseBroadcast(
+  streamId: string,
+): Promise<{ released: boolean; detail?: string }> {
+  const id = streamId.trim()
+  if (!id) return { released: true }
+
+  const base = `${ANTMEDIA_URL}/${ANTMEDIA_APP}/rest/v2/broadcasts/${id}`
+
+  try {
+    // Already-stopped is the common case and not an error worth surfacing.
+    const stopRes = await fetch(`${base}/stop`, { method: 'POST', headers: antmediaHeaders() })
+    if (!stopRes.ok) {
+      console.warn(`Stop before delete for "${id}" returned ${await antmediaError(stopRes)}`)
+    }
+
+    const deleteRes = await fetch(base, { method: 'DELETE', headers: antmediaHeaders() })
+    // 404 means it is already gone, which is the state we wanted.
+    if (!deleteRes.ok && deleteRes.status !== 404) {
+      const detail = await antmediaError(deleteRes)
+      console.error(`Failed to delete Ant Media broadcast "${id}": ${detail}`)
+      return { released: false, detail }
+    }
+
+    return { released: true }
+  } catch (err) {
+    console.error(`Deleting Ant Media broadcast "${id}" threw:`, err)
+    return { released: false, detail: err instanceof Error ? err.message : 'unknown error' }
+  }
+}
+
+/**
+ * Turn recording on or off for one camera (SEC-189).
+ *
+ * The column and the server have to move together, and the DB write goes first:
+ * if Ant Media is unreachable, the intent is still recorded and re-provisioning
+ * re-applies it. The other order would leave a camera recording with the UI
+ * insisting it isn't.
+ *
+ * Open to company_manager as well as super_admin — unlike `stream_id` (SEC-176),
+ * this carries no cross-tenant risk: RLS scopes which camera row you may write,
+ * and the value is a boolean about your own camera.
+ */
+export async function setCameraRecording(
+  cameraId: string,
+  enabled: boolean,
+): Promise<{ success: boolean; appliedToServer: boolean; error?: string }> {
+  await requireRole('super_admin', 'company_manager')
+
+  const supabase = await createServerSupabaseClient()
+  const { data: camera, error } = await supabase
+    .from('cameras')
+    .update({ recording_enabled: enabled })
+    .eq('id', cameraId)
+    .select('stream_id')
+    .single()
+
+  if (error) {
+    console.error('Failed to set recording_enabled on camera:', error)
+    return { success: false, appliedToServer: false, error: 'Could not save the change.' }
+  }
+
+  // No stream yet: the flag is stored and createBroadcast()/createStreamSource()
+  // apply it at provisioning time.
+  if (!camera?.stream_id) {
+    revalidatePath(`/cameras/${cameraId}`)
+    return { success: true, appliedToServer: false }
+  }
+
+  const appliedToServer = await setBroadcastRecording(camera.stream_id, enabled)
+
+  revalidatePath('/cameras')
+  revalidatePath(`/cameras/${cameraId}`)
+  return { success: true, appliedToServer }
 }
 
 // Stops Ant Media from pulling the RTSP source but keeps source_url so it can be
