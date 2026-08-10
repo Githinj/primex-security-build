@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { authenticateWebhook } from '@/lib/streaming/webhook-auth'
 import {
   AMS_HOOK,
   streamDropCounts,
@@ -7,7 +8,11 @@ import {
   vodRecordingRow,
 } from '@/lib/streaming/webhook-events'
 
-const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET!
+const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET
+// Optional second factor. AMS runs on a fixed address, so pinning the hook to it
+// means a leaked hook URL — and it will leak, see webhook-auth.ts — is not on its
+// own enough to write here. Unset leaves the secret standing alone.
+const WEBHOOK_ALLOWED_IPS = process.env.ANTMEDIA_WEBHOOK_ALLOWED_IPS
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 // DO_SPACES_ENDPOINT may be set as a full URL (worker/boto3 style, e.g.
@@ -21,8 +26,19 @@ const DO_SPACES_ENDPOINT = process.env.DO_SPACES_RECORDINGS_BUCKET
   : ''
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Antmedia-Secret') ?? req.nextUrl.searchParams.get('secret')
-  if (!secret || secret !== WEBHOOK_SECRET) {
+  const auth = authenticateWebhook({
+    headerSecret: req.headers.get('X-Antmedia-Secret'),
+    querySecret: req.nextUrl.searchParams.get('secret'),
+    expectedSecret: WEBHOOK_SECRET,
+    forwardedFor: req.headers.get('x-forwarded-for'),
+    allowList: WEBHOOK_ALLOWED_IPS,
+  })
+  if (!auth.ok) {
+    // One uniform 401 whatever failed — the reason is for us, not the sender.
+    // 'not-configured' in particular is worth seeing in the log: it means every
+    // delivery is being dropped because the deployment has no secret set, which
+    // otherwise looks identical to AMS never calling.
+    console.warn(`Rejected Ant Media webhook: ${auth.reason}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
