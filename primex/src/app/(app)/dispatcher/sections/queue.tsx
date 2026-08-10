@@ -86,7 +86,7 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-0 h-full -m-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-0 h-full -mx-4 -my-6 sm:-mx-9 sm:-my-8">
         {/* ── Left panel: alert list ── */}
         <div className="border-r border-border bg-bg flex flex-col h-full overflow-hidden">
           {/* Header */}
