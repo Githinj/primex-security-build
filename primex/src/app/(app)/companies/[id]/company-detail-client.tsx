@@ -1,22 +1,23 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import {
   MapPin,
   Users,
   Briefcase,
   Camera,
   Building,
-  ArrowLeft,
 } from "lucide-react";
 
 import {
   Card,
   Pill,
   DataTable,
-  Button,
   StatCard,
   KV,
   SectionHeader,
+  Breadcrumb,
 } from "@/components/ui";
 
 import type { Company, CompanyStatus, Site, Camera as CameraType, Profile } from "@/lib/types";
@@ -86,6 +87,8 @@ interface CompanyDetailClientProps {
 }
 
 export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDetailClientProps) {
+  const router = useRouter();
+
   // Derived data
   const companySites = sites;
   const siteIds = companySites.map((s) => s.id);
@@ -141,17 +144,8 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
-      {/* Back nav */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={ArrowLeft}
-          onClick={() => history.back()}
-        >
-          Back to companies
-        </Button>
-      </div>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Companies", onClick: () => router.push("/companies") }, company.name]} />
 
       {/* Company header */}
       <div className="flex items-start justify-between gap-4">

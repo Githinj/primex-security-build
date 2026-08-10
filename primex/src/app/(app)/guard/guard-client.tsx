@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Pill, Label, LiveDot } from '@/components/ui'
+import { Button, Pill, Label, LiveDot, Breadcrumb } from '@/components/ui'
 import { severityTone } from '@/lib/utils'
 import { updateIncidentStatus, uploadIncidentPhoto, addIncidentUpdate } from '@/lib/data/actions/incidents'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -15,7 +15,6 @@ import {
 import type { Incident, Site, Profile } from '@/lib/types'
 import {
   MapPin,
-  ArrowLeft,
   Check,
   Navigation,
   CheckCircle2,
@@ -342,13 +341,9 @@ function DetailView({
   if (status === 'resolved') {
     return (
       <>
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-[12.5px] text-ink-2 font-sans mb-5 cursor-pointer hover:text-ink transition-colors"
-        >
-          <ArrowLeft size={14} strokeWidth={2} />
-          Back
-        </button>
+        <div className="mb-5">
+          <Breadcrumb items={[{ label: "Assignments", onClick: onBack }, incident.title]} />
+        </div>
 
         <div className="bg-p-green-soft rounded-xl p-[22px] text-center">
           <CheckCircle2
@@ -372,14 +367,10 @@ function DetailView({
 
   return (
     <>
-      {/* Back button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-[12.5px] text-ink-2 font-sans mb-5 cursor-pointer hover:text-ink transition-colors"
-      >
-        <ArrowLeft size={14} strokeWidth={2} />
-        Back
-      </button>
+      {/* Breadcrumb */}
+      <div className="mb-5">
+        <Breadcrumb items={[{ label: "Assignments", onClick: onBack }, incident.title]} />
+      </div>
 
       {/* Severity pill */}
       <div className="mb-2">

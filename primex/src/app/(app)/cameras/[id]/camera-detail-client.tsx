@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Trash2 } from "lucide-react";
-import { Card, KV, Button, Label, Pill } from "@/components/ui";
+import { Trash2 } from "lucide-react";
+import { Card, KV, Button, Label, Pill, Breadcrumb } from "@/components/ui";
 import { CameraPlayer } from "@/components/streaming/camera-player";
 import { RecordingTimeline } from "@/components/streaming/recording-timeline";
 import { RecordingPlayer } from "@/components/streaming/recording-player";
@@ -53,15 +53,8 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-4xl">
-      {/* Back nav */}
-      <button
-        type="button"
-        onClick={() => router.push("/cameras")}
-        className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors duration-100 font-sans cursor-pointer w-fit"
-      >
-        <ArrowLeft size={14} strokeWidth={2} />
-        Back to Cameras
-      </button>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Cameras", onClick: () => router.push("/cameras") }, camera.name]} />
 
       {/* Live player or recording player */}
       <div className="w-full max-w-2xl">
