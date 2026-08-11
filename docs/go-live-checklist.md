@@ -21,8 +21,10 @@ an unset value makes a feature stay dark rather than break.
 
 ## 1. Database migrations
 
-Local is at `022`. `021`/`022` add the pg_cron + pg_net camera-reconciliation
-schedule; `020` adds the evidentiary hold.
+Local is at `023`. `023` adds `webhook_deliveries` (the SEC-202 instrument —
+nothing else depends on it, but SEC-202 cannot be closed until it is applied);
+`021`/`022` add the pg_cron + pg_net camera-reconciliation schedule; `020` adds
+the evidentiary hold.
 
 ```bash
 cd primex
@@ -30,7 +32,7 @@ npx supabase migration list          # anything local-only is pending
 npx supabase db push
 ```
 
-- [ ] Confirm remote is at `022`. `migration list` is the only source of truth —
+- [ ] Confirm remote is at `023`. `migration list` is the only source of truth —
       this line has been wrong before.
 - [ ] Seed data is **not** deployed by `db push`. Prod accounts were created
       individually (SEC-195), *not* by running `seed.sql` — that file inserts
@@ -161,11 +163,29 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
         Connect from the camera detail page is the repair path.
       - Optionally set `settings.listenerHookURL` in the app's
         `WEB-INF/red5-web.properties` as a server-wide default.
-      - Then confirm end to end: start a stream → a `stream_events` row appears.
-        The `vodReady` payload was captured under SEC-182, so the field names are
-        no longer guesswork — **record the observed `Content-Type` and field names
-        on SEC-202** if they are not already there, since the route accepts both
-        form-encoded and JSON and the parsing branch depends on which arrives.
+      - Then confirm end to end. **Migration 023 must be applied first** — it adds
+        `webhook_deliveries`, which the route writes on *every* delivery, including
+        the two that previously vanished into the Vercel log (an unparseable body,
+        and an id matching no camera). Start a stream, then:
+
+        ```sql
+        SELECT created_at, outcome, content_type, action, stream_id, body_keys
+        FROM webhook_deliveries ORDER BY created_at DESC LIMIT 20;
+        ```
+
+        - `content_type` settles form-encoded vs JSON; `body_keys` settles
+          `streamId` vs `id` vs `streamName`. **Record both on SEC-202** — the
+          route accepts either encoding and the parsing branch depends on which
+          arrives.
+        - `outcome = 'unknown_stream'` means AMS is calling but the id it sends
+          matches no `cameras.stream_id` — a provisioning mismatch, not a
+          transport failure.
+        - **Zero rows after a stream start is itself the finding.** It means
+          `listenerHookURL` still is not reaching AMS and the re-provisioning
+          repair path above has not taken. Check the AMS-side broadcast object
+          before touching anything in this app.
+        - Rows expire after 7 days (pg_cron), matching `stream_events`. This is a
+          diagnostic buffer, not an audit log — do not build on it.
 - [x] **TURN server standing**, `ANTMEDIA_TURN_URLS` + `ANTMEDIA_TURN_SECRET` set
       (SEC-184). Run over **TLS on 443** so it survives firewalls that only allow
       HTTPS; `ANTMEDIA_TURN_SECRET` is coturn's `static-auth-secret`.
@@ -256,7 +276,7 @@ What is genuinely still open, and why:
 
 | Issue | State | What remains |
 |---|---|---|
-| **SEC-202** | In Progress | No AMS webhook delivery has been *observed*. Until one is, camera status, drop telemetry and recordings are unproven in production. |
+| **SEC-202** | In Progress | No AMS webhook delivery has been *observed*. Until one is, camera status, drop telemetry and recordings are unproven in production. The instrument now exists (migration 023 → `webhook_deliveries`); what remains is applying it to prod and starting one stream. |
 | **SEC-190** | Todo | Bucket lifecycle window vs `evidence_retention_days` still needs reconciling — see Recordings retention above. This is the item that can lose evidence. |
 | **SEC-192** | Todo | Viewer caps shipped; the load test to find the real per-droplet knee, and the origin/edge split plan, did not. Nobody has measured the ceiling. |
 | **SEC-203** | Backlog | Nothing pages a human when a camera goes dark. Needs a policy decision on the threshold before it can be built. |
