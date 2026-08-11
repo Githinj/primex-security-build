@@ -10,7 +10,7 @@ from supabase import create_client
 
 from camera_task import CameraTask
 from cooldown import CooldownRegistry
-from config import WorkerConfig
+from config import WorkerConfig, load_config
 from detector import Detector
 from event_poster import EventPoster
 from stats import WorkerStats
@@ -56,10 +56,49 @@ class Supervisor:
 
         while True:
             try:
+                self._refresh_config()
                 await self._sync_cameras()
             except Exception as e:
                 logger.error(f"Supervisor sync error: {e}")
             await asyncio.sleep(SYNC_INTERVAL_S)
+
+    def _refresh_config(self) -> None:
+        """Re-read `ai_worker_config` and apply it if it changed (SEC-169).
+
+        Config used to be read once at process start, so retuning the worker
+        meant a redeploy. `CameraTask` and `BehaviorTracker` capture their
+        thresholds at construction, so applying a change means recreating the
+        tasks: they are cancelled here and `_sync_cameras` rebuilds them on the
+        same tick with the new values.
+
+        That deliberately costs in-flight tracker state — a person part-way to
+        the lingering threshold starts counting again. Restarting is the honest
+        trade for a rare, admin-initiated change, and is far simpler to reason
+        about than mutating thresholds under a running loop.
+
+        A failed read leaves the current config in place: a Supabase blip must
+        not silently reset a tuned worker to defaults.
+        """
+        try:
+            new_config = load_config(self._supabase)
+        except Exception as e:
+            logger.warning(f"Could not re-read worker config, keeping current: {e}")
+            return
+
+        if new_config == self.config:
+            return
+
+        logger.info("Worker config changed: %s -> %s", self.config, new_config)
+        self.config = new_config
+        # The registry is shared across cameras and holds no per-task state
+        # worth preserving, so the new window applies without recreating it.
+        self.cooldown.cooldown_s = new_config.cooldown_s
+
+        for cam_id, task in self._tasks.items():
+            logger.info("Restarting camera task %s to apply new config", cam_id)
+            task.cancel()
+        self._tasks.clear()
+        self._camera_tasks.clear()
 
     async def _sync_cameras(self):
         resp = self._supabase.table("cameras").select(

@@ -15,6 +15,7 @@ import {
   Camera,
   Check,
   ArrowLeft,
+  ScanEye,
 } from "lucide-react";
 import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import {
@@ -47,6 +48,13 @@ import {
   uploadMyAvatar,
 } from "@/lib/data/actions/account";
 import { createCheckoutSession, createPortalSession } from "@/lib/data/actions/billing";
+import { updateAiWorkerConfig } from "@/lib/data/actions/ai-worker-config";
+import {
+  CONFIG_BOUNDS,
+  CONFIG_HELP,
+  type AiWorkerConfigInput,
+} from "@/lib/ai-worker-config";
+import type { AiWorkerConfig } from "@/lib/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { subscribeToPush, isPushSupported } from "@/lib/push/subscribe";
 import { PLAN_TIERS, planTier } from "@/lib/billing/plans";
@@ -89,12 +97,16 @@ const ROLES_PERMS = [
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type Tab = "profile" | "roles" | "notifications" | "integrations" | "billing";
+type Tab = "profile" | "roles" | "notifications" | "detection" | "integrations" | "billing";
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+// `superAdminOnly` gates the tab in the nav. It is presentation only — the
+// server action behind the Detection tab does its own requireRole check, since
+// hiding a button is not authorization.
+const TABS: { id: Tab; label: string; icon: React.ElementType; superAdminOnly?: boolean }[] = [
   { id: "profile", label: "Profile", icon: UserIcon },
   { id: "roles", label: "Roles & permissions", icon: Lock },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "detection", label: "AI detection", icon: ScanEye, superAdminOnly: true },
   { id: "integrations", label: "Integrations", icon: Zap },
   { id: "billing", label: "Billing & plans", icon: CreditCard },
 ];
@@ -1049,6 +1061,130 @@ function BillingTab({
 // SettingsClient
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// AI detection tab (super_admin) — SEC-169
+// ---------------------------------------------------------------------------
+
+const CONFIG_FIELDS: { key: keyof AiWorkerConfigInput; unit: string; step: string }[] = [
+  { key: "confidence_threshold", unit: "", step: "0.05" },
+  { key: "snapshot_interval_s", unit: "seconds", step: "1" },
+  { key: "cooldown_s", unit: "seconds", step: "5" },
+  { key: "dwell_threshold_s", unit: "seconds", step: "10" },
+];
+
+function DetectionTab({ config }: { config: AiWorkerConfig | null }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  // Held as strings so a half-typed value ("0.") doesn't get coerced to NaN
+  // mid-keystroke and blow away what the user was typing.
+  const [values, setValues] = useState<Record<string, string>>(() => ({
+    confidence_threshold: String(config?.confidence_threshold ?? 0.7),
+    snapshot_interval_s: String(config?.snapshot_interval_s ?? 2),
+    cooldown_s: String(config?.cooldown_s ?? 60),
+    dwell_threshold_s: String(config?.dwell_threshold_s ?? 300),
+  }));
+
+  if (!config) {
+    return (
+      <Card>
+        <InfoBox tone="amber">
+          No <code>ai_worker_config</code> row was found. It is created by migration
+          002 — if this database has been migrated, check that the row with{" "}
+          <code>id = 1</code> still exists.
+        </InfoBox>
+      </Card>
+    );
+  }
+
+  function handleSave() {
+    setError(null);
+    setSaved(false);
+
+    startTransition(async () => {
+      const res = await updateAiWorkerConfig({
+        confidence_threshold: Number(values.confidence_threshold),
+        snapshot_interval_s: Number(values.snapshot_interval_s),
+        cooldown_s: Number(values.cooldown_s),
+        dwell_threshold_s: Number(values.dwell_threshold_s),
+      } as AiWorkerConfigInput);
+
+      if (res.ok) {
+        setSaved(true);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-serif text-xl font-semibold text-ink">AI detection tuning</h3>
+          <p className="text-[13px] text-ink-3">
+            Global settings for the detection worker. These apply to every camera on
+            every site.
+          </p>
+        </div>
+
+        <InfoBox tone="blue">
+          The worker re-reads these on its next sync tick (within 30 seconds) and
+          restarts its camera tasks to pick them up — no redeploy. Restarting a task
+          clears that camera&apos;s in-flight tracking, so a person already being
+          timed for lingering starts counting again.
+        </InfoBox>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {CONFIG_FIELDS.map(({ key, unit, step }) => {
+            const bound = CONFIG_BOUNDS[key];
+            return (
+              <Field
+                key={key}
+                label={unit ? `${bound.label} (${unit})` : bound.label}
+                hint={`${CONFIG_HELP[key]} Allowed: ${bound.min}–${bound.max}.`}
+              >
+                <TextInput
+                  type="number"
+                  step={step}
+                  min={bound.min}
+                  max={bound.max}
+                  value={values[key]}
+                  onChange={(e) => {
+                    setSaved(false);
+                    setValues((v) => ({ ...v, [key]: e.target.value }));
+                  }}
+                />
+              </Field>
+            );
+          })}
+        </div>
+
+        {/* amber, not red — InfoBox has no red tone, and the zone editor
+            reports validation failures the same way. */}
+        {error && <InfoBox tone="amber">{error}</InfoBox>}
+
+        <div className="flex items-center gap-3">
+          <Button onClick={handleSave} disabled={isPending}>
+            {isPending ? "Saving…" : "Save settings"}
+          </Button>
+          {saved && !isPending && (
+            <span className="inline-flex items-center gap-1.5 text-[13px] text-p-green font-medium">
+              <Check size={15} strokeWidth={2} />
+              Saved — the worker picks this up within 30s
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-ink-4">
+          Last updated {new Date(config.updated_at).toLocaleString()}.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
 interface SettingsClientProps {
   profile: Profile;
   notificationPrefs: NotificationPrefs;
@@ -1056,6 +1192,7 @@ interface SettingsClientProps {
   billingConfigured: boolean;
   emailConfigured: boolean;
   roleCounts: Record<string, number>;
+  aiWorkerConfig: AiWorkerConfig | null;
 }
 
 export function SettingsClient({
@@ -1065,13 +1202,18 @@ export function SettingsClient({
   billingConfigured,
   emailConfigured,
   roleCounts,
+  aiWorkerConfig,
 }: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
+
+  const isSuperAdmin = profile.role === "super_admin";
+  const visibleTabs = TABS.filter((t) => !t.superAdminOnly || isSuperAdmin);
 
   const tabContent: Record<Tab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} />,
     roles: <RolesTab roleCounts={roleCounts} />,
     notifications: <NotificationsTab prefs={notificationPrefs} />,
+    detection: <DetectionTab config={aiWorkerConfig} />,
     integrations: <IntegrationsTab billingConfigured={billingConfigured} emailConfigured={emailConfigured} />,
     billing: <BillingTab subscription={subscription} billingConfigured={billingConfigured} />,
   };
@@ -1099,7 +1241,7 @@ export function SettingsClient({
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 items-start">
         {/* Sidebar tabs */}
         <nav className="flex md:flex-col gap-1 overflow-x-auto">
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
