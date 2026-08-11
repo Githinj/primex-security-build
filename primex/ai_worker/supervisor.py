@@ -158,7 +158,6 @@ class Supervisor:
                 poster=self.poster,
                 snapshot_interval_s=self.config.snapshot_interval_s,
                 dwell_threshold_s=self.config.dwell_threshold_s,
-                door_open_threshold_s=self.config.door_open_threshold_s,
                 confidence_threshold=self.config.confidence_threshold,
                 antmedia_url=os.environ.get("ANTMEDIA_URL", ""),
                 antmedia_secret=os.environ.get("ANTMEDIA_API_KEY", ""),

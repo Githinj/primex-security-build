@@ -9,15 +9,36 @@ const box = (over: Partial<AiZoneInput> = {}): AiZoneInput => ({
 })
 
 describe('isZoneType', () => {
-  it('accepts the three types the worker understands', () => {
+  it('accepts the two types the worker understands', () => {
     expect(isZoneType('entry')).toBe(true)
-    expect(isZoneType('door')).toBe(true)
     expect(isZoneType('restricted')).toBe(true)
   })
 
-  it('rejects anything else', () => {
+  it('rejects anything else, including the retired door type', () => {
+    expect(isZoneType('door')).toBe(false)
     expect(isZoneType('perimeter')).toBe(false)
     expect(isZoneType('')).toBe(false)
+  })
+})
+
+describe('retired zone types (SEC-166)', () => {
+  it('drops a saved door zone instead of rejecting the whole save', () => {
+    // Door zones were drawable but inert, so dropping one changes no
+    // behaviour — whereas throwing would block a user editing an unrelated
+    // zone on a camera that happens to have a legacy door zone stored.
+    const zones = normalizeZones([
+      { name: 'Back door', type: 'door' as never, coords: { x1: 0.1, y1: 0.1, x2: 0.4, y2: 0.4 } },
+      box({ name: 'Main Entry' }),
+    ])
+
+    expect(zones).toHaveLength(1)
+    expect(zones[0].name).toBe('Main Entry')
+  })
+
+  it('still rejects a genuinely unknown type', () => {
+    expect(() => normalizeZones([box({ type: 'perimeter' as never })])).toThrow(
+      /unknown zone type/i,
+    )
   })
 })
 

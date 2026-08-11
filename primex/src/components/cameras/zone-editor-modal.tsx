@@ -10,6 +10,7 @@ import {
   ZONE_TYPES,
   ZONE_TYPE_HELP,
   ZONE_TYPE_LABELS,
+  isRetiredZoneType,
   normalizeZones,
   type AiZoneInput,
   type ZoneType,
@@ -30,11 +31,22 @@ import type { AiZone } from "@/lib/types";
 
 const ZONE_TONES: Record<ZoneType, { stroke: string; fill: string; pill: "blue" | "amber" | "red" }> = {
   entry: { stroke: "#2563eb", fill: "rgba(37, 99, 235, 0.18)", pill: "blue" },
-  door: { stroke: "#d97706", fill: "rgba(217, 119, 6, 0.18)", pill: "amber" },
   restricted: { stroke: "#dc2626", fill: "rgba(220, 38, 38, 0.18)", pill: "red" },
 };
 
 const typeOptions = ZONE_TYPES.map((t) => ({ value: t, label: ZONE_TYPE_LABELS[t] }));
+
+/**
+ * Drop zones whose type no longer exists (SEC-166 retired `door`).
+ *
+ * Not cosmetic: every render path here indexes `ZONE_TONES[zone.type]` and
+ * reads `.stroke` off it, so one legacy door zone loaded from the database
+ * would throw while painting the list. They are dropped rather than migrated
+ * because they never drove a detection — `normalizeZones` does the same on save.
+ */
+function usableZones(zones: AiZone[]): AiZoneInput[] {
+  return zones.filter((z) => !isRetiredZoneType(z.type)) as AiZoneInput[];
+}
 
 interface Draft {
   x1: number;
@@ -62,7 +74,7 @@ export function ZoneEditorModal({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [items, setItems] = useState<AiZoneInput[]>(() => zones as AiZoneInput[]);
+  const [items, setItems] = useState<AiZoneInput[]>(() => usableZones(zones));
   const [draft, setDraft] = useState<Draft | null>(null);
   const [name, setName] = useState("");
   const [type, setType] = useState<ZoneType>("entry");
@@ -78,7 +90,7 @@ export function ZoneEditorModal({
   const [seededId, setSeededId] = useState<string | null>(null);
   if (cameraId !== seededId) {
     setSeededId(cameraId);
-    setItems(zones as AiZoneInput[]);
+    setItems(usableZones(zones));
     setDraft(null);
     setName("");
     setType("entry");
@@ -372,9 +384,8 @@ export function ZoneEditorModal({
 
           <InfoBox tone="blue">
             Zone types drive different detections. Entry zones trigger concealment
-            alerts, restricted zones trigger vehicle alerts, and door zones are used for
-            door-left-open alerts. A camera with no zones still detects loitering and
-            after-hours motion.
+            alerts and restricted zones trigger vehicle alerts. A camera with no
+            zones still detects loitering and after-hours motion.
           </InfoBox>
 
           {error && <InfoBox tone="amber">{error}</InfoBox>}
