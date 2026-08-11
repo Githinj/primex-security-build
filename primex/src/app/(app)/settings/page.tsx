@@ -3,6 +3,7 @@ import { getRoleHomePath } from "@/lib/auth/role-redirect";
 import { getProfile } from "@/lib/data/profiles";
 import { getNotificationPreferences } from "@/lib/data/actions/notification-preferences";
 import { getCompanySubscription } from "@/lib/data/subscriptions";
+import { getAiWorkerConfig } from "@/lib/data/actions/ai-worker-config";
 import { isBillingConfigured } from "@/lib/billing/stripe";
 import { isEmailConfigured } from "@/lib/notifications/email";
 import { SettingsClient } from "./settings-client";
@@ -30,6 +31,11 @@ export default async function SettingsPage() {
     roleCounts[r.role] = (roleCounts[r.role] ?? 0) + 1;
   }
 
+  // Only fetched for super_admin — the tab is theirs, and RLS on
+  // ai_worker_config would return nothing for anyone else anyway (SEC-169).
+  const aiWorkerConfig =
+    profile.role === "super_admin" ? await getAiWorkerConfig() : null;
+
   return (
     <SettingsClient
       profile={profile}
@@ -38,6 +44,7 @@ export default async function SettingsPage() {
       billingConfigured={isBillingConfigured()}
       emailConfigured={isEmailConfigured()}
       roleCounts={roleCounts}
+      aiWorkerConfig={aiWorkerConfig}
     />
   );
 }

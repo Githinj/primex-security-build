@@ -14,11 +14,17 @@ class WorkerConfig:
     door_open_threshold_s: int = 120
 
 
-def load_config() -> WorkerConfig:
-    """Fetch singleton config from ai_worker_config table."""
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
-    client = create_client(url, key)
+def load_config(client=None) -> WorkerConfig:
+    """Fetch singleton config from ai_worker_config table.
+
+    Accepts an existing Supabase client so the supervisor can re-read this on
+    its sync tick (SEC-169) without building a new client every 30 seconds.
+    Called with no argument at startup, before a supervisor exists.
+    """
+    if client is None:
+        url = os.environ["SUPABASE_URL"]
+        key = os.environ["SUPABASE_SERVICE_KEY"]
+        client = create_client(url, key)
 
     resp = client.table("ai_worker_config").select("*").eq("id", 1).single().execute()
     row = resp.data
