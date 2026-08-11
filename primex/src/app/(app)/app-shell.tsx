@@ -10,6 +10,12 @@ import { useProfile } from '@/components/providers/profile-provider'
 // sidebar is suppressed to avoid a redundant/empty second sidebar.
 const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard', 'client']
 
+// The shell is `h-dvh`, not `h-screen`: `100vh` on mobile measures the viewport
+// with the browser chrome retracted, so the last rows of a table and the
+// pagination strip sit behind the URL bar. The outer element is
+// `overflow-hidden` and only `main` scrolls, so there is nothing to scroll to
+// reach them. `100dvh` tracks the visible viewport instead.
+
 interface AppShellProps {
   children: React.ReactNode
   navCounts?: Record<string, number>
@@ -21,11 +27,11 @@ export function AppShell({ children, navCounts }: AppShellProps) {
   const hideGlobalNav = SELF_NAV_ROLES.includes(profile?.role ?? '')
 
   if (hideGlobalNav) {
-    return <div className="flex h-screen overflow-hidden">{children}</div>
+    return <div className="flex h-dvh overflow-hidden">{children}</div>
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* Desktop sidebar — always visible */}
       <div className="hidden lg:flex w-60 flex-shrink-0">
         <Sidebar navCounts={navCounts} />
