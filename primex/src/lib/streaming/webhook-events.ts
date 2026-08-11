@@ -359,3 +359,55 @@ export function streamWebhookEffect(
       }
   }
 }
+
+/** Cap on the stored body. Real hook bodies are a few hundred bytes; this is a
+ *  guard against a pathological payload, not an expectation. */
+export const MAX_STORED_BODY = 4000
+
+export type DeliveryOutcome = 'parsed' | 'unparseable' | 'unknown_stream'
+
+export type WebhookDelivery = {
+  content_type: string | null
+  action: string | null
+  stream_id: string | null
+  body_keys: string[]
+  raw_body: string
+  outcome: DeliveryOutcome
+}
+
+/**
+ * Build the diagnostic record for one listener-hook delivery (SEC-202).
+ *
+ * The webhook has never been observed firing in production, and everything that
+ * would tell you *why* — the Content-Type, the field names, an unparseable body —
+ * died in a server log. This turns each delivery into a row, so the first real
+ * one answers SEC-202's acceptance criteria by itself instead of needing somebody
+ * to be tailing Vercel at the moment a stream starts.
+ *
+ * `body_keys` is the useful half: AMS's documented form contract carries
+ * `streamName` while the route resolves on `streamId ?? id`, and nobody has seen
+ * which actually arrives. Recording the key set settles that from one delivery.
+ *
+ * The raw body is kept too, truncated — an unparseable delivery has no keys by
+ * definition, and that is exactly the case where the bytes matter.
+ */
+export function webhookDelivery(
+  contentType: string | null | undefined,
+  raw: string,
+  body: Record<string, unknown> | null,
+  outcome: DeliveryOutcome,
+): WebhookDelivery {
+  return {
+    content_type: contentType ?? null,
+    action: typeof body?.action === 'string' ? body.action : null,
+    stream_id:
+      typeof body?.streamId === 'string'
+        ? body.streamId
+        : typeof body?.id === 'string'
+          ? body.id
+          : null,
+    body_keys: body ? Object.keys(body).sort() : [],
+    raw_body: raw.slice(0, MAX_STORED_BODY),
+    outcome,
+  }
+}

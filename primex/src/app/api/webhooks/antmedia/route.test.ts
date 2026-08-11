@@ -22,6 +22,7 @@ const db = {
   cameraUpdates: [] as { match: Row; values: Row }[],
   streamEvents: [] as Row[],
   recordingUpserts: [] as Row[],
+  webhookDeliveries: [] as Row[],
 }
 
 function resetDb() {
@@ -31,6 +32,7 @@ function resetDb() {
   db.cameraUpdates = []
   db.streamEvents = []
   db.recordingUpserts = []
+  db.webhookDeliveries = []
 }
 
 /**
@@ -71,6 +73,11 @@ function makeBuilder(table: string) {
     if (table === 'stream_events' && op === 'insert') {
       const rows = Array.isArray(values) ? values : [values]
       db.streamEvents.push(...rows)
+      return { data: rows, error: null }
+    }
+    if (table === 'webhook_deliveries' && op === 'insert') {
+      const rows = Array.isArray(values) ? values : [values]
+      db.webhookDeliveries.push(...rows)
       return { data: rows, error: null }
     }
     return { data: [], error: null }
@@ -200,10 +207,56 @@ describe('POST /api/webhooks/antmedia', () => {
       expect(db.cameraUpdates[0].values.status).toBe('Online')
     })
 
-    it('400s on a body it cannot parse, without writing', async () => {
+    it('captures what a real delivery looked like, which is SEC-202 AC3 and AC4', async () => {
+      // The acceptance criteria ask for the observed Content-Type and the field
+      // names AMS actually sends. Recording them per delivery means the first
+      // real one answers both, rather than needing someone tailing Vercel logs
+      // at the moment a stream starts.
+      await post('id=cam-01&action=liveStreamStarted&streamName=Front+Gate', {
+        contentType: 'application/x-www-form-urlencoded',
+      })
+
+      expect(db.webhookDeliveries).toHaveLength(1)
+      expect(db.webhookDeliveries[0]).toMatchObject({
+        content_type: 'application/x-www-form-urlencoded',
+        action: 'liveStreamStarted',
+        stream_id: 'cam-01',
+        outcome: 'parsed',
+        camera_id: 'camera-uuid',
+      })
+      // Settles streamId-vs-id-vs-streamName from one sample.
+      expect(db.webhookDeliveries[0].body_keys).toEqual(['action', 'id', 'streamName'])
+    })
+
+    it('records a delivery for a stream it does not know', async () => {
+      // Previously this vanished into a console.warn — which is exactly how a
+      // misconfigured stream id stayed invisible.
+      const res = await post(json({ action: 'liveStreamStarted', streamId: 'not-a-camera' }))
+
+      expect(res.status).toBe(200)
+      expect(db.webhookDeliveries).toHaveLength(1)
+      expect(db.webhookDeliveries[0]).toMatchObject({
+        outcome: 'unknown_stream',
+        stream_id: 'not-a-camera',
+      })
+    })
+
+    it('200s on a body it cannot parse — and records it instead of writing state', async () => {
+      // Deliberately not a 400 (SEC-202). AMS retries any non-2xx from 2.8.3
+      // onward, and a body we could not parse once will not parse on the tenth
+      // attempt — a 400 here is a retry storm against an unparseable payload.
+      // The delivery is captured instead, which is the actionable half.
       const res = await post('not a body at all')
-      expect(res.status).toBe(400)
+      expect(res.status).toBe(200)
       expect(db.streamEvents).toHaveLength(0)
+      expect(db.cameraUpdates).toHaveLength(0)
+
+      expect(db.webhookDeliveries).toHaveLength(1)
+      expect(db.webhookDeliveries[0]).toMatchObject({
+        outcome: 'unparseable',
+        raw_body: 'not a body at all',
+        content_type: 'application/json',
+      })
     })
 
     it('400s when the action is missing', async () => {
