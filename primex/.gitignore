@@ -44,6 +44,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# load-test output — raw per-run samples, summarised into the deploy doc instead
+/loadtest/results/
+
 # python (ai_worker) — running pytest, locally or in the docker container that
 # mounts this directory, otherwise leaves these staged for the next `git add -A`
 __pycache__/

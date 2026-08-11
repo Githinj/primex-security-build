@@ -14,6 +14,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // `loadtest/` holds the streaming capacity harness (SEC-192). Its decision
+    // logic — when to stop pushing load at a production server — is tested here
+    // rather than trusted, so it runs with the rest of the suite.
+    include: ['src/**/*.test.ts', 'loadtest/**/*.test.mjs'],
   },
 })
