@@ -109,8 +109,15 @@ export async function loginAs(page: Page, role: Role) {
       JSON.parse(fs.readFileSync(statePath, 'utf-8')).cookies ?? []
     )
     const cached = await page.goto(user.home)
-    const bounced = await serverRedirectTarget(cached)
-    if (!page.url().includes('/login') && !bounced?.includes('/login')) return
+    let bouncedTo: string | null = null
+    try {
+      bouncedTo = cached ? redirectTargetIn(await cached.text()) : null
+    } catch {
+      // Unlike `landingPathFor`, losing the body here is harmless — the worst case
+      // is one redundant UI login, not a misreported access-control verdict.
+      bouncedTo = null
+    }
+    if (!page.url().includes('/login') && !bouncedTo?.includes('/login')) return
     // Cache was minted against an older database — start over.
     await page.context().clearCookies()
   }
@@ -143,6 +150,39 @@ export function getHomePath(role: Role): string {
  * access-matrix spec, where a redirect is the expected outcome half the time.
  */
 export async function landingPathFor(page: Page, target: string): Promise<string> {
+  const attempts = 3
+  const reasons: string[] = []
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const probe = await probeRoute(page, target)
+    if (probe.kind === 'redirect') return await settleOn(page, probe.to)
+    if (probe.kind === 'served') return probe.path
+    reasons.push(`attempt ${attempt}: ${probe.why}`)
+  }
+
+  // Only reachable when every attempt lost the response body AND the page never
+  // moved — i.e. the environment misbehaved repeatedly. Still not reported as a
+  // leak, because we never actually established that the page was served.
+  throw new Error(
+    `[e2e] could not determine where ${target} lands after ${attempts} attempts:\n  ` +
+      reasons.join('\n  ')
+  )
+}
+
+type Probe =
+  | { kind: 'redirect'; to: string }
+  | { kind: 'served'; path: string }
+  | { kind: 'unreadable'; why: string }
+
+/**
+ * One navigation, and what it tells us.
+ *
+ * The invariant that matters: **`served` is only ever returned from a response body
+ * we actually read.** Every other path can conclude `redirect` (positive evidence)
+ * or `unreadable` (retry), never `served` — because "we failed to look" must not
+ * become "the page was served", which the caller reads as an access-control leak.
+ */
+async function probeRoute(page: Page, target: string): Promise<Probe> {
   let response: Awaited<ReturnType<Page['goto']>> = null
   try {
     response = await page.goto(target)
@@ -150,27 +190,89 @@ export async function landingPathFor(page: Page, target: string): Promise<string
     // The redirect document's `<meta http-equiv="refresh" content="1;url=…">` fires
     // about a second in and can abort the navigation `goto` is still waiting on.
     // An aborted navigation is evidence the gate fired, not a reason to fail.
-    if (!String(err).includes('ERR_ABORTED')) throw err
+    if (String(err).includes('ERR_ABORTED')) {
+      // fall through: the checks below find where it went
+    } else if (isTransientNavigationError(err)) {
+      // The browser never got to ask the question — a suspended or dropped
+      // connection says nothing about the route, so retry rather than guess.
+      return { kind: 'unreadable', why: `navigation failed transiently: ${String(err).split('\n')[0]}` }
+    } else {
+      throw err
+    }
   }
 
-  const fromBody = await serverRedirectTarget(response)
-  if (fromBody) return await settleOn(page, fromBody)
+  if (response) {
+    let body: string | null = null
+    try {
+      body = await response.text()
+    } catch (err) {
+      // Playwright reads the body over CDP, and a superseded navigation can evict
+      // the resource before we ask — "No resource with given identifier found".
+      // Transient and worth retrying; anything else is a real fault.
+      if (!isBodyUnavailable(err)) throw err
+    }
 
-  // Same payload, read from the live DOM — covers the case where the response body
-  // came back before Next had finished writing the redirect into it.
+    if (body !== null) {
+      const to = redirectTargetIn(body)
+      return to ? { kind: 'redirect', to } : { kind: 'served', path: await settledPath(page) }
+    }
+  }
+
+  // No readable body. The same payload also lands in the DOM as a meta refresh,
+  // which survives until the client router makes the hop.
   const fromMeta = await page
     .locator('meta#__next-page-redirect')
     .first()
     .getAttribute('content', { timeout: 1000 })
     .catch(() => null)
   const metaTarget = fromMeta?.split('url=')[1]
-  if (metaTarget) return await settleOn(page, metaTarget)
+  if (metaTarget) return { kind: 'redirect', to: metaTarget }
 
-  // Nothing says "redirect", so the page really does look served. Confirm by
-  // letting the URL go quiet — a false "leak" here is the worst failure this
-  // helper can produce, so it is worth a couple of seconds to be sure.
+  // Last resort: where did the browser actually end up? Moving off the requested
+  // path proves a gate fired and names the destination. Staying put proves nothing
+  // — the hop may simply not have started — so that case retries rather than
+  // guessing "served".
+  const settled = await settledPath(page)
+  if (settled !== target) return { kind: 'redirect', to: settled }
+
+  return {
+    kind: 'unreadable',
+    why: `response body was unavailable and the page never left ${target}`,
+  }
+}
+
+/**
+ * Network-stack failures that say nothing about the route — a laptop suspending
+ * I/O, a dropped connection, a machine under enough load to time the socket out.
+ * Retrying is honest here; concluding anything from them would not be.
+ */
+function isTransientNavigationError(err: unknown): boolean {
+  const message = String(err)
+  return [
+    'ERR_NETWORK_IO_SUSPENDED',
+    'ERR_NETWORK_CHANGED',
+    'ERR_CONNECTION_RESET',
+    'ERR_CONNECTION_CLOSED',
+    'ERR_CONNECTION_REFUSED',
+    'ERR_EMPTY_RESPONSE',
+    'ERR_INTERNET_DISCONNECTED',
+  ].some((code) => message.includes(code))
+}
+
+/** True for the CDP condition where a superseded navigation's body is gone. */
+function isBodyUnavailable(err: unknown): boolean {
+  const message = String(err)
+  return (
+    message.includes('No resource with given identifier found') ||
+    message.includes('Network.getResponseBody')
+  )
+}
+
+/** The path the browser rests on once the URL stops changing. */
+async function settledPath(page: Page): Promise<string> {
   await page.waitForLoadState('domcontentloaded').catch(() => {})
   await page.waitForLoadState('networkidle').catch(() => {})
+
   let last = new URL(page.url()).pathname
   for (let stable = 0; stable < 4; ) {
     await page.waitForTimeout(250)
@@ -198,7 +300,8 @@ async function settleOn(page: Page, target: string): Promise<string> {
 }
 
 /**
- * Where a server component's `redirect()` is sending us, or null if none fired.
+ * Where a server component's `redirect()` is sending us, read out of the document,
+ * or null if no gate fired.
  *
  * A role gate does NOT answer with a 3xx. Next returns HTTP 200 whose body carries
  * `NEXT_REDIRECT;replace;/dashboard;307;` in the RSC payload, plus a
@@ -207,24 +310,10 @@ async function settleOn(page: Page, target: string): Promise<string> {
  * resolves with `page.url()` still on the requested path — for up to a second or
  * more — and a naive URL read reports every working redirect as a leak.
  *
- * Reading the verdict out of the response body instead is exact and needs no
- * waiting: the destination is right there in the payload.
+ * Reading the verdict out of the payload instead is exact and needs no waiting: the
+ * destination is right there.
  */
-async function serverRedirectTarget(
-  response: Awaited<ReturnType<Page['goto']>>
-): Promise<string | null> {
-  if (!response) return null
-  let body: string
-  try {
-    body = await response.text()
-  } catch (err) {
-    // Never fall through to "no redirect" here. The caller reads that as "the page
-    // was served", i.e. an access-control leak — and an unreadable body is an
-    // environment problem, not a security finding.
-    throw new Error(
-      `[e2e] could not read the navigation response for ${response.url()}: ${String(err)}`
-    )
-  }
+function redirectTargetIn(body: string): string | null {
   return (
     body.match(/NEXT_REDIRECT;[^;"]*;([^;"]+);/)?.[1] ??
     body.match(/id="__next-page-redirect"[^>]*content="[^;]*;url=([^"]+)"/)?.[1] ??
