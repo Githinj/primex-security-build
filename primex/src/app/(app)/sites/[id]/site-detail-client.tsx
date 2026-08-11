@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Settings, ArrowLeft, Camera, Clock } from "lucide-react";
-import { Card, Pill, Button, Label, InfoBox } from "@/components/ui";
+import { MapPin, Settings, Camera, Clock } from "lucide-react";
+import { Card, Pill, Button, Label, InfoBox, Breadcrumb } from "@/components/ui";
 import { CameraGrid } from "@/components/sites/camera-grid";
 import { EditSiteModal } from "@/components/sites/edit-site-modal";
 import { BusinessHoursModal } from "@/components/sites/business-hours-modal";
@@ -62,15 +62,8 @@ export function SiteDetailClient({
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-5xl">
-      {/* Back nav */}
-      <button
-        type="button"
-        onClick={() => router.push("/sites")}
-        className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors duration-100 font-sans cursor-pointer w-fit"
-      >
-        <ArrowLeft size={14} strokeWidth={2} />
-        Back to Sites
-      </button>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Sites", onClick: () => router.push("/sites") }, site.name]} />
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -104,7 +97,7 @@ export function SiteDetailClient({
       />
 
       {/* Mini stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Risk */}
         <Card className="flex flex-col gap-2">
           <span className="text-[11px] text-ink-3 font-semibold tracking-widest uppercase font-sans">

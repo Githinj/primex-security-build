@@ -1,6 +1,6 @@
 "use client";
 
-type Tone = "red" | "amber" | "green" | "blue" | "gray" | "navy";
+export type Tone = "red" | "amber" | "green" | "blue" | "gray" | "navy";
 type Size = "sm" | "md";
 
 const toneClasses: Record<Tone, { fg: string; bg: string }> = {
@@ -11,6 +11,10 @@ const toneClasses: Record<Tone, { fg: string; bg: string }> = {
   gray:  { fg: "text-p-gray",  bg: "bg-p-gray-soft" },
   navy:  { fg: "text-white",   bg: "bg-navy" },
 };
+
+export function getToneClasses(tone: Tone): { fg: string; bg: string } {
+  return toneClasses[tone] ?? toneClasses.gray;
+}
 
 const sizeClasses: Record<Size, string> = {
   sm: "px-2 py-0.5 text-[10px]",

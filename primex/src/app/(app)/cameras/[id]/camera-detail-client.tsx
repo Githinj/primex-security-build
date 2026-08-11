@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Trash2, SquareDashedMousePointer } from "lucide-react";
-import { Card, KV, Button, Label, Pill } from "@/components/ui";
+// ArrowLeft is deliberately absent: this branch replaced the hand-rolled back
+// link with the Breadcrumb primitive, so nothing references it any more.
+import { Trash2, SquareDashedMousePointer } from "lucide-react";
+import { Card, KV, Button, Label, Pill, Breadcrumb, Toggle } from "@/components/ui";
 import { ZoneEditorModal } from "@/components/cameras/zone-editor-modal";
 import { CameraPlayer } from "@/components/streaming/camera-player";
 import { RecordingTimeline } from "@/components/streaming/recording-timeline";
@@ -59,15 +61,8 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-4xl">
-      {/* Back nav */}
-      <button
-        type="button"
-        onClick={() => router.push("/cameras")}
-        className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors duration-100 font-sans cursor-pointer w-fit"
-      >
-        <ArrowLeft size={14} strokeWidth={2} />
-        Back to Cameras
-      </button>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Cameras", onClick: () => router.push("/cameras") }, camera.name]} />
 
       {/* Live player or recording player */}
       <div className="w-full max-w-2xl">
@@ -120,16 +115,11 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
               k="Recording"
               v={
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label={
-                      camera.recording_enabled ? "Turn recording off" : "Turn recording on"
-                    }
-                    aria-pressed={camera.recording_enabled}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                      camera.recording_enabled ? 'bg-p-blue' : 'bg-p-gray/30'
-                    }`}
-                    onClick={() => startTransition(async () => {
+                  <Toggle
+                    on={camera.recording_enabled}
+                    disabled={isPending}
+                    label="Recording"
+                    onChange={() => startTransition(async () => {
                       try {
                         // The column existed since migration 003 but nothing read
                         // or wrote it — this is the only control over whether Ant
@@ -150,14 +140,7 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
                         console.error(err);
                       }
                     })}
-                    disabled={isPending}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                        camera.recording_enabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
+                  />
                   {!camera.stream_id && (
                     <span className="text-xs text-ink-4">Applies when connected</span>
                   )}
@@ -186,12 +169,10 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-ink font-sans">Status</span>
-              <button
-                type="button"
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                  aiConfig?.enabled ? 'bg-p-blue' : 'bg-p-gray/30'
-                }`}
-                onClick={() => startTransition(async () => {
+              <Toggle
+                on={aiConfig?.enabled ?? false}
+                disabled={isPending}
+                onChange={() => startTransition(async () => {
                   try {
                     await toggleCameraAi(camera.id, !(aiConfig?.enabled ?? false));
                     router.refresh();
@@ -199,14 +180,7 @@ export function CameraDetailClient({ camera, site, aiConfig, recordings }: Camer
                     console.error(err);
                   }
                 })}
-                disabled={isPending}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                    aiConfig?.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              />
             </div>
             <KV k="Zones configured" v={String(aiConfig?.zones?.length ?? 0)} />
             {aiConfig?.zones && aiConfig.zones.length > 0 && (

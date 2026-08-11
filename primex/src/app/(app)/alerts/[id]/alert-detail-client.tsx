@@ -2,8 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Camera, ArrowLeft, AlertTriangle, X } from "lucide-react";
-import { Card, Pill, Button, KV } from "@/components/ui";
+import { MapPin, Camera, AlertTriangle, X } from "lucide-react";
+import { Card, Pill, Button, KV, Breadcrumb } from "@/components/ui";
 import { severityTone } from "@/lib/utils";
 import { updateAlertStatus } from "@/lib/data/actions/alerts";
 import type { Alert, Site, Camera as CameraType } from "@/lib/types";
@@ -59,15 +59,8 @@ export function AlertDetailClient({ alert, site, camera, frameUrl }: AlertDetail
 
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6 max-w-5xl">
-      {/* Back nav */}
-      <button
-        type="button"
-        onClick={() => router.push("/alerts")}
-        className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors duration-100 font-sans cursor-pointer w-fit"
-      >
-        <ArrowLeft size={14} strokeWidth={2} />
-        Back to Alerts
-      </button>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Alerts", onClick: () => router.push("/alerts") }, alert.title]} />
 
       {/* Header */}
       <div className="flex flex-col gap-3">

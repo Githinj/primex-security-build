@@ -1,21 +1,23 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import {
   MapPin,
   Users,
   Briefcase,
   Camera,
   Building,
-  ArrowLeft,
 } from "lucide-react";
 
 import {
   Card,
   Pill,
   DataTable,
-  Button,
   StatCard,
   KV,
+  SectionHeader,
+  Breadcrumb,
 } from "@/components/ui";
 
 import type { Company, CompanyStatus, Site, Camera as CameraType, Profile } from "@/lib/types";
@@ -85,6 +87,8 @@ interface CompanyDetailClientProps {
 }
 
 export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDetailClientProps) {
+  const router = useRouter();
+
   // Derived data
   const companySites = sites;
   const siteIds = companySites.map((s) => s.id);
@@ -140,17 +144,8 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
   return (
     <div className="px-4 sm:px-9 py-6 sm:py-8 flex flex-col gap-6">
 
-      {/* Back nav */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={ArrowLeft}
-          onClick={() => history.back()}
-        >
-          Back to companies
-        </Button>
-      </div>
+      {/* Breadcrumb */}
+      <Breadcrumb items={[{ label: "Companies", onClick: () => router.push("/companies") }, company.name]} />
 
       {/* Company header */}
       <div className="flex items-start justify-between gap-4">
@@ -211,8 +206,8 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
 
         {/* Left: Company details card */}
         <Card>
-          <div className="flex flex-col gap-1 mb-4">
-            <h3 className="font-serif text-lg font-semibold text-ink">Company details</h3>
+          <div className="mb-4">
+            <SectionHeader title="Company details" />
           </div>
           <div className="flex flex-col gap-3">
             <KV k="Name" v={company.name} />
@@ -241,13 +236,11 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
 
         {/* Right: Sites table */}
         <Card padding="p-0">
-          <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-0.5">
-              <h3 className="font-serif text-lg font-semibold text-ink">Sites</h3>
-              <p className="text-ink-3 text-xs font-sans">
-                {companySites.length} site{companySites.length !== 1 ? "s" : ""} under this company
-              </p>
-            </div>
+          <div className="px-5 py-4 border-b border-border">
+            <SectionHeader
+              title="Sites"
+              sub={`${companySites.length} site${companySites.length !== 1 ? "s" : ""} under this company`}
+            />
           </div>
 
           {companySites.length === 0 ? (
@@ -268,12 +261,10 @@ export function CompanyDetailClient({ company, sites, cameras, team }: CompanyDe
       {/* Team members */}
       <Card padding="p-0">
         <div className="px-5 py-4 border-b border-border">
-          <div className="flex flex-col gap-0.5">
-            <h3 className="font-serif text-lg font-semibold text-ink">Team members</h3>
-            <p className="text-ink-3 text-xs font-sans">
-              Primex staff and client users with access to this company
-            </p>
-          </div>
+          <SectionHeader
+            title="Team members"
+            sub="Primex staff and client users with access to this company"
+          />
         </div>
 
         {teamRows.length === 0 ? (

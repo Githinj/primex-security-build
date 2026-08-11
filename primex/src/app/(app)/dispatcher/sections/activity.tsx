@@ -11,8 +11,7 @@ import {
   Settings,
   Eye,
 } from 'lucide-react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { PageTitle, Card } from '@/components/ui'
+import { PageTitle, Card, getToneClasses, Pagination } from '@/components/ui'
 import type { ActivityItem } from '@/lib/types'
 
 interface DispatcherActivityProps {
@@ -30,14 +29,6 @@ const iconMap: Record<string, React.ElementType> = {
   eye: Eye,
 }
 
-const toneBg: Record<string, string> = {
-  red: 'bg-p-red-soft text-p-red',
-  amber: 'bg-p-amber-soft text-p-amber',
-  green: 'bg-p-green-soft text-p-green',
-  blue: 'bg-p-blue-soft text-p-blue',
-  gray: 'bg-p-gray-soft text-p-gray',
-}
-
 function formatTimestamp(dateStr: string) {
   return new Date(dateStr).toLocaleString('en-AU', {
     day: '2-digit',
@@ -52,7 +43,6 @@ const PAGE_SIZE = 20
 
 export function DispatcherActivity({ activity }: DispatcherActivityProps) {
   const [page, setPage] = useState(1)
-  const totalPages = Math.ceil(activity.length / PAGE_SIZE)
   const paginatedActivity = activity.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
@@ -71,7 +61,7 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
           ) : (
             paginatedActivity.map((item) => {
               const Icon = iconMap[item.icon] ?? Bell
-              const toneClass = toneBg[item.tone] ?? toneBg.gray
+              const { fg, bg } = getToneClasses(item.tone)
 
               return (
                 <div
@@ -80,9 +70,9 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
                 >
                   {/* Icon */}
                   <span
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${toneClass}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}
                   >
-                    <Icon size={15} strokeWidth={2} />
+                    <Icon size={15} strokeWidth={2} className={fg} />
                   </span>
 
                   {/* Content */}
@@ -106,32 +96,9 @@ export function DispatcherActivity({ activity }: DispatcherActivityProps) {
           )}
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-border">
-            <span className="text-xs text-ink-3 font-sans tabular-nums">
-              {(page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, activity.length)} of {activity.length}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={16} strokeWidth={2} />
-              </button>
-              <span className="text-xs font-sans text-ink-2 px-2 tabular-nums">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                className="p-1.5 rounded-md text-ink-3 hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={16} strokeWidth={2} />
-              </button>
-            </div>
+        {activity.length > 0 && (
+          <div className="px-5 py-3 border-t border-border">
+            <Pagination page={page} pageSize={PAGE_SIZE} total={activity.length} onPageChange={setPage} itemLabel="events" />
           </div>
         )}
       </Card>

@@ -76,7 +76,7 @@ export function ClientReports({ reports }: ClientReportsProps) {
   ])
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1000px]">
+    <div className="flex flex-col gap-6 max-w-[1200px]">
       <PageTitle
         title="My reports"
         sub={`${reports.length} report${reports.length !== 1 ? 's' : ''} available`}

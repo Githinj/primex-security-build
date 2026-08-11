@@ -3,16 +3,25 @@
 interface ToggleProps {
   on: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
+  /**
+   * Accessible name. A switch with no name is announced as just "switch, on" —
+   * fine when the visible label is adjacent and unambiguous, but worth passing
+   * wherever the control's meaning comes from context a screen reader misses.
+   */
+  label?: string;
 }
 
-export function Toggle({ on, onChange }: ToggleProps) {
+export function Toggle({ on, onChange, disabled = false, label }: ToggleProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
-      className={`relative inline-flex w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p-blue ${
+      disabled={disabled}
+      className={`relative inline-flex w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p-blue ${
         on ? "bg-p-blue" : "bg-surface border border-border-strong"
       }`}
     >

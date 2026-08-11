@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Phone, AlertTriangle, Mail, Plus } from 'lucide-react'
-import { PageTitle, Card, Button } from '@/components/ui'
+import { PageTitle, Card, Button, SectionHeader } from '@/components/ui'
 import { DISPATCH_PHONE_DISPLAY, DISPATCH_PHONE_TEL, SUPPORT_EMAIL } from '@/lib/support'
 import { ReportIssueModal } from '../report-issue-modal'
 
@@ -24,9 +24,7 @@ export function ClientHelp({ siteId }: { siteId: string }) {
               <Phone size={20} className="text-p-blue" strokeWidth={2} />
             </div>
             <div>
-              <h3 className="font-serif text-[22px] font-semibold text-ink leading-snug">
-                Call dispatch
-              </h3>
+              <SectionHeader title="Call dispatch" />
               <p className="text-sm text-ink-3 font-sans mt-1">
                 Speak directly with our 24/7 dispatch team for urgent matters.
               </p>
@@ -51,9 +49,7 @@ export function ClientHelp({ siteId }: { siteId: string }) {
               <AlertTriangle size={20} className="text-p-amber" strokeWidth={2} />
             </div>
             <div>
-              <h3 className="font-serif text-[22px] font-semibold text-ink leading-snug">
-                Report an incident
-              </h3>
+              <SectionHeader title="Report an incident" />
               <p className="text-sm text-ink-3 font-sans mt-1">
                 Let us know about something suspicious or an issue at your location.
               </p>
@@ -71,9 +67,7 @@ export function ClientHelp({ siteId }: { siteId: string }) {
               <Mail size={20} className="text-p-gray" strokeWidth={2} />
             </div>
             <div>
-              <h3 className="font-serif text-[22px] font-semibold text-ink leading-snug">
-                Email support
-              </h3>
+              <SectionHeader title="Email support" />
               <p className="text-sm text-ink-3 font-sans mt-1">
                 Send us a message and we&apos;ll get back to you within 24 hours.
               </p>

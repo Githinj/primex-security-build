@@ -154,7 +154,7 @@ export function PortalClient({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-auto bg-bg px-4 sm:px-8 py-6 sm:py-8">
+      <main className="flex-1 min-w-0 overflow-auto bg-bg px-4 sm:px-9 py-6 sm:py-8">
         {section === 'home' && (
           <ClientHome
             siteId={site.id}

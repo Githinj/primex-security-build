@@ -24,6 +24,7 @@ import {
   Button,
   LiveDot,
   FilterPills,
+  SectionHeader,
 } from "@/components/ui";
 
 import { useScope } from "@/components/providers/scope-provider";
@@ -174,7 +175,7 @@ export function DashboardClient({
       />
 
       {/* ── Stat cards row 1 ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Companies"
           value={String(scopedStats.totalCompanies)}
@@ -220,7 +221,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Stat cards row 2 ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 mb-4 sm:mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-4 sm:mb-8">
         <StatCard
           label="Active incidents"
           value={String(scopedStats.activeIncidents)}
@@ -265,16 +266,16 @@ export function DashboardClient({
         {/* Left: Recent active incidents */}
         <Card padding="p-0">
           {/* Card header */}
-          <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-border">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="font-serif text-xl font-semibold text-ink">
-                Recent active incidents
-              </h2>
-              <p className="text-ink-3 text-xs font-sans">Live · all companies</p>
-            </div>
-            <Button variant="link" size="sm" icon={ArrowRight} onClick={() => router.push("/incidents")}>
-              View all
-            </Button>
+          <div className="px-5 py-4 border-b border-border">
+            <SectionHeader
+              title="Recent active incidents"
+              sub="Live · all companies"
+              actions={
+                <Button variant="link" size="sm" icon={ArrowRight} onClick={() => router.push("/incidents")}>
+                  View all
+                </Button>
+              }
+            />
           </div>
 
           {/* Table */}
@@ -288,13 +289,15 @@ export function DashboardClient({
         <Card padding="p-0">
           {/* Card header */}
           <div className="px-[22px] py-4 border-b border-border">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="inline-flex items-center gap-2.5 font-serif text-[20px] font-bold text-ink">
-                <LiveDot color="red" />
-                Critical alerts
-              </h2>
-              <p className="text-[12.5px] text-ink-3 font-sans">Need review now</p>
-            </div>
+            <SectionHeader
+              title={
+                <span className="inline-flex items-center gap-2.5">
+                  <LiveDot color="red" />
+                  Critical alerts
+                </span>
+              }
+              sub="Need review now"
+            />
           </div>
 
           {/* Alert feed */}
@@ -343,13 +346,11 @@ export function DashboardClient({
       {/* ── Camera status by company ── */}
       <Card padding="p-0">
         {/* Card header */}
-        <div className="px-[22px] py-4 border-b border-border flex flex-col gap-1">
-          <h2 className="font-serif text-[20px] font-bold text-ink">
-            Camera status by company
-          </h2>
-          <p className="text-[12.5px] text-ink-3 font-sans">
-            Online · Offline · Maintenance · Unknown
-          </p>
+        <div className="px-[22px] py-4 border-b border-border">
+          <SectionHeader
+            title="Camera status by company"
+            sub="Online · Offline · Maintenance · Unknown"
+          />
         </div>
 
         {/* Company columns */}
