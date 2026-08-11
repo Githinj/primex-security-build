@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { PageStrip } from '@/components/layout/page-strip'
 import { useProfile } from '@/components/providers/profile-provider'
+import type { NotificationAlert } from '@/lib/data/alerts'
 
 // Roles whose page renders its own in-page nav (their SPA), so the global
 // sidebar is suppressed to avoid a redundant/empty second sidebar.
@@ -19,9 +20,10 @@ const SELF_NAV_ROLES = ['dispatcher', 'company_manager', 'guard', 'client']
 interface AppShellProps {
   children: React.ReactNode
   navCounts?: Record<string, number>
+  alerts?: NotificationAlert[]
 }
 
-export function AppShell({ children, navCounts }: AppShellProps) {
+export function AppShell({ children, navCounts, alerts }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const profile = useProfile()
   const hideGlobalNav = SELF_NAV_ROLES.includes(profile?.role ?? '')
@@ -55,6 +57,11 @@ export function AppShell({ children, navCounts }: AppShellProps) {
       <div className="flex flex-col flex-1 min-w-0">
         {/* Navbar: hamburger (mobile) + page strip */}
         <PageStrip
+          alerts={alerts}
+          // The badge counts every open alert, while the panel lists only the
+          // newest few — `navCounts.alerts` is that total, already computed in
+          // the layout for the sidebar.
+          openAlertCount={navCounts?.alerts ?? 0}
           menuButton={
             <button
               type="button"
