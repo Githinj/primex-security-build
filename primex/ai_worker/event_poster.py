@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 import httpx
 import boto3
 
+from heartbeat import Heartbeat
+
 logger = logging.getLogger(__name__)
 
 # Overridable so a container can point it at a mounted volume — otherwise
@@ -19,6 +21,7 @@ MISSED_EVENTS_FILE = os.environ.get("MISSED_EVENTS_FILE", "missed_events.jsonl")
 class EventPoster:
     def __init__(self):
         self.edge_fn_url = os.environ["SUPABASE_URL"] + "/functions/v1/ai-event-ingest"
+        self.heartbeat_url = os.environ["SUPABASE_URL"] + "/functions/v1/camera-heartbeat"
         self.worker_secret = os.environ["AI_WORKER_SECRET"]
 
         self.endpoint = os.environ["DO_SPACES_ENDPOINT"]
@@ -100,6 +103,38 @@ class EventPoster:
 
         logger.error(f"Failed to post event after 3 retries: {event_type} for {camera_id}")
         self._log_missed_event(payload)
+        return False
+
+    async def post_heartbeat(self, camera_id: str, beat: Heartbeat) -> bool:
+        """Report frame liveness (SEC-204).
+
+        Fire-and-forget on purpose: no retries, no missed-events spill file.
+        A heartbeat is only ever a claim about one instant, and the next one is
+        at most `interval_s` away — retrying a stale observation would write an
+        older timestamp over a newer one. Events get the retry machinery
+        because a dropped event is gone for good; a dropped heartbeat is not.
+        """
+        payload = {
+            "camera_id": camera_id,
+            "observed_at": datetime.fromtimestamp(beat.observed_at, timezone.utc).isoformat(),
+            "degraded": beat.degraded,
+            "consecutive_failures": beat.consecutive_failures,
+            # Lets the receiver log a timeline row for state changes only,
+            # instead of one per beat forever.
+            "transition": beat.transition,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(
+                    self.heartbeat_url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.worker_secret}"},
+                )
+            if resp.status_code == 200:
+                return True
+            logger.warning(f"Heartbeat returned {resp.status_code}: {resp.text}")
+        except Exception as e:
+            logger.warning(f"Heartbeat POST failed for {camera_id}: {e}")
         return False
 
     def _log_missed_event(self, payload: dict) -> None:

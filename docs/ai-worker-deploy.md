@@ -24,7 +24,7 @@ At the default 2s poll interval and roughly 100ms per `yolov8n` frame on a moder
 
 Before deploying, these must already be true:
 
-- [ ] **Edge Function deployed.** From `primex/`: `supabase functions deploy ai-event-ingest`
+- [ ] **Edge Functions deployed.** From `primex/`: `supabase functions deploy ai-event-ingest` and `supabase functions deploy camera-heartbeat`. The second carries frame-liveness heartbeats (SEC-204) — without it the worker still detects normally, but `cameras.last_frame_at` never reflects an actually-observed frame and each beat logs a 404
 - [ ] **`AI_WORKER_SECRET` set in Supabase** (`supabase secrets set AI_WORKER_SECRET=...`) — the function rejects everything without it, and the same value goes in the worker's env
 - [ ] **Droplet IP added to the Ant Media REST allowlist.** Production AMS blocks non-whitelisted IPs on the REST API, which is exactly the snapshot endpoint the worker uses in Enterprise mode. Skipping this produces 403s on every snapshot and a worker that looks alive but detects nothing
 - [ ] **At least one camera** with `stream_id` set, `status = 'Online'`, and `camera_ai_config.enabled = true` — the supervisor's query requires all three

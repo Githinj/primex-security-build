@@ -201,8 +201,14 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       for the full runbook (Docker, sizing, first-light validation, troubleshooting).
       Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`
       byte-identical to the app's.
-- [ ] `supabase functions deploy ai-event-ingest` and set `AI_WORKER_SECRET` as a
-      Supabase secret — the worker's POSTs 401 without it.
+- [ ] `supabase functions deploy ai-event-ingest` **and**
+      `supabase functions deploy camera-heartbeat`, then set `AI_WORKER_SECRET` as a
+      Supabase secret — the worker's POSTs 401 without it, and both functions fail
+      closed when it is unset rather than accepting anonymous writes.
+      `camera-heartbeat` is what makes `cameras.last_frame_at` mean "we saw a frame"
+      instead of "Ant Media said something" (SEC-204). Skipping it is not fatal —
+      the worker logs a warning and carries on detecting — but the column stays
+      dead and every beat writes a 404 to the worker log.
 - [ ] Add the worker droplet's IP to the **Ant Media REST allowlist**, or every
       Enterprise snapshot fetch 403s and the worker detects nothing while looking healthy.
 

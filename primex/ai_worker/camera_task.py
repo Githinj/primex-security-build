@@ -11,9 +11,15 @@ from behavior_tracker import BehaviorTracker, Detection
 from cooldown import CooldownRegistry
 from detector import Detector
 from event_poster import EventPoster
+from heartbeat import DEFAULT_FAILURE_THRESHOLD, DEFAULT_INTERVAL_S, Heartbeat, HeartbeatState
 from stats import WorkerStats
 
 logger = logging.getLogger(__name__)
+
+# Snapshot failures tolerated before the camera counts as not delivering.
+# Shared by the /health view (`is_degraded`) and the heartbeat reporter so the
+# two can never disagree about what "degraded" means.
+FAILURE_THRESHOLD = DEFAULT_FAILURE_THRESHOLD
 
 
 class CameraTask:
@@ -36,6 +42,7 @@ class CameraTask:
         antmedia_secret: str = "",
         antmedia_app: str = "LiveApp",
         stats: WorkerStats | None = None,
+        heartbeat_interval_s: int = DEFAULT_INTERVAL_S,
     ):
         self.camera_id = camera_id
         self.site_id = site_id
@@ -54,6 +61,12 @@ class CameraTask:
         # Persistent OpenCV capture for the Community-Edition HLS strategy.
         self._hls_cap = None
         self._consecutive_failures = 0
+        # Frame-liveness reporting (SEC-204). Decides when to report; the
+        # poster does the sending.
+        self._heartbeat = HeartbeatState(
+            interval_s=heartbeat_interval_s,
+            failure_threshold=FAILURE_THRESHOLD,
+        )
 
         self.tracker = BehaviorTracker(
             zones=zones,
@@ -70,12 +83,19 @@ class CameraTask:
                 frame = await self._fetch_snapshot()
                 if frame is None:
                     self._consecutive_failures += 1
-                    if self._consecutive_failures >= 5:
-                        logger.warning(f"Camera {self.camera_id}: 5+ consecutive snapshot failures")
+                    if self._consecutive_failures >= FAILURE_THRESHOLD:
+                        logger.warning(
+                            f"Camera {self.camera_id}: "
+                            f"{FAILURE_THRESHOLD}+ consecutive snapshot failures"
+                        )
+                    await self._report_liveness(self._heartbeat.on_failure(time.time()))
                     await asyncio.sleep(self.snapshot_interval_s)
                     continue
 
                 self._consecutive_failures = 0
+                # Before inference, not after: this says "the source delivered a
+                # frame", which is true regardless of whether the GPU is healthy.
+                await self._report_liveness(self._heartbeat.on_frame(time.time()))
 
                 try:
                     detections = await self.detector.submit(frame, self.camera_id)
@@ -119,6 +139,16 @@ class CameraTask:
                 logger.error(f"Unexpected error in camera task {self.camera_id}: {e}")
 
             await asyncio.sleep(self.snapshot_interval_s)
+
+    async def _report_liveness(self, beat: Heartbeat | None) -> None:
+        """Send a heartbeat if the state machine produced one. Never raises:
+        liveness reporting must not be able to kill the detection loop."""
+        if beat is None:
+            return
+        try:
+            await self.poster.post_heartbeat(self.camera_id, beat)
+        except Exception as e:
+            logger.warning(f"Heartbeat failed for {self.camera_id}: {e}")
 
     async def _fetch_snapshot(self) -> bytes | None:
         """Grab one JPEG frame. Two strategies, mirroring the front-end's
@@ -201,4 +231,4 @@ class CameraTask:
 
     @property
     def is_degraded(self) -> bool:
-        return self._consecutive_failures >= 5
+        return self._consecutive_failures >= FAILURE_THRESHOLD
