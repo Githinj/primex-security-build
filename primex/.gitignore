@@ -44,4 +44,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# python (ai_worker) — running pytest, locally or in the docker container that
+# mounts this directory, otherwise leaves these staged for the next `git add -A`
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
 .vercel

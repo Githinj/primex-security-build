@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
 import { Breadcrumb } from "@/components/ui";
+import { NotificationMenu } from "./notification-menu";
+import type { NotificationAlert } from "@/lib/data/alerts";
 
 function buildBreadcrumb(pathname: string): string[] {
   const segmentLabels: Record<string, string> = {
@@ -39,9 +40,11 @@ function formatDate(date: Date): string {
 
 interface PageStripProps {
   menuButton?: React.ReactNode;
+  alerts?: NotificationAlert[];
+  openAlertCount?: number;
 }
 
-export function PageStrip({ menuButton }: PageStripProps) {
+export function PageStrip({ menuButton, alerts = [], openAlertCount = 0 }: PageStripProps) {
   const pathname = usePathname();
   const crumbs = buildBreadcrumb(pathname ?? "");
   const today = formatDate(new Date());
@@ -55,20 +58,12 @@ export function PageStrip({ menuButton }: PageStripProps) {
       </div>
 
       {/* Right — date + notifications */}
-      <div className="hidden sm:flex items-center gap-4">
-        <span className="text-sm font-sans text-ink-3">{today}</span>
-
-        {/* Bell with badge */}
-        <button
-          type="button"
-          className="relative p-1.5 rounded-lg hover:bg-surface-subtle transition-colors duration-150"
-          aria-label="Notifications"
-        >
-          <Bell size={17} className="text-ink-2" strokeWidth={2} />
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-p-red text-white text-[10px] font-bold font-sans rounded-full px-1 leading-none">
-            3
-          </span>
-        </button>
+      <div className="flex items-center gap-4">
+        {/* The date is decoration; the bell is not, so only the date hides on
+            small screens. Both used to be behind `hidden sm:flex`, which put
+            the alert count out of reach on a phone. */}
+        <span className="hidden sm:inline text-sm font-sans text-ink-3">{today}</span>
+        <NotificationMenu alerts={alerts} openCount={openAlertCount} />
       </div>
     </header>
   );

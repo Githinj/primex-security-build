@@ -3,6 +3,7 @@ import { ProfileProvider } from '@/components/providers/profile-provider'
 import { ScopeProvider } from '@/components/providers/scope-provider'
 import { AppShell } from './app-shell'
 import { getCompanies } from '@/lib/data/companies'
+import { getRecentAlerts, type NotificationAlert } from '@/lib/data/alerts'
 import type { Profile } from '@/lib/types'
 import type { Company } from '@/lib/types'
 
@@ -24,12 +25,15 @@ export default async function AppLayout({
     profile = data
   }
 
-  // Fetch companies for scope dropdown + nav counts (super_admin only)
+  // Fetch companies for scope dropdown + nav counts (super_admin only).
+  // The notification menu rides along here for the same reason: it renders in
+  // the shell, and only this role's shell shows it.
   let companies: Company[] = []
   let navCounts: Record<string, number> = {}
+  let recentAlerts: NotificationAlert[] = []
   if (profile?.role === 'super_admin') {
     try {
-      const [companiesData, counts] = await Promise.all([
+      const [companiesData, counts, alerts] = await Promise.all([
         getCompanies(),
         Promise.all([
           supabase.from('companies').select('*', { count: 'exact', head: true }),
@@ -40,8 +44,10 @@ export default async function AppLayout({
           supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'guard'),
           supabase.from('profiles').select('*', { count: 'exact', head: true }),
         ]),
+        getRecentAlerts(),
       ])
       companies = companiesData
+      recentAlerts = alerts
       navCounts = {
         companies: counts[0].count ?? 0,
         sites: counts[1].count ?? 0,
@@ -59,7 +65,7 @@ export default async function AppLayout({
   return (
     <ProfileProvider profile={profile}>
       <ScopeProvider companies={companies}>
-        <AppShell navCounts={navCounts}>{children}</AppShell>
+        <AppShell navCounts={navCounts} alerts={recentAlerts}>{children}</AppShell>
       </ScopeProvider>
     </ProfileProvider>
   )
