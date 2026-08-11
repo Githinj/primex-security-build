@@ -19,7 +19,7 @@ import { cn, severityTone } from '@/lib/utils'
 import { updateAlertStatus } from '@/lib/data/actions/alerts'
 import { useRealtimeAlerts } from '@/lib/hooks/use-realtime-alerts'
 import type { Alert, AlertSeverity, Profile, Site, Camera as CameraType } from '@/lib/types'
-import { CameraPlayer } from '@/components/streaming/camera-player'
+import { DeferredCameraPlayer } from '@/components/streaming/deferred-camera-player'
 
 type FilterSeverity = 'All' | AlertSeverity
 
@@ -226,12 +226,19 @@ export function DispatcherQueue({ alerts, guards, sites, cameras }: DispatcherQu
                 )}
               </div>
 
-              {/* Live stream — compact player */}
+              {/* Live stream — compact player.
+                  Critical alerts open the stream immediately; everything else
+                  waits for a click, so reading down the queue does not hold a
+                  peer connection open per alert looked at (SEC-192). Keyed on
+                  the alert so switching selection returns to the poster. */}
               {selectedCamera && selectedCamera.status === 'Online' && selectedCamera.stream_id && (
-                <CameraPlayer
+                <DeferredCameraPlayer
+                  key={selected.id}
                   cameraId={selectedCamera.id}
                   cameraName={selectedCamera.name}
                   status={selectedCamera.status}
+                  subtitle={selectedSite?.name}
+                  autoStart={selected.severity === 'Critical'}
                   compact
                 />
               )}

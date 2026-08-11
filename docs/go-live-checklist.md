@@ -278,7 +278,7 @@ What is genuinely still open, and why:
 |---|---|---|
 | **SEC-202** | In Progress | No AMS webhook delivery has been *observed*. Until one is, camera status, drop telemetry and recordings are unproven in production. The instrument now exists (migration 023 → `webhook_deliveries`); what remains is applying it to prod and starting one stream. |
 | **SEC-190** | Todo | Bucket lifecycle window vs `evidence_retention_days` still needs reconciling — see Recordings retention above. This is the item that can lose evidence. |
-| **SEC-192** | Todo | Viewer caps shipped; the load test to find the real per-droplet knee, and the origin/edge split plan, did not. Nobody has measured the ceiling. |
+| **SEC-192** | Todo | Measured: **≥30 concurrent viewers per stream**, ceiling not reached — see `docs/streaming-capacity.md`. Set `ANTMEDIA_WEBRTC_VIEWER_LIMIT=30` and re-provision, or broadcasts keep AMS's unlimited default. Open: RTMP publish drops every 90–180s (four runs), not yet isolated to network vs server. |
 | **SEC-203** | Backlog | Nothing pages a human when a camera goes dark. Needs a policy decision on the threshold before it can be built. |
 | **SEC-129** | Backlog | Stripe live-mode provisioning — parked pending monetisation strategy. |
 | **SEC-148** | — | Web push VAPID keys, if push is wanted at launch. |
