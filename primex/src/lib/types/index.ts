@@ -87,6 +87,12 @@ export interface CameraStreamConfig {
   source_url: string | null
 }
 
+/**
+ * A zone as **stored**, which is not the same as a zone we still accept.
+ * `door` is retired (SEC-166) but rows written before that survive, so reading
+ * code must handle it; writing code goes through `ZoneType` in lib/ai-zones.ts,
+ * which no longer includes it.
+ */
 export interface AiZone {
   name: string
   type: 'door' | 'restricted' | 'entry'

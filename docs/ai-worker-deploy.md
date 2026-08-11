@@ -82,7 +82,7 @@ The point of this step is to prove the whole chain in one shot: snapshot → inf
 
 If the alert appears but the image is broken, the problem is presigning (`DO_SPACES_KEY`/`SECRET` on the *app* side), not the worker.
 
-Note that with no zones configured and no business hours, `person_lingering` is the only detection type that can fire at all. `concealment_behavior` and `vehicle_detection` need zones (SEC-167); `door_event` has no production caller yet (SEC-166).
+Note that with no zones configured and no business hours, `person_lingering` is the only detection type that can fire at all. `concealment_behavior` and `vehicle_detection` need zones (SEC-167). `door_event` was removed from the worker (SEC-166) — it could never fire, because the detector runs stock YOLOv8 over the COCO classes and COCO has no door. The enum value and the Edge Function's alert mapping are still there, so wiring a real contact sensor later is additive.
 
 ## 6. Health and troubleshooting
 

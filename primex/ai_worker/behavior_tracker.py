@@ -1,4 +1,12 @@
-"""Per-camera behavior tracker — dwell, concealment, after-hours, door, vehicle."""
+"""Per-camera behavior tracker — dwell, concealment, after-hours, vehicle.
+
+No door tracking (SEC-166). `mark_door_open`/`mark_door_closed`, the
+`_door_state` dict and the `door_open_threshold_s` knob existed here but had no
+production caller, and could not have had one: the detector is stock YOLOv8 over
+the COCO classes, which contain no door. The `detection_event_type` enum value
+and the edge function's "Door left open" mapping are intentionally left in the
+database, so wiring a real contact sensor later is additive.
+"""
 
 import datetime
 from dataclasses import dataclass, field
@@ -49,22 +57,12 @@ class BehaviorTracker:
         business_hours: dict,
         timezone: str = "UTC",
         dwell_threshold_s: int = 300,
-        door_open_threshold_s: int = 120,
     ):
         self.zones = zones
         self.business_hours = business_hours
         self.timezone = timezone
         self.dwell_threshold_s = dwell_threshold_s
-        self.door_open_threshold_s = door_open_threshold_s
         self._tracks: dict[str, _TrackState] = {}
-        self._door_state: dict[str, float] = {}
-
-    def mark_door_open(self, zone_name: str, timestamp: float) -> None:
-        if zone_name not in self._door_state:
-            self._door_state[zone_name] = timestamp
-
-    def mark_door_closed(self, zone_name: str) -> None:
-        self._door_state.pop(zone_name, None)
 
     def process(self, detections: list[Detection], timestamp: float) -> list[SecurityEvent]:
         events: list[SecurityEvent] = []
@@ -136,16 +134,6 @@ class BehaviorTracker:
                     confidence=det.confidence,
                     track_id=det.track_id,
                     zone=track.zone,
-                ))
-
-        # Door events
-        for zone_name, open_since in list(self._door_state.items()):
-            if timestamp - open_since >= self.door_open_threshold_s:
-                events.append(SecurityEvent(
-                    event_type="door_event",
-                    confidence=1.0,
-                    zone=zone_name,
-                    metadata={"open_seconds": timestamp - open_since},
                 ))
 
         # Prune disappeared tracks

@@ -30,7 +30,6 @@ class CameraTask:
         poster: EventPoster,
         snapshot_interval_s: int = 2,
         dwell_threshold_s: int = 300,
-        door_open_threshold_s: int = 120,
         confidence_threshold: float = 0.7,
         antmedia_url: str = "",
         antmedia_secret: str = "",
@@ -60,7 +59,6 @@ class CameraTask:
             business_hours=business_hours,
             timezone=timezone,
             dwell_threshold_s=dwell_threshold_s,
-            door_open_threshold_s=door_open_threshold_s,
         )
 
     async def run(self):

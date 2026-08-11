@@ -9,9 +9,24 @@
  * stream published 1280x720.
  */
 
-export const ZONE_TYPES = ['entry', 'door', 'restricted'] as const
+export const ZONE_TYPES = ['entry', 'restricted'] as const
 
 export type ZoneType = (typeof ZONE_TYPES)[number]
+
+/**
+ * Types that were once offered and are no longer (SEC-166).
+ *
+ * `door` drove `door_event`, which could never fire: the worker runs stock
+ * YOLOv8 on the COCO classes, and COCO has no door. The zone was drawable and
+ * inert. Rather than reject saved data, `normalizeZones` drops these — silently,
+ * because dropping something that never did anything changes no behaviour, and
+ * refusing the save would block a user editing an unrelated zone.
+ *
+ * The `detection_event_type` enum value and the edge function's alert mapping
+ * are left in place: re-adding them behind a real door sensor is cheap, while
+ * removing a Postgres enum value is not.
+ */
+export const RETIRED_ZONE_TYPES = ['door'] as const
 
 export interface ZoneCoords {
   x1: number
@@ -29,13 +44,11 @@ export interface AiZoneInput {
 /** What each zone type actually drives in the worker's heuristics. */
 export const ZONE_TYPE_HELP: Record<ZoneType, string> = {
   entry: 'Entry — a person crouching here for 30s raises a concealment alert.',
-  door: 'Door — used for door-left-open alerts.',
   restricted: 'Restricted — a vehicle detected here raises an alert.',
 }
 
 export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
   entry: 'Entry',
-  door: 'Door',
   restricted: 'Restricted',
 }
 
@@ -57,6 +70,11 @@ export function isZoneType(value: string): value is ZoneType {
   return (ZONE_TYPES as readonly string[]).includes(value)
 }
 
+/** True for a type that was once offered and no longer is. */
+export function isRetiredZoneType(value: string): boolean {
+  return (RETIRED_ZONE_TYPES as readonly string[]).includes(value)
+}
+
 /**
  * Validate and canonicalise a set of zones.
  *
@@ -72,6 +90,9 @@ export function normalizeZones(input: AiZoneInput[] | undefined): AiZoneInput[] 
   const zones: AiZoneInput[] = []
 
   for (const zone of input) {
+    // Retired types are dropped, not rejected — see RETIRED_ZONE_TYPES.
+    if (isRetiredZoneType(zone.type)) continue
+
     const name = zone.name?.trim()
     if (!name) throw new Error('Every zone needs a name.')
     if (name.length > MAX_ZONE_NAME_LENGTH) {

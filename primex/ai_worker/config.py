@@ -11,7 +11,6 @@ class WorkerConfig:
     snapshot_interval_s: int = 2
     cooldown_s: int = 60
     dwell_threshold_s: int = 300
-    door_open_threshold_s: int = 120
 
 
 def load_config() -> WorkerConfig:
@@ -30,5 +29,4 @@ def load_config() -> WorkerConfig:
         snapshot_interval_s=row["snapshot_interval_s"],
         cooldown_s=row["cooldown_s"],
         dwell_threshold_s=row["dwell_threshold_s"],
-        door_open_threshold_s=row["door_open_threshold_s"],
     )

@@ -23,18 +23,17 @@ def make_vehicle(track_id="v1", x1=100, y1=100, x2=300, y2=300, conf=0.85,
 
 ENTRY_ZONE = [{"name": "entry1", "type": "entry", "coords": {"x1": 0.05, "y1": 0.1, "x2": 0.4, "y2": 0.95}}]
 RESTRICTED_ZONE = [{"name": "restricted1", "type": "restricted", "coords": {"x1": 0.05, "y1": 0.1, "x2": 0.55, "y2": 0.73}}]
-DOOR_ZONE = [{"name": "door1", "type": "door", "coords": {"x1": 0.15, "y1": 0.2, "x2": 0.47, "y2": 0.83}}]
 BIZ_HOURS = {"mon": {"open": "08:00", "close": "18:00"}}
 
 
 def test_no_events_on_empty_detections():
-    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=300)
     events = tracker.process([], timestamp=1000.0)
     assert events == []
 
 
 def test_person_lingering_fires_after_dwell():
-    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=10, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=10)
     person = make_person()
     for t in range(10):
         events = tracker.process([person], timestamp=1000.0 + t)
@@ -45,7 +44,7 @@ def test_person_lingering_fires_after_dwell():
 
 
 def test_afterhours_motion_fires_outside_hours():
-    tracker = BehaviorTracker(zones=[], business_hours=BIZ_HOURS, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=[], business_hours=BIZ_HOURS, timezone="UTC", dwell_threshold_s=300)
     import datetime
     tue_23 = datetime.datetime(2026, 6, 30, 23, 0, 0).timestamp()
     person = make_person()
@@ -55,7 +54,7 @@ def test_afterhours_motion_fires_outside_hours():
 
 
 def test_no_afterhours_during_business_hours():
-    tracker = BehaviorTracker(zones=[], business_hours=BIZ_HOURS, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=[], business_hours=BIZ_HOURS, timezone="UTC", dwell_threshold_s=300)
     import datetime
     mon_10 = datetime.datetime(2026, 6, 29, 10, 0, 0).timestamp()
     person = make_person()
@@ -65,7 +64,7 @@ def test_no_afterhours_during_business_hours():
 
 
 def test_vehicle_in_restricted_zone():
-    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300)
     vehicle = make_vehicle(x1=100, y1=100, x2=300, y2=300)
     events = tracker.process([vehicle], timestamp=1000.0)
     types = [e.event_type for e in events]
@@ -73,7 +72,7 @@ def test_vehicle_in_restricted_zone():
 
 
 def test_concealment_requires_entry_zone_and_duration():
-    tracker = BehaviorTracker(zones=ENTRY_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=ENTRY_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300)
     crouching = make_person(x1=100, y1=350, x2=250, y2=400)
     events = tracker.process([crouching], timestamp=1000.0)
     types = [e.event_type for e in events]
@@ -84,15 +83,14 @@ def test_concealment_requires_entry_zone_and_duration():
     assert "concealment_behavior" in types
 
 
-def test_door_event_fires_after_threshold():
-    tracker = BehaviorTracker(zones=DOOR_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=5)
-    tracker.mark_door_open("door1", timestamp=1000.0)
-    events = tracker.process([], timestamp=1004.0)
-    types = [e.event_type for e in events]
-    assert "door_event" not in types
-    events = tracker.process([], timestamp=1006.0)
-    types = [e.event_type for e in events]
-    assert "door_event" in types
+def test_door_tracking_is_gone():
+    """SEC-166: the door path had no production caller and could not have had
+    one — the detector is stock YOLOv8 over COCO, which has no door class. This
+    guards against someone re-adding the API without a real sensor behind it."""
+    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=300)
+    assert not hasattr(tracker, "mark_door_open")
+    assert not hasattr(tracker, "mark_door_closed")
+    assert not hasattr(tracker, "door_open_threshold_s")
 
 
 def test_zone_matching_is_resolution_independent():
@@ -102,7 +100,7 @@ def test_zone_matching_is_resolution_independent():
     640x480 snapshot must still cover the same part of the scene once the camera
     publishes 1280x720.
     """
-    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300)
 
     # Centre at (0.3125, 0.4167) of the frame, expressed at two resolutions.
     small = make_vehicle(track_id="v-small", x1=100, y1=100, x2=300, y2=300, frame_w=640, frame_h=480)
@@ -119,7 +117,7 @@ def test_zone_matching_skipped_when_frame_size_unknown():
     Skipping beats guessing: comparing raw pixels against fractions would put
     every detection outside every zone anyway, but silently.
     """
-    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=RESTRICTED_ZONE, business_hours={}, timezone="UTC", dwell_threshold_s=300)
     vehicle = make_vehicle(x1=100, y1=100, x2=300, y2=300, frame_w=0, frame_h=0)
 
     events = tracker.process([vehicle], timestamp=1000.0)
@@ -129,7 +127,7 @@ def test_zone_matching_skipped_when_frame_size_unknown():
 
 
 def test_track_pruning_after_disappearance():
-    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=300, door_open_threshold_s=120)
+    tracker = BehaviorTracker(zones=[], business_hours={}, timezone="UTC", dwell_threshold_s=300)
     person = make_person(track_id="p1")
     tracker.process([person], timestamp=1000.0)
     assert "p1" in tracker._tracks
