@@ -8,6 +8,8 @@ import {
   streamDropCounts,
   streamWebhookEffect,
   vodRecordingRow,
+  webhookDelivery,
+  type WebhookDelivery,
 } from '@/lib/streaming/webhook-events'
 
 const WEBHOOK_SECRET = process.env.ANTMEDIA_WEBHOOK_SECRET
@@ -71,6 +73,27 @@ async function handleServerShutdown(
   return NextResponse.json({ ok: true, affected: ids.length })
 }
 
+/**
+ * Persist one delivery to `webhook_deliveries` (SEC-202).
+ *
+ * Never throws and never changes the response. This is instrumentation: if the
+ * diagnostic write fails, the actual webhook must still be handled. A failure
+ * here is logged and dropped precisely because the alternative — 500ing a real
+ * `liveStreamStarted` because a debug table was unreachable — is worse than
+ * losing the sample.
+ */
+async function recordDelivery(
+  supabase: SupabaseClient,
+  delivery: WebhookDelivery & { camera_id?: string },
+) {
+  try {
+    const { error } = await supabase.from('webhook_deliveries').insert(delivery)
+    if (error) console.warn('Could not record webhook delivery:', error.message)
+  } catch (e) {
+    console.warn('Could not record webhook delivery:', e)
+  }
+}
+
 export async function POST(req: NextRequest) {
   const auth = authenticateWebhook({
     headerSecret: req.headers.get('X-Antmedia-Secret'),
@@ -91,12 +114,18 @@ export async function POST(req: NextRequest) {
   // Read once as text and let the parser decide the encoding: AMS posts
   // form-urlencoded, not JSON (SEC-202).
   const raw = await req.text()
-  const body = parseHookBody(req.headers.get('content-type'), raw)
+  const contentType = req.headers.get('content-type')
+  const body = parseHookBody(contentType, raw)
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
   if (!body) {
-    console.warn(
-      `Unparseable Ant Media webhook body (content-type: ${req.headers.get('content-type') ?? 'none'})`,
-    )
-    return NextResponse.json({ error: 'Unparseable body' }, { status: 400 })
+    console.warn(`Unparseable Ant Media webhook body (content-type: ${contentType ?? 'none'})`)
+    await recordDelivery(supabase, webhookDelivery(contentType, raw, null, 'unparseable'))
+    // 200, not 400. AMS retries any non-2xx (2.8.3+), and re-sending a body we
+    // could not parse the first time will not parse on the tenth — it would just
+    // retry-storm. The delivery is now recorded, which is the actionable half.
+    return NextResponse.json({ ok: true, recorded: 'unparseable' })
   }
 
   const action = body.action as string
@@ -106,19 +135,26 @@ export async function POST(req: NextRequest) {
   const streamId = (body.streamId as string) ?? (body.id as string)
 
   if (!action) {
+    await recordDelivery(supabase, webhookDelivery(contentType, raw, body, 'unparseable'))
     return NextResponse.json({ error: 'Missing action' }, { status: 400 })
   }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   // Fleet-wide, and it arrives with no stream id — so it has to be handled before
   // the camera lookup or it dies at the "missing streamId" 400 below (SEC-181).
   // Every camera on this server just went dark simultaneously.
   if (action === AMS_HOOK.serverShutdown) {
+    // Recorded here rather than after the camera lookup, which this path never
+    // reaches — otherwise the one event that takes the whole fleet Offline would
+    // be the only action absent from the delivery log.
+    await recordDelivery(supabase, webhookDelivery(contentType, raw, body, 'parsed'))
     return handleServerShutdown(supabase, body)
   }
 
   if (!streamId) {
+    // Recorded, not just rejected: a delivery that carries an action but no id
+    // we recognise is the single most useful sample for settling which key AMS
+    // actually sends (SEC-202) — `body_keys` on the row names them.
+    await recordDelivery(supabase, webhookDelivery(contentType, raw, body, 'unknown_stream'))
     return NextResponse.json({ error: 'Missing streamId' }, { status: 400 })
   }
 
@@ -130,10 +166,16 @@ export async function POST(req: NextRequest) {
 
   if (!camera) {
     console.warn(`Webhook for unknown stream_id: ${streamId}`)
+    await recordDelivery(supabase, webhookDelivery(contentType, raw, body, 'unknown_stream'))
     return NextResponse.json({ ok: true, skipped: true })
   }
 
   const cameraId = camera.id
+
+  await recordDelivery(
+    supabase,
+    { ...webhookDelivery(contentType, raw, body, 'parsed'), camera_id: cameraId },
+  )
 
   // What this action means for camera state and the event log lives in
   // lib/streaming/webhook-events.ts so the mapping is unit-testable; this route

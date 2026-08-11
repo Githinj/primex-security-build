@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   AMS_HOOK,
+  MAX_STORED_BODY,
   parseHookBody,
   streamDropCounts,
   streamWebhookEffect,
   vodRecordingRow,
+  webhookDelivery,
 } from './webhook-events'
 
 describe('streamWebhookEffect', () => {
@@ -373,5 +375,69 @@ describe('vodRecordingRow', () => {
     const row = vodRecordingRow('cam-front-gate', { vodName: 'clip.mp4' }, options)
     expect(row.started_at).toBe(options.receivedAt)
     expect(row.ended_at).toBe(options.receivedAt)
+  })
+})
+
+describe('webhookDelivery (SEC-202)', () => {
+  it('records the content type verbatim — that is the whole open question', () => {
+    const raw = 'id=cam-01&action=liveStreamStarted'
+    const body = parseHookBody('application/x-www-form-urlencoded', raw)
+    const row = webhookDelivery('application/x-www-form-urlencoded', raw, body, 'parsed')
+
+    expect(row.content_type).toBe('application/x-www-form-urlencoded')
+    expect(row.action).toBe('liveStreamStarted')
+    expect(row.stream_id).toBe('cam-01')
+  })
+
+  it('records the key set, which is what settles streamId vs id vs streamName', () => {
+    const raw = 'id=cam-01&action=liveStreamStarted&streamName=Front+Door'
+    const body = parseHookBody('application/x-www-form-urlencoded', raw)
+    const row = webhookDelivery('application/x-www-form-urlencoded', raw, body, 'parsed')
+
+    expect(row.body_keys).toEqual(['action', 'id', 'streamName'])
+  })
+
+  it('prefers streamId over id when both are present', () => {
+    const row = webhookDelivery(
+      'application/json',
+      '{}',
+      { streamId: 'from-streamId', id: 'from-id' },
+      'parsed',
+    )
+    expect(row.stream_id).toBe('from-streamId')
+  })
+
+  it('never resolves a stream id from streamName', () => {
+    // streamName is the human-readable broadcast name. Treating it as a key
+    // would match the wrong camera, or none.
+    const row = webhookDelivery('application/json', '{}', { streamName: 'Front Door' }, 'parsed')
+    expect(row.stream_id).toBeNull()
+  })
+
+  it('keeps the raw body when the parse failed — the one case where bytes matter', () => {
+    const raw = '<?xml version="1.0"?><hook/>'
+    const row = webhookDelivery('text/xml', raw, null, 'unparseable')
+
+    expect(row.raw_body).toBe(raw)
+    expect(row.body_keys).toEqual([])
+    expect(row.action).toBeNull()
+    expect(row.outcome).toBe('unparseable')
+  })
+
+  it('truncates a pathological body rather than storing it whole', () => {
+    const raw = 'x'.repeat(MAX_STORED_BODY + 500)
+    const row = webhookDelivery('application/json', raw, null, 'unparseable')
+    expect(row.raw_body).toHaveLength(MAX_STORED_BODY)
+  })
+
+  it('handles a missing content-type header', () => {
+    const row = webhookDelivery(null, '{}', {}, 'parsed')
+    expect(row.content_type).toBeNull()
+  })
+
+  it('ignores non-string action and id values instead of coercing them', () => {
+    const row = webhookDelivery('application/json', '{}', { action: 42, id: false }, 'parsed')
+    expect(row.action).toBeNull()
+    expect(row.stream_id).toBeNull()
   })
 })
