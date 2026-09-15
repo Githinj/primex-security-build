@@ -3,6 +3,12 @@
 One place for everything needed to take the platform live. Supersedes the
 Stripe-only `docs/stripe-go-live-checklist.md` (still useful for Stripe detail).
 
+> 🚨 **Architecture change (2026-09-15):** camera ingest is moving from RTSP pull to
+> outbound **SRT push**. `docs/streaming-architecture.md` is the authority; where this
+> checklist still assumes pull, that part is legacy and marked 🕸️. Two overdue items now
+> gate the streaming section — the **AMS Enterprise licence** (renewal was due 2026-08-24)
+> and **secrets rotation**. Both are in the tracker at the foot of this document.
+
 **Snapshot (2026-08-11):** the provisioning backlog that dominated this document
 has been worked through — site networking (SEC-197/198/199/200), the Vercel link
 (SEC-196), env values (SEC-152/194), prod role accounts (SEC-195), the DO Spaces
@@ -69,7 +75,7 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 ### Recordings (DigitalOcean Spaces)
 | Var | | Notes |
 |-----|---|-------|
-| `DO_SPACES_RECORDINGS_BUCKET` | ⚙️ | Bucket name, resolved under SEC-194. ⚠️ **`primex-recordings` is wrong** — that name is repeated throughout this repo's older specs and `.env.example`, and it exists in no DO region (probed across nine, 2026-08-10). Take the value from the DO console, never from a doc |
+| `DO_SPACES_RECORDINGS_BUCKET` | ⚙️ | ⚠️ **No recordings bucket exists on this account.** `primex-recordings` — the name in this repo's older specs and `.env.example` — is unprovisioned and exists in no DO region (probed across nine, 2026-08-10). 🚨 **The bucket named `primex` in `sgp1` belongs to a THIRD PARTY — never point recordings at it.** Recordings are a future feature: leave this unset, and create `primex-recordings` in `nyc3` (co-located with the AMS droplet) when they ship |
 | `DO_SPACES_ENDPOINT` | ⚙️ | e.g. `https://sgp1.digitaloceanspaces.com` |
 | `DO_SPACES_REGION` | 💤 | Presign region (default `sgp1`) |
 | `DO_SPACES_KEY` / `DO_SPACES_SECRET` | 🔑 | Presigns private-bucket reads. Optional for recordings (only if that bucket is private) but **required** for AI detection frames — that bucket is private by design, so without these every alert snapshot 403s |
@@ -131,6 +137,17 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       answerable; object-side losses are not.
 
 ### Ant Media / AI worker
+
+> 🚨 **Read `docs/streaming-architecture.md` first.** Ingest is moving from RTSP pull to
+> outbound **SRT push** (decided 2026-09-15). Items below that concern the pull path are
+> marked; they are kept for the pilot camera that still runs on it, not as guidance.
+> Two things gate everything else in this section:
+> - **The AMS Enterprise licence renewal was due 2026-08-24 — verify its status.** SRT
+>   ingest, token control and the REST JWT auth the provisioning layer uses are all
+>   Enterprise-only features.
+> - **The droplet is 2 vCPU / 4 GB, below Ant Media's stated 4 vCPU / 8 GB minimum.**
+>   Upgrade before onboarding more sites; plan 8–16 vCPU for 100+ ingests.
+
 - [ ] Point `ANTMEDIA_*` at the live server.
 - [ ] **Enable token control for BOTH `play` and `publish`** on the AMS app. AMS
       enforces it per-type, so play-only leaves ingest wide open — anyone who
@@ -148,11 +165,15 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       `0x03`.** An unlistened `rtmps://` port breaks ingest with no error surfaced.
 - [ ] Re-issue ingest URLs for any camera provisioned before this change — the old
       URLs carry no token, and the token is shown once at creation.
-- [ ] **Verify the webhook actually arrives** (SEC-202 — still open). As of
-      2026-08-10 it never had: `listenerHookURL` was `null` on all three live
-      broadcasts and `stream_events` / `recordings` were empty, so camera status,
-      drop telemetry and recordings were all inert in production. Until a delivery
-      is observed, treat those three features as unproven in prod.
+- [ ] **Verify the webhook actually arrives** (SEC-202). ⚠️ **The original premise is
+      stale — the hook DOES fire in prod.** `stream_events` held ~2353 rows spanning
+      2026-08-10 → 2026-08-12, and `webhook-events.ts` is its only writer, so camera-status
+      telemetry is proven. What 023 still buys is *diagnostic detail* (real Content-Type,
+      real field names) and visibility of the deliveries that never reach `stream_events`
+      at all — not the yes/no. The 2026-08-10 note below ("`listenerHookURL` was `null` on
+      all three live broadcasts") described a real state that has since been repaired by
+      re-provisioning; keep it as the check to re-run, not as current fact.
+      Under push this hook is also the offline-alerting path — see the tracker below.
       - `createBroadcast()` / `createStreamSource()` now set `listenerHookURL`
         themselves, derived from `NEXT_PUBLIC_SITE_URL` (or `ANTMEDIA_WEBHOOK_URL`)
         plus `ANTMEDIA_WEBHOOK_SECRET`. **Both must be set before provisioning** —
@@ -220,7 +241,8 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       The daily Vercel cron is kept as a backstop: pg_net is fire-and-forget, so an
       external run also proves the endpoint is reachable. Reconciliation is
       idempotent, so both running is harmless.
-- [x] **AMS app setting `rtspPullTransportType` set to `tcp`** for every app that
+- [x] 🕸️ *(legacy pull path — moot once the pilot moves to SRT push)*
+      **AMS app setting `rtspPullTransportType` set to `tcp`** for every app that
       pulls RTSP (SEC-201). This is an **application** setting — AMS reads it in
       `StreamFetcher` and passes it to ffmpeg as `rtsp_transport`, so it cannot be set
       per-broadcast and `createStreamSource()` has no field for it. Change it in the
@@ -230,9 +252,17 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       (`--clamp-mss-to-pmtu`), and a clamp only applies to TCP. Left on the default,
       the RTSP pull may negotiate UDP, the clamp does nothing, and oversized packets
       keep vanishing into the MTU black hole (SEC-197 / SEC-198).
-- [ ] While in there, review `rtspTimeoutDurationMs` — it feeds ffmpeg's RTSP
-      `timeout`, so it decides how long a lossy tunnel may stall before AMS gives up
-      and the stream flaps.
+- [ ] 🕸️ *(legacy pull path)* While in there, review `rtspTimeoutDurationMs` — it feeds
+      ffmpeg's RTSP `timeout`, so it decides how long a lossy tunnel may stall before AMS
+      gives up and the stream flaps. Under push there is no tunnel and AMS never fetches,
+      so this knob disappears rather than needing a better value.
+- [ ] **Enable SRT ingest** (Enterprise, default UDP **4200**) and open that port. Confirm
+      the streamId format the app must mint is `<appName>/<streamId>` (e.g.
+      `WebRTCAppEE/site017`), and settle the per-site AES passphrase + publish-token
+      scheme before any gateway is imaged. Nothing in `src/` speaks SRT yet.
+- [ ] Leave server-side ABR **off** (`settings.encoderSettings=[]`) until the droplet is
+      upgraded. Forced transcoding failed on odd DVR frame dimensions and produced empty
+      HLS playlists; correct DVR config is the primary control, ABR is the later backstop.
 - [ ] Deploy the Python `ai_worker` separately — **see `docs/ai-worker-deploy.md`**
       for the full runbook (Docker, sizing, first-light validation, troubleshooting).
       Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`
@@ -274,12 +304,18 @@ networking chain are all Done as of 2026-08-11.
 
 What is genuinely still open, and why:
 
+**The largest open item is not in this table: the ingest architecture is being reversed
+from RTSP pull to outbound SRT push** (decided 2026-09-15, `docs/streaming-architecture.md`).
+It supersedes several rows below and needs its own Linear epic.
+
 | Issue | State | What remains |
 |---|---|---|
-| **SEC-202** | In Progress | No AMS webhook delivery has been *observed*. Until one is, camera status, drop telemetry and recordings are unproven in production. The instrument now exists (migration 023 → `webhook_deliveries`); what remains is applying it to prod and starting one stream. |
-| **SEC-190** | Todo | Bucket lifecycle window vs `evidence_retention_days` still needs reconciling — see Recordings retention above. This is the item that can lose evidence. |
-| **SEC-192** | Todo | Measured: **≥30 concurrent viewers per stream**, ceiling not reached — see `docs/streaming-capacity.md`. Set `ANTMEDIA_WEBRTC_VIEWER_LIMIT=30` and re-provision, or broadcasts keep AMS's unlimited default. Open: RTMP publish drops every 90–180s (four runs), not yet isolated to network vs server. |
-| **SEC-203** | Backlog | Nothing pages a human when a camera goes dark. Needs a policy decision on the threshold before it can be built. |
+| **licence** | ⚠️ **Overdue** | AMS Enterprise renewal was due **2026-08-24**. SRT ingest, token control and REST JWT auth are Enterprise-only — if it lapsed, the push plan is blocked at the server. Verify before anything else here. |
+| **secrets** | ⚠️ **Overdue** | Rotate the DVR admin password, AMS `jwtSecretKey`, old Opal/GoodCloud passwords, WireGuard keys and the webhook secret — all have appeared in transcripts and been shared externally. Note `jwtSecretKey` = `ANTMEDIA_API_KEY` is **also read by `ai_worker`**; rotate both in one window or the worker 403s silently. |
+| **SEC-202** | In Progress | ⚠️ Premise corrected: the hook **does** fire (~2353 `stream_events` rows). What remains is applying **migration 023** to prod — still unapplied as of 2026-09-15, verified via `migration list --linked` — then starting one stream to capture the real Content-Type and field names. |
+| **SEC-203** | **Promoted — must-have** | Nothing pages a human when a site goes dark, and gateways have gone dark silently more than once. Detection already exists (`liveStreamStarted`/`liveStreamEnded` are mapped); the gap is the "did not re-publish within N seconds" alert. **Still blocked only on choosing N** — ~90–120s is the sane starting range, above SRT's ~800 ms buffer and a procd/systemd respawn. |
+| **SEC-192** | Todo | Measured: **≥30 concurrent viewers per stream**, ceiling not reached — see `docs/streaming-capacity.md`. Set `ANTMEDIA_WEBRTC_VIEWER_LIMIT=30` and re-provision, or broadcasts keep AMS's unlimited default. ✅ The publish-flap half is **closed**: it was the degraded tunnel, not the server. |
+| **SEC-190** | Todo — **not yet live** | Bucket lifecycle vs `evidence_retention_days`. Deferred in practice: **no recordings bucket exists and no recordings exist**, so there is nothing to lose yet. It becomes urgent the day `primex-recordings` is created. |
 | **SEC-129** | Backlog | Stripe live-mode provisioning — parked pending monetisation strategy. |
 | **SEC-148** | — | Web push VAPID keys, if push is wanted at launch. |
 
