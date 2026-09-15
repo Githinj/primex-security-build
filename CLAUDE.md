@@ -11,6 +11,7 @@ Top-level files:
 - `Primex-Mockup (1).jsx` — original standalone UI mockup (historical reference, not wired into the app)
 - `docs/superpowers/` — design specs and implementation plans
 - `docs/go-live-checklist.md` — consolidated deploy checklist (migrations, every env var, provisioning); `docs/stripe-go-live-checklist.md` covers billing specifically
+- `docs/streaming-architecture.md` — 🚨 **the authority on how video reaches the app.** Ingest is moving from RTSP pull to outbound **SRT push** (decided 2026-09-15); the code and every other doc are still behind it. Read this before touching `primex/src/lib/data/actions/streaming.ts`, the camera/stream schema, the AMS webhook, or provisioning
 - `docs/ai-worker-deploy.md` — runbook for the Python detection worker (Docker on a DO droplet, deployed separately from Vercel)
 - `docs/streaming-capacity.md` — measured WebRTC viewer ceiling and the origin/edge plan (SEC-192)
 - `.github/workflows/deploy.yml` — the whole CI pipeline: a push to `master` curls a Vercel deploy hook. No build, lint, typecheck or test gate, so run those locally

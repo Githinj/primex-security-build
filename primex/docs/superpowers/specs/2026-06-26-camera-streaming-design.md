@@ -1,5 +1,13 @@
 # Camera Streaming — Design Spec
 
+> ⛔ **SUPERSEDED (2026-09-15) — historical record, not guidance.**
+> This document describes the **RTSP pull** ingest design (AMS reaching into the
+> customer LAN to fetch a stream). That architecture failed in the field and has been
+> abandoned; ingest is now an **outbound SRT push** from a gateway at the customer site.
+> It also names a DO Spaces bucket, `primex-recordings`, that does not exist.
+> **Authority: `docs/streaming-architecture.md` at the repo root.** Do not implement from
+> this file.
+
 > Primex Security Platform — Phase 2 Streaming
 > Date: 2026-06-26
 

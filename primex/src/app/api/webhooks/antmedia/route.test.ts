@@ -140,7 +140,7 @@ const SECRET = 'test-webhook-secret'
 vi.stubEnv('ANTMEDIA_WEBHOOK_SECRET', SECRET)
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.supabase.co')
 vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
-vi.stubEnv('DO_SPACES_RECORDINGS_BUCKET', 'primex')
+vi.stubEnv('DO_SPACES_RECORDINGS_BUCKET', 'test-recordings')
 vi.stubEnv('DO_SPACES_ENDPOINT', 'sgp1.digitaloceanspaces.com')
 
 const { POST } = await import('./route')
@@ -371,7 +371,7 @@ describe('POST /api/webhooks/antmedia', () => {
     it('builds the file URL from the configured bucket', async () => {
       await post(json(vod))
       expect(db.recordings[0].file_url).toBe(
-        'https://primex.sgp1.digitaloceanspaces.com/recordings/cam-01_2026-08-10.mp4',
+        'https://test-recordings.sgp1.digitaloceanspaces.com/recordings/cam-01_2026-08-10.mp4',
       )
     })
 

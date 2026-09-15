@@ -1,5 +1,13 @@
 # Camera Streaming Implementation Plan
 
+> ⛔ **SUPERSEDED (2026-09-15) — historical record, not guidance.**
+> This document describes the **RTSP pull** ingest design (AMS reaching into the
+> customer LAN to fetch a stream). That architecture failed in the field and has been
+> abandoned; ingest is now an **outbound SRT push** from a gateway at the customer site.
+> It also names a DO Spaces bucket, `primex-recordings`, that does not exist.
+> **Authority: `docs/streaming-architecture.md` at the repo root.** Do not implement from
+> this file.
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add live camera streaming with WebRTC/HLS playback, Ant Media webhook integration, and a recording timeline scrubber to the Primex security platform.

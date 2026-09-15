@@ -51,7 +51,18 @@ To find the real knee, run the harness from several droplets in the same region
 and sum the server-side counts. Run the *publisher* on a droplet too, not from an
 office connection.
 
-## Finding: RTMP publish will not stay up
+## Finding: RTMP publish will not stay up — ✅ RESOLVED 2026-09-15
+
+> **Cause found: the degraded VPN tunnel on the pull path, not the server and not
+> the DVR.** The customer gateway's WAN was on a WiFi-repeater backhaul that
+> flapped; Ant Media's own engineer measured 55% packet loss to the gateway's
+> tunnel IP, and the earlier hardware generation ran at 20–100% loss. That
+> architecture has been abandoned in favour of outbound SRT push — see
+> `docs/streaming-architecture.md`. **Do not re-open this as a server fault.**
+>
+> The viewer-capacity result above is unaffected and still stands. The reasoning
+> below is kept because the *harness* behaviour it describes is still true: a
+> dying publisher still mimics saturation, and that trap outlives its cause.
 
 Reproduced on **four consecutive runs**: an RTMP publish from a laptop to this
 server aborts after roughly 90–180 seconds, with `WSAECONNABORTED` /
@@ -65,12 +76,13 @@ This is what ended each run, and it is more consequential than the number above:
   harness read that as a viewer ceiling of **3**. The harness now detects a
   publisher restart mid-step and marks the run cut short rather than reporting a
   number — worth knowing about before trusting any capacity figure.
-- The production cameras use **RTSP pull** (`streamSource`), where AMS connects
-  outward, so they do not take this path. Any camera moved to **RTMP push**
-  would.
-- It may be the network path from that machine rather than the server. It has not
-  been isolated. Re-test by publishing from a droplet in the same region: if it
-  holds there, the path is the problem; if it drops there too, the server is.
+- ~~The production cameras use **RTSP pull** (`streamSource`), where AMS connects
+  outward, so they do not take this path.~~ **Obsolete:** pull is being removed
+  entirely. Every camera moves to an outbound push, so this path becomes the only
+  path — which is precisely why SRT (with ARQ recovery and automatic reconnect)
+  replaces bare RTMP as the transport.
+- ~~It may be the network path from that machine rather than the server.~~
+  **Settled: it was the path.**
 
 Related: the two live cameras were observed flapping between `broadcasting` and
 `finished` across probes minutes apart, which is consistent with an unstable
