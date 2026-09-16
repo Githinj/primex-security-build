@@ -5,9 +5,9 @@ Stripe-only `docs/stripe-go-live-checklist.md` (still useful for Stripe detail).
 
 > 🚨 **Architecture change (2026-09-15):** camera ingest is moving from RTSP pull to
 > outbound **SRT push**. `docs/streaming-architecture.md` is the authority; where this
-> checklist still assumes pull, that part is legacy and marked 🕸️. Two overdue items now
-> gate the streaming section — the **AMS Enterprise licence** (renewal was due 2026-08-24)
-> and **secrets rotation**. Both are in the tracker at the foot of this document.
+> checklist still assumes pull, that part is legacy and marked 🕸️. The AMS Enterprise
+> licence that gated this section was **renewed 2026-09-16**; **secrets rotation is still
+> overdue**. Both are in the tracker at the foot of this document.
 
 **Snapshot (2026-08-11):** the provisioning backlog that dominated this document
 has been worked through — site networking (SEC-197/198/199/200), the Vercel link
@@ -141,12 +141,14 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
 > 🚨 **Read `docs/streaming-architecture.md` first.** Ingest is moving from RTSP pull to
 > outbound **SRT push** (decided 2026-09-15). Items below that concern the pull path are
 > marked; they are kept for the pilot camera that still runs on it, not as guidance.
-> Two things gate everything else in this section:
-> - **The AMS Enterprise licence renewal was due 2026-08-24 — verify its status.** SRT
->   ingest, token control and the REST JWT auth the provisioning layer uses are all
->   Enterprise-only features.
+> - [x] **AMS Enterprise subscription renewed 2026-09-16.** It had lapsed past its
+>   2026-08-24 date. **Keep the check:** SRT ingest, token control and the REST JWT auth
+>   the provisioning layer uses are all Enterprise-only, and a lapse surfaces only as a
+>   403 on REST — indistinguishable from the IP-allowlist failure below. Re-confirm the
+>   licence before re-deriving that theory.
 > - **The droplet is 2 vCPU / 4 GB, below Ant Media's stated 4 vCPU / 8 GB minimum.**
->   Upgrade before onboarding more sites; plan 8–16 vCPU for 100+ ingests.
+>   This gate is still open: upgrade before onboarding more sites; plan 8–16 vCPU for
+>   100+ ingests.
 
 - [ ] Point `ANTMEDIA_*` at the live server.
 - [ ] **Enable token control for BOTH `play` and `publish`** on the AMS app. AMS
@@ -310,7 +312,7 @@ It supersedes several rows below and needs its own Linear epic.
 
 | Issue | State | What remains |
 |---|---|---|
-| **licence** | ⚠️ **Overdue** | AMS Enterprise renewal was due **2026-08-24**. SRT ingest, token control and REST JWT auth are Enterprise-only — if it lapsed, the push plan is blocked at the server. Verify before anything else here. |
+| **licence** | ✅ **Done 2026-09-16** | AMS Enterprise subscription renewed, clearing the server-side gate on the push plan. Tier/expiry not verified against the AMS dashboard — confirm there before depending on SRT ingest being included. |
 | **secrets** | ⚠️ **Overdue** | Rotate the DVR admin password, AMS `jwtSecretKey`, old Opal/GoodCloud passwords, WireGuard keys and the webhook secret — all have appeared in transcripts and been shared externally. Note `jwtSecretKey` = `ANTMEDIA_API_KEY` is **also read by `ai_worker`**; rotate both in one window or the worker 403s silently. |
 | **SEC-202** | In Progress | ⚠️ Premise corrected: the hook **does** fire (~2353 `stream_events` rows). What remains is applying **migration 023** to prod — still unapplied as of 2026-09-15, verified via `migration list --linked` — then starting one stream to capture the real Content-Type and field names. |
 | **SEC-203** | **Promoted — must-have** | Nothing pages a human when a site goes dark, and gateways have gone dark silently more than once. Detection already exists (`liveStreamStarted`/`liveStreamEnded` are mapped); the gap is the "did not re-publish within N seconds" alert. **Still blocked only on choosing N** — ~90–120s is the sane starting range, above SRT's ~800 ms buffer and a procd/systemd respawn. |
