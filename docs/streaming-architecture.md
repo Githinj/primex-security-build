@@ -186,9 +186,15 @@ Never commit or log any of these.
 
 ## Also open
 
-- **The AMS Enterprise licence renewal was due 2026-08-24.** Verify its status first: SRT
-  ingest, token control and the REST JWT auth the provisioning layer depends on are all
-  Enterprise-only. If the licence lapsed, push does not work any better than pull did.
+- ✅ **AMS Enterprise subscription renewed (2026-09-16)** — it had lapsed past its
+  2026-08-24 renewal date, which would have blocked the push plan at the server. **The
+  check is kept, not the alarm:** SRT ingest, token control and the REST JWT auth the
+  provisioning layer depends on are all Enterprise-only, so a lapse is silent from the
+  app's side until a REST call starts returning 403 — which looks identical to the IP
+  allowlist problem. If Enterprise features misbehave, re-confirm the licence before
+  re-deriving that theory. Renewal terms (tier, expiry, whether SRT ingest is included in
+  the plan purchased) were not verified against the server in the session that recorded
+  this — confirm against the AMS dashboard before relying on them.
 - **There is no recordings bucket.** `primex-recordings` — the name in `.env.example`, the
   specs and both `CLAUDE.md` files — is unprovisioned on this account. The bucket named
   `primex` in `sgp1` **belongs to a third party; never point anything at it.** Create

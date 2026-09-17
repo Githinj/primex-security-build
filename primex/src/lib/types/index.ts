@@ -7,7 +7,10 @@ export type AlertStatus = 'New' | 'Reviewing' | 'Escalated' | 'Closed'
 export type IncidentStatus = 'Open' | 'In Progress' | 'Dispatched' | 'Resolved' | 'Closed'
 export type GuardStatus = 'Available' | 'On Incident' | 'Off-duty'
 export type UserRole = 'super_admin' | 'company_manager' | 'dispatcher' | 'guard' | 'client'
-export type DetectionEventType = 'motion_afterhours' | 'person_lingering' | 'concealment_behavior' | 'door_event' | 'vehicle_detection'
+// No `door_event` (SEC-166): YOLO's COCO classes contain no door, so nothing can
+// emit it. The Postgres enum still carries the value — see migration 024 for why
+// it cannot simply be dropped — but no code path produces or maps one.
+export type DetectionEventType = 'motion_afterhours' | 'person_lingering' | 'concealment_behavior' | 'vehicle_detection'
 export type PlanTier = 'starter' | 'professional' | 'enterprise'
 // Mirrors Stripe subscription statuses.
 export type SubscriptionStatus =
@@ -119,7 +122,6 @@ export interface AiWorkerConfig {
   snapshot_interval_s: number
   cooldown_s: number
   dwell_threshold_s: number
-  door_open_threshold_s: number
   updated_at: string
 }
 
