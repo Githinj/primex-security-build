@@ -1,0 +1,61 @@
+-- 024_drop_door_event_residue.sql
+-- Remove the dead `door_event` detection path's database residue (SEC-166)
+--
+-- WHY THIS EXISTS
+--
+-- `door_event` could never fire. The worker's `BehaviorTracker` had a state
+-- machine and a `door_open_threshold_s` knob for it, but YOLO's COCO classes
+-- contain no door, so no detection could ever drive that state. SEC-166 removed
+-- the worker-side code. The database and edge function kept advertising the
+-- feature: the enum value, this column, and a "Door left open" entry in
+-- `ai-event-ingest`'s EVENT_MAP that would happily mint that alert for anything
+-- posting the string. The edge function entry is removed alongside this
+-- migration, so nothing can produce a `door_event` alert any more.
+--
+-- Verified 2026-09-17 against production: zero `alerts` rows carry
+-- `event_type = 'door_event'` (in fact zero rows carry any `event_type` — the
+-- AI worker has never run in production).
+
+-- ─── The dead knob ────────────────────────────────────────
+--
+-- Nothing reads this. `config.py` loads only confidence_threshold,
+-- snapshot_interval_s, cooldown_s and dwell_threshold_s; the Settings UI
+-- (`src/lib/ai-worker-config.ts`) never exposed it. Dropping it keeps the
+-- singleton config row honest about what is actually tunable.
+
+ALTER TABLE ai_worker_config DROP COLUMN IF EXISTS door_open_threshold_s;
+
+-- ─── The enum value is deliberately LEFT IN PLACE ─────────
+--
+-- `detection_event_type` still contains 'door_event', and that is a considered
+-- decision rather than an oversight.
+--
+-- Postgres has no `ALTER TYPE ... DROP VALUE`. Removing it means renaming the
+-- type, creating a replacement, re-typing `alerts.event_type`, and dropping the
+-- old type — which additionally requires dropping and recreating
+-- `create_alert_with_incident()` (migration 004), because that function's
+-- `p_event_type` parameter binds the old type's OID and would block the DROP.
+-- That function is SECURITY DEFINER and is the single write path for every
+-- alert and incident in the product, AI-sourced or not.
+--
+-- That swap is not something to land untested, and it could not be tested here:
+-- this machine has no Docker, so no local Supabase stack to run it against.
+-- Shipping an untested rewrite of the alert-creation function to remove an inert
+-- enum label is a bad trade.
+--
+-- The value is inert. No producer can emit it (SEC-166), and `ai-event-ingest`
+-- now rejects it as an unrecognised type rather than mapping it to an alert.
+-- It costs one unused label in a type listing.
+--
+-- If it is ever worth removing, do it on a branch with a local stack up, in this
+-- order, and reset the DB to prove it:
+--
+--   1. assert `SELECT count(*) FROM alerts WHERE event_type = 'door_event'` is 0
+--   2. DROP FUNCTION create_alert_with_incident(...)   -- full signature
+--   3. ALTER TYPE detection_event_type RENAME TO detection_event_type_old
+--   4. CREATE TYPE detection_event_type AS ENUM (the four surviving values)
+--   5. ALTER TABLE alerts ALTER COLUMN event_type TYPE detection_event_type
+--        USING event_type::text::detection_event_type
+--   6. recreate create_alert_with_incident() verbatim from migration 004
+--   7. DROP TYPE detection_event_type_old
+--   8. re-GRANT EXECUTE if the recreate changed the owner

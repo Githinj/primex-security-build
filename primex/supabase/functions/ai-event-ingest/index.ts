@@ -1,11 +1,17 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// `door_event` is deliberately absent (SEC-166). The worker cannot produce it —
+// YOLO's COCO classes contain no door, so `BehaviorTracker` dropped the state
+// machine and its `door_open_threshold_s` knob. Listing it here meant this
+// endpoint would still mint a "Door left open" alert for anything that posted
+// the string, which is now the only way such an alert could ever exist. An
+// unrecognised type is rejected, so that path is closed rather than dormant.
+// Do not re-add without a detector that can actually see a door.
 const VALID_EVENT_TYPES = [
   'motion_afterhours',
   'person_lingering',
   'concealment_behavior',
-  'door_event',
   'vehicle_detection',
 ] as const
 
@@ -15,7 +21,6 @@ const EVENT_MAP: Record<EventType, { title: string; severity: string }> = {
   motion_afterhours: { title: 'After-hours motion detected', severity: 'Critical' },
   person_lingering: { title: 'Person lingering detected', severity: 'Warning' },
   concealment_behavior: { title: 'Suspicious concealment detected', severity: 'Critical' },
-  door_event: { title: 'Door left open', severity: 'Warning' },
   vehicle_detection: { title: 'Vehicle in restricted zone', severity: 'Info' },
 }
 
