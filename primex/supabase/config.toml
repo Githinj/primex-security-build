@@ -315,6 +315,33 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# ─── Edge functions ───────────────────────────────────────────────────────────
+#
+# Both of these are called by the Python AI worker, which authenticates with a
+# SHARED SECRET, not a Supabase JWT: it sends `Authorization: Bearer
+# <AI_WORKER_SECRET>` and each function compares that against its own env var.
+#
+# `verify_jwt` defaults to TRUE, and with it on the platform tries to validate
+# that header as a JWT and rejects the request *before* the function runs. The
+# function's own auth code never executes, and the worker sees a 401 that looks
+# exactly like a wrong secret rather than a wrong deploy flag.
+#
+# So these must deploy with verify_jwt disabled. Pinning it here means a plain
+# `supabase functions deploy <name>` keeps working — without it, the setting
+# lives only in whoever last remembered to pass `--no-verify-jwt`, and the next
+# deploy silently breaks ingestion.
+#
+# This is NOT an unauthenticated endpoint. Both functions fail closed when
+# AI_WORKER_SECRET is unset (500, every request refused) rather than degrading
+# to open, because they write with the service-role key — see the comments in
+# each function.
+
+[functions.ai-event-ingest]
+verify_jwt = false
+
+[functions.camera-heartbeat]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

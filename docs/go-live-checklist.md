@@ -269,14 +269,31 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
       for the full runbook (Docker, sizing, first-light validation, troubleshooting).
       Its own env; Community Edition works after SEC-138, Enterprise needs `ANTMEDIA_API_KEY`
       byte-identical to the app's.
-- [ ] `supabase functions deploy ai-event-ingest` **and**
-      `supabase functions deploy camera-heartbeat`, then set `AI_WORKER_SECRET` as a
-      Supabase secret — the worker's POSTs 401 without it, and both functions fail
-      closed when it is unset rather than accepting anonymous writes.
+- [x] `supabase functions deploy ai-event-ingest` — **deployed 2026-09-17**
+      (`verify_jwt: false`, version 1). Before this, **zero** edge functions existed on
+      the project: `functions list` returned `[]`, so the AI layer had no ingestion
+      endpoint at all and every worker POST would have 404'd into `missed_events.jsonl`.
+- [ ] `supabase functions deploy camera-heartbeat` — still **not deployed**.
       `camera-heartbeat` is what makes `cameras.last_frame_at` mean "we saw a frame"
       instead of "Ant Media said something" (SEC-204). Skipping it is not fatal —
       the worker logs a warning and carries on detecting — but the column stays
       dead and every beat writes a 404 to the worker log.
+- [ ] ⚠️ **Both functions must deploy with `verify_jwt` disabled** — now pinned in
+      `supabase/config.toml` (`[functions.*] verify_jwt = false`), so a plain
+      `functions deploy` is correct and no flag needs remembering. **The trap, kept:**
+      the worker authenticates with a shared secret (`Authorization: Bearer
+      <AI_WORKER_SECRET>`), not a Supabase JWT. `verify_jwt` defaults to *true*, and
+      with it on the platform rejects that header as a malformed JWT **before the
+      function runs** — so the function's own auth never executes and the worker sees a
+      401 indistinguishable from a wrong secret. If ingestion ever 401s, check this
+      before suspecting the secret.
+- [ ] **Set `AI_WORKER_SECRET`** as a Supabase secret — as of 2026-09-17 only the
+      auto-provided `SUPABASE_DB_URL` exists, so **both functions currently refuse every
+      request with a 500**. That is deliberate: they write with the service-role key and
+      fail closed rather than degrade to unauthenticated alert injection. Generate it
+      where it will not be captured in a transcript or log
+      (`npx supabase secrets set AI_WORKER_SECRET=$(openssl rand -hex 32)`), and put the
+      identical value in `ai_worker/.env`. A mismatch is a 401 on every event.
 - [ ] Add the worker droplet's IP to the **Ant Media REST allowlist**, or every
       Enterprise snapshot fetch 403s and the worker detects nothing while looking healthy.
 
