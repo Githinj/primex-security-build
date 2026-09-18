@@ -27,10 +27,10 @@ an unset value makes a feature stay dark rather than break.
 
 ## 1. Database migrations
 
-Local is at `023`. `023` adds `webhook_deliveries` (the SEC-202 instrument —
-nothing else depends on it, but SEC-202 cannot be closed until it is applied);
-`021`/`022` add the pg_cron + pg_net camera-reconciliation schedule; `020` adds
-the evidentiary hold.
+Local and remote are both at `024` as of 2026-09-17. `024` drops the dead
+`door_open_threshold_s` column (SEC-166); `023` added `webhook_deliveries`, the
+SEC-202 instrument; `021`/`022` add the pg_cron + pg_net camera-reconciliation
+schedule; `020` adds the evidentiary hold.
 
 ```bash
 cd primex
@@ -38,8 +38,8 @@ npx supabase migration list          # anything local-only is pending
 npx supabase db push
 ```
 
-- [ ] Confirm remote is at `023`. `migration list` is the only source of truth —
-      this line has been wrong before.
+- [x] Remote confirmed at `024` (2026-09-17). `migration list` is the only source of
+      truth — **this line has been wrong before**, so re-run it rather than trusting it.
 - [ ] Seed data is **not** deployed by `db push`. Prod accounts were created
       individually (SEC-195), *not* by running `seed.sql` — that file inserts
       fixtures with fixed UUIDs into what is now a live tenant. Do not run it here.
@@ -186,10 +186,10 @@ Legend: 🔑 secret (never `NEXT_PUBLIC_`) · 🌐 public · ⚙️ required · 
         Connect from the camera detail page is the repair path.
       - Optionally set `settings.listenerHookURL` in the app's
         `WEB-INF/red5-web.properties` as a server-wide default.
-      - Then confirm end to end. **Migration 023 must be applied first** — it adds
-        `webhook_deliveries`, which the route writes on *every* delivery, including
-        the two that previously vanished into the Vercel log (an unparseable body,
-        and an id matching no camera). Start a stream, then:
+      - Then confirm end to end. **Migration 023 was applied 2026-09-15**, so
+        `webhook_deliveries` exists in prod — the route writes it on *every* delivery,
+        including the two that previously vanished into the Vercel log (an unparseable
+        body, and an id matching no camera). Start a stream, then:
 
         ```sql
         SELECT created_at, outcome, content_type, action, stream_id, body_keys
@@ -308,13 +308,13 @@ What is genuinely still open, and why:
 
 **The largest open item is not in this table: the ingest architecture is being reversed
 from RTSP pull to outbound SRT push** (decided 2026-09-15, `docs/streaming-architecture.md`).
-It supersedes several rows below and needs its own Linear epic.
+It supersedes several rows below and needs its own Linear epic. **For the order this and everything else happens in, see [`roadmap.md`](./roadmap.md)** — this table owns per-issue state, that file owns sequencing.
 
 | Issue | State | What remains |
 |---|---|---|
 | **licence** | ✅ **Done 2026-09-16** | AMS Enterprise subscription renewed, clearing the server-side gate on the push plan. Tier/expiry not verified against the AMS dashboard — confirm there before depending on SRT ingest being included. |
 | **secrets** | ⚠️ **Overdue** | Rotate the DVR admin password, AMS `jwtSecretKey`, old Opal/GoodCloud passwords, WireGuard keys and the webhook secret — all have appeared in transcripts and been shared externally. Note `jwtSecretKey` = `ANTMEDIA_API_KEY` is **also read by `ai_worker`**; rotate both in one window or the worker 403s silently. |
-| **SEC-202** | In Progress | ⚠️ Premise corrected: the hook **does** fire (~2353 `stream_events` rows). What remains is applying **migration 023** to prod — still unapplied as of 2026-09-15, verified via `migration list --linked` — then starting one stream to capture the real Content-Type and field names. |
+| **SEC-202** | In Progress | ⚠️ Premise corrected: the hook **does** fire (~2353 `stream_events` rows). Migration **023 was applied to prod on 2026-09-15** (and 024 on 2026-09-17), so `webhook_deliveries` exists and the instrument is live — the earlier "still unapplied" note here was stale within two days, which is why sequencing lives in [`roadmap.md`](./roadmap.md) and not in a second table. What remains is starting one stream and reading the real `Content-Type` and field names off it. Expect zero rows until something publishes: the pilot camera has been silent since 2026-08-12. |
 | **SEC-203** | **Promoted — must-have** | Nothing pages a human when a site goes dark, and gateways have gone dark silently more than once. Detection already exists (`liveStreamStarted`/`liveStreamEnded` are mapped); the gap is the "did not re-publish within N seconds" alert. **Still blocked only on choosing N** — ~90–120s is the sane starting range, above SRT's ~800 ms buffer and a procd/systemd respawn. |
 | **SEC-192** | Todo | Measured: **≥30 concurrent viewers per stream**, ceiling not reached — see `docs/streaming-capacity.md`. Set `ANTMEDIA_WEBRTC_VIEWER_LIMIT=30` and re-provision, or broadcasts keep AMS's unlimited default. ✅ The publish-flap half is **closed**: it was the degraded tunnel, not the server. |
 | **SEC-190** | Todo — **not yet live** | Bucket lifecycle vs `evidence_retention_days`. Deferred in practice: **no recordings bucket exists and no recordings exist**, so there is nothing to lose yet. It becomes urgent the day `primex-recordings` is created. |

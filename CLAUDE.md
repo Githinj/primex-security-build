@@ -10,6 +10,7 @@ Top-level files:
 - `Primex-Build-Plan.md` — original project specification (historical, stack has since changed to Next.js + Supabase)
 - `Primex-Mockup (1).jsx` — original standalone UI mockup (historical reference, not wired into the app)
 - `docs/superpowers/` — design specs and implementation plans
+- `docs/roadmap.md` — **what to do next and in what order** across the streaming, AI-detection and go-live tracks, with the critical path called out. Sequencing only; it links out rather than restating detail
 - `docs/go-live-checklist.md` — consolidated deploy checklist (migrations, every env var, provisioning); `docs/stripe-go-live-checklist.md` covers billing specifically
 - `docs/streaming-architecture.md` — 🚨 **the authority on how video reaches the app.** Ingest is moving from RTSP pull to outbound **SRT push** (decided 2026-09-15); the code and every other doc are still behind it. Read this before touching `primex/src/lib/data/actions/streaming.ts`, the camera/stream schema, the AMS webhook, or provisioning
 - `docs/ai-worker-deploy.md` — runbook for the Python detection worker (Docker on a DO droplet, deployed separately from Vercel)
